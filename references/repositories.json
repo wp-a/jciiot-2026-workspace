@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-07-22",
+  "repositories": [
+    {
+      "id": "robomimic",
+      "category": "direct-candidate",
+      "url": "https://github.com/ARISE-Initiative/robomimic.git",
+      "branch": "master",
+      "commit": "e10526b9a40c78b41f1e37e60041dc0ec0a5f60f",
+      "license": "MIT",
+      "competition_use": "adopt-candidate",
+      "sparse_paths": []
+    },
+    {
+      "id": "pythonrobotics",
+      "category": "direct-candidate",
+      "url": "https://github.com/AtsushiSakai/PythonRobotics.git",
+      "branch": "master",
+      "commit": "b38c510e083d69a5755d98d0680bd50f3d9a91fa",
+      "license": "MIT-LICENSE-FILE",
+      "competition_use": "algorithm-reference",
+      "sparse_paths": [
+        "PathPlanning/AStar",
+        "PathPlanning/ThetaStar",
+        "PathPlanning/DStarLite",
+        "PathPlanning/BSplinePath",
+        "PathPlanning/CubicSpline"
+      ]
+    },
+    {
+      "id": "py_trees",
+      "category": "direct-candidate",
+      "url": "https://github.com/splintered-reality/py_trees.git",
+      "branch": "devel",
+      "commit": "48d0f7afe23dc67d591003740667cacb4c164937",
+      "license": "BSD-3-Clause",
+      "competition_use": "adopt-candidate",
+      "sparse_paths": []
+    },
+    {
+      "id": "multimodal_bt",
+      "category": "planning-reference",
+      "url": "https://github.com/cristianobattistini/multimodal-bt-generation.git",
+      "branch": "main",
+      "commit": "49969844dfd930a57280b0a0ae8174b377ba2b47",
+      "license": "MIT",
+      "competition_use": "research-only",
+      "sparse_paths": [
+        "behavior_integration",
+        "embodied_bt_brain",
+        "processing",
+        "prompts",
+        "config"
+      ]
+    },
+    {
+      "id": "kios",
+      "category": "planning-reference",
+      "url": "https://github.com/ProNeverFake/kios.git",
+      "branch": "main",
+      "commit": "e9f16f5bd110ab647242077d55d5cb0a71e4fcd9",
+      "license": "MIT",
+      "competition_use": "design-reference",
+      "sparse_paths": []
+    },
+    {
+      "id": "mimiclabs",
+      "category": "data-reference",
+      "url": "https://github.com/GaTech-RL2/mimiclabs.git",
+      "branch": "main",
+      "commit": "0b81d7e8cc077de3a6da4cd02ffe6c605c793d9a",
+      "license": "MIT-WITH-DEPENDENCY-REVIEW",
+      "competition_use": "research-only",
+      "sparse_paths": [
+        "mimiclabs/data_collection",
+        "mimiclabs/mimicgen",
+        "docs"
+      ]
+    },
+    {
+      "id": "cpgen",
+      "category": "data-reference",
+      "url": "https://github.com/kevin-thankyou-lin/cpgen.git",
+      "branch": "main",
+      "commit": "1e7c1fc4a467c7678c8542ca762e332d1757d8d5",
+      "license": "MIT-WITH-DEPENDENCY-REVIEW",
+      "competition_use": "research-only",
+      "sparse_paths": []
+    },
+    {
+      "id": "ok_robot",
+      "category": "architecture-reference",
+      "url": "https://github.com/ok-robot/ok-robot.git",
+      "branch": "main",
+      "commit": "174c742b6a1866a2da8f75a89e2c544bb77ab5f9",
+      "license": "MIT-WITH-RESTRICTED-COMPONENTS",
+      "competition_use": "architecture-only",
+      "sparse_paths": [
+        "ok-robot-navigation"
+      ]
+    },
+    {
+      "id": "act_plus_plus",
+      "category": "policy-reference",
+      "url": "https://github.com/MarkFzp/act-plus-plus.git",
+      "branch": "main",
+      "commit": "26bab0789d05b7496bacef04f5c6b2541a4403b5",
+      "license": "MIT",
+      "competition_use": "research-only",
+      "sparse_paths": []
+    },
+    {
+      "id": "mobilemanibench",
+      "category": "evaluation-reference",
+      "url": "https://github.com/DexHand/MobileManiBench.git",
+      "branch": "main",
+      "commit": "135466638d379c642f0c3f1742e6c20091b203c7",
+      "license": "BSD-3-Clause",
+      "competition_use": "research-only",
+      "sparse_paths": [
+        "unimanip/rsl_ppo"
+      ]
+    },
+    {
+      "id": "robomonkey",
+      "category": "verification-reference",
+      "url": "https://github.com/robomonkey-vla/RoboMonkey.git",
+      "branch": "main",
+      "commit": "db9f8d314ea78e986f515617ac43afc58f984a53",
+      "license": "MIT",
+      "competition_use": "research-only",
+      "sparse_paths": [
+        "monkey-verifier",
+        "scripts"
+      ]
+    },
+    {
+      "id": "jciiot_qisheng",
+      "category": "competition-comparison",
+      "url": "https://github.com/QiShengZhao/JCIIOT2026.git",
+      "branch": "master",
+      "commit": "95fa2bedc3b4bc286cb86258169bde046090d065",
+      "license": "NOASSERTION",
+      "competition_use": "comparison-only-do-not-copy",
+      "sparse_paths": [
+        "JCIIOT/scripts",
+        "docs/superpowers/specs"
+      ]
+    }
+  ]
+}
