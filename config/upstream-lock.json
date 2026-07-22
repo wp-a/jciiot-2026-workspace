@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "audited_at": "2026-07-22T17:30:00+08:00",
+  "repository": {
+    "name": "JCIIOT2026/JCIIOT2026",
+    "url": "https://github.com/JCIIOT2026/JCIIOT2026.git",
+    "branch": "master",
+    "commit": "f4ab8fd2158b919a41b2ce350432259cd1ee6a11",
+    "commit_date": "2026-07-22T17:17:47+08:00",
+    "local_path": "vendor/JCIIOT2026"
+  },
+  "tracked_files": [
+    {
+      "path": "JCIIOT/app.py",
+      "sha256": "fb51f03b10f2e1cb0e30fdfb3e29a6905c02bfa0280c39430f105deb74d5211b",
+      "role": "official scorer and application"
+    },
+    {
+      "path": "JCIIOT/README.md",
+      "sha256": "a4b4dea87946bef8ec225169c39e29a97604dccfc5eff3cf8c5636ebbbbecd3d",
+      "role": "contestant manual and modification boundary"
+    },
+    {
+      "path": "ERRATUM.md",
+      "sha256": "65a9c2398cc3873629284ef87fe75b7b97d8f07d762eb1a62646d246c849d6bc",
+      "role": "SOP corrections"
+    },
+    {
+      "path": "JCIIOT/knowledge/task_config.json",
+      "sha256": "94cf60c228a1c541d6a16e9d2ad64c5ef89daf148e53171dfa1329468b4b989a",
+      "role": "locked task mapping"
+    },
+    {
+      "path": "JCIIOT/knowledge/robot_params.json",
+      "sha256": "bd2c739c003d233c9f760f0ea11034ef55136c5f02bc9113e01682091d11e0df",
+      "role": "allowed parameter baseline"
+    }
+  ],
+  "allowed_modification_roots": [
+    "JCIIOT/src/robot_agent/skills/",
+    "JCIIOT/src/robot_agent/workflows/",
+    "JCIIOT/knowledge/robot_params.json"
+  ],
+  "prohibited_modification_roots": [
+    "JCIIOT/src/robot_agent/core/",
+    "JCIIOT/src/robot_agent/environments/",
+    "JCIIOT/app.py",
+    "JCIIOT/knowledge/task_config.json"
+  ]
+}
