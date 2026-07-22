@@ -35,4 +35,4 @@ experiments/runs/
 vendor/JCIIOT2026
 
 # External source checkouts are pinned in references/repositories.json.
-references/repos/
+references/repos
