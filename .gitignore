@@ -1,0 +1,27 @@
+.DS_Store
+.worktrees/
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.py[cod]
+
+data/*
+!data/README.md
+artifacts/*
+!artifacts/README.md
+experiments/runs/
+
+*.pth
+*.pt
+*.ckpt
+*.hdf5
+*.h5
+*.zip
+*.mp4
+*.gif
+*.log
+
+# The upstream baseline is a nested Git checkout and is managed separately.
+vendor/JCIIOT2026/

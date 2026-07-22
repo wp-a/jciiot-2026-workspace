@@ -1,0 +1,1 @@
+experiment_id,date,baseline_commit,solution_commit,scene,seed,change,checkpoint,score,max_score,task_success,grasp_success,arrival_success,collision,elapsed_s,path_length_m,retries,trajectory_path,notes

@@ -1,0 +1,75 @@
+{
+  "snapshot_date": "2026-07-22",
+  "official_commit": "f4ab8fd2158b919a41b2ce350432259cd1ee6a11",
+  "coordinate_frame": "official semantic-map world XY in metres",
+  "scoring": {
+    "objective_weight_percent": 60,
+    "innovation_weight_percent": 40,
+    "departure_threshold_m": 1.0,
+    "arrival_xy_threshold_m": 0.8,
+    "collision_penalty": 5,
+    "time_usage": "tie-break only",
+    "strict_compatibility_policy": "Emit a successful grasp_end event and satisfy both source-centre and true-spawn departure interpretations."
+  },
+  "tasks": [
+    {
+      "level": "L1",
+      "scene": "FactorySorting1_3FO3ERFHISEM",
+      "human_prompt": "Pick Station 2 -> Place Station 3",
+      "source": "input_5",
+      "source_center_xy": [7.186, 3.938],
+      "target": "output_4",
+      "target_center_xy": [-0.166, -7.29],
+      "objects": ["line_5_container_h01_near"],
+      "max_score": 10
+    },
+    {
+      "level": "L2",
+      "scene": "FactorySorting3_3FO3ERRPH7X9",
+      "human_prompt": "Pick Station 1 -> Place Station 3",
+      "source": "input_6",
+      "source_center_xy": [11.937, 3.932],
+      "target": "output_4",
+      "target_center_xy": [-0.166, -7.29],
+      "objects": ["green_tote_b01_upper"],
+      "max_score": 15
+    },
+    {
+      "level": "L3",
+      "scene": "FactorySorting5_3FO3ERTPXEUT",
+      "human_prompt": "Pick Station 1 / Placement Point 1 -> Place Station 2",
+      "source": "input_6",
+      "source_center_xy": [11.937, 3.932],
+      "target": "output_5",
+      "target_center_xy": [4.872, -7.261],
+      "objects": ["orange_tote_b01_upper"],
+      "max_score": 20
+    },
+    {
+      "level": "L4",
+      "scene": "FactorySorting7_3FO3ERFKY9RN",
+      "human_prompt": "Pick Station 5 -> Place Station 2",
+      "source": "input_2",
+      "source_center_xy": [-9.761, 5.01],
+      "target": "output_5",
+      "target_center_xy": [4.872, -7.261],
+      "objects": ["blue_container_h01_back_upper"],
+      "max_score": 25
+    },
+    {
+      "level": "L5",
+      "scene": "FactorySorting9_3FO3ERT2C5FP",
+      "human_prompt": "Pick Station 6 -> Place Station 1; move all three white totes",
+      "source": "input_1",
+      "source_center_xy": [-14.544, 5.01],
+      "target": "output_6",
+      "target_center_xy": [10.032, -7.267],
+      "objects": [
+        "white_tote_b01_left_center",
+        "white_tote_b01_left_front",
+        "white_tote_b01_left_back"
+      ],
+      "max_score": 30
+    }
+  ]
+}
