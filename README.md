@@ -15,14 +15,16 @@
 
 ## 从这里开始
 
-1. [比赛简报](docs/00-competition-brief.md)：规则、赛程、任务和交付物。
-2. [官方基线审计](docs/01-official-baseline-audit.md)：代码结构、评分实现、限制与已发现风险。
-3. [最新技术地图](docs/02-technology-landscape.md)：2025-2026 可用技术及与本赛题的适配度。
-4. [竞赛技术路线](docs/03-winning-strategy.md)：分阶段方案、实验门槛与优先级。
-5. [资料索引](docs/04-source-index.md)：官网、代码、直播、论文与官方文档。
-6. [待确认问题](docs/05-open-questions.md)：需要在官方群向组委会确认的规则冲突。
-7. [提交合规清单](docs/06-submission-compliance.md)：组队、依赖、复现、报告和发布要求。
-8. [检索记录](research/search-log.md)：检索范围、查询词和证据限制。
+1. [当前状态](STATUS.md)：当前阶段、阻塞、下一里程碑和更新规则。
+2. [比赛简报](docs/00-competition-brief.md)：规则、赛程、任务和交付物。
+3. [官方基线审计](docs/01-official-baseline-audit.md)：代码结构、评分实现、限制与已发现风险。
+4. [最新技术地图](docs/02-technology-landscape.md)：2025-2026 可用技术及与本赛题的适配度。
+5. [竞赛技术路线](docs/03-winning-strategy.md)：分阶段方案、实验门槛与优先级。
+6. [同类项目调研](docs/07-similar-projects.md)：公开仓库、可复用内容、成本和许可证风险。
+7. [模块路线图](docs/08-module-roadmap.md)：SOP、编排、导航、抓放、恢复、数据与评测的优化顺序。
+8. [资料索引](docs/04-source-index.md)和[来源台账](research/source-ledger.csv)：网页、代码、论文、固定版本和采用状态。
+9. [架构决策](decisions/README.md)：路线选择和第三方代码隔离政策。
+10. [提交合规清单](docs/06-submission-compliance.md)：组队、依赖、复现、报告和发布要求。
 
 ## 工作区结构
 
@@ -30,11 +32,31 @@
 config/       已核对的任务事实和评分约束
 docs/         比赛与技术调研文档
 research/     检索记录和后续论文笔记
+decisions/    不覆盖历史的架构与合规决策记录
+references/   外部项目 manifest；实际 checkout 不入顶层 Git
 experiments/  实验协议与结果日志
 src/          后续自研代码入口，当前不放占位实现
 data/         数据说明；大文件不入库
 artifacts/    轨迹、模型和评测产物说明；大文件不入库
 vendor/       官方基线的只读快照
+tests/        工作空间管理脚本的离线测试
+```
+
+## 常用命令
+
+```bash
+# 下载或更新固定版本参考仓库，不下载 Git LFS/模型/数据
+bash scripts/fetch_references.sh
+
+# 校验参考仓库的 origin、commit 和干净状态
+bash scripts/check_references.sh
+
+# 校验资料、来源、上游哈希、忽略规则和禁跟踪文件
+bash scripts/check_workspace.sh
+
+# 运行工作空间管理脚本测试
+bash tests/test_reference_scripts.sh
+bash tests/test_workspace_check.sh
 ```
 
 ## 上游状态
