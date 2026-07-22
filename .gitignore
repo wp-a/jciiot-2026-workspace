@@ -19,9 +19,20 @@ experiments/runs/
 *.hdf5
 *.h5
 *.zip
+*.tar
+*.tar.gz
 *.mp4
+*.mov
+*.avi
 *.gif
 *.log
+*.onnx
+*.safetensors
+*.npy
+*.npz
 
 # The upstream baseline is a nested Git checkout and is managed separately.
-vendor/JCIIOT2026/
+vendor/JCIIOT2026
+
+# External source checkouts are pinned in references/repositories.json.
+references/repos/
