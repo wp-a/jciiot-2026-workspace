@@ -1,6 +1,6 @@
 # 官方基线审计
 
-审计对象：官方仓库提交 `f4ab8fd2158b919a41b2ce350432259cd1ee6a11`（2026-07-22）。
+审计对象：官方仓库提交 `f4ab8fd2158b919a41b2ce350432259cd1ee6a11`（2026-07-22）；2026-07-26 增量再审计至 `f948609f2f281176272287fa991fce96d1f9ff98`，见文末补遗。
 
 ## 架构
 
@@ -80,6 +80,16 @@ Planner 让 LLM 输出严格结构化 JSON，但示例主路径被压成固定�
 ## 环境注意事项
 
 - 官方推荐 Python 3.11，并需安装项目自身、内嵌 robosuite 及 requirements。
-- 本机当前没有 Git LFS；官方 `.pth`、`.hdf5`、`.zip` 由 LFS 管理，轻量快照中的指针不能替代权重。
+- 官方 `.pth`、`.hdf5`、`.zip` 由 LFS 管理，轻量快照中的指针不能替代权重。
 - macOS 的 MuJoCo 可视 viewer 与普通 Python 子进程可能冲突；批量实验宜使用正确配置的 offscreen 渲染或 Linux GPU 环境。
 - 官方参考硬件是 Linux + RTX 4090 级别。正式复现应记录操作系统、CPU/GPU、驱动、MuJoCo 后端与随机种子。
+
+## 2026-07-26 增量再审计（f4ab8fd → f948609）
+
+改动范围：`app.py`（+73/-31）、`knowledge/task_config.json`（+28/-12）、`skills/pick_up.py`（+14/-2）、`task_subprocess_runner.py`（+14/-2）。`ERRATUM.md`、`README.md`、`robot_params.json` 无变化。
+
+1. **候选物体机制**：每关 `object` 改为数组；`_object_name_matches` 对候选做双向子串匹配，空名或空列表视为通过。成功 `grasp_end` 事件记录的物体名优先作为计分对象；无事件时兜底“距目标最近”只在候选内选取。抓取门控本身没有放松，先前“两种离开口径都要满足”的策略保持不变。
+2. **L3 目标物体更换**：`orange_tote_b01_upper` → `blue_tote_b01_far_right` / `blue_tote_b01_near_right`（源/目标工位不变）。旧物体名的固定计划、抓取位姿和 SOP 笔记必须迁移。
+3. **技能侧取主物体**：`pick_up.py` 与 `task_subprocess_runner.py` 用 `_primary_object_name` 取数组第一项，意味着官方管线默认仍抓第一个候选；把候选选择做成决策点（按可达性/抓取可靠性挑选）是合规的差异化空间。
+4. 注释乱码修复无行为影响。
+5. **LFS 配额超限（运维风险）**：上游 GitHub 仓库当前返回 "exceeded its LFS budget"，`model_epoch_150.pth`、示例 `.hdf5`、USD `.zip` 拉取失败。经核对：桌面网格 zip 仅是建模源档案，MJCF 未引用，解压后 `.obj/.stl`（3996 个）均为普通 git 对象且完整；USD 仅用于 Isaac 可视化。**仿真运行不被阻塞**，但 BC 权重必须自训或向组委会索取。建议在官方群反馈配额问题并留存记录。

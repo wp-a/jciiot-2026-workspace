@@ -44,7 +44,7 @@
 
 ### 必须兼容的评分口径冲突
 
-比赛说明文档把“离开”描述为相对物体初始位置，且没有写抓取事件门控；当前官方 `app.py`（提交 `f4ab8fd...`）则要求匹配的 `grasp_end` 成功事件，并按源工位中心计算位移。L5 也只在成功抓取后检查三件物体。
+比赛说明文档把“离开”描述为相对物体初始位置，且没有写抓取事件门控；当前官方 `app.py`（提交 `f948609...`，2026-07-26）则要求匹配的 `grasp_end` 成功事件，并按源工位中心计算位移。L5 也只在成功抓取后检查三件物体。f948609 起物体匹配改为对候选物体列表做双向子串匹配，成功抓取的物体优先参与计分，兜底“取距目标最近物体”也只在候选列表内选择。
 
 工程上不应赌某一口径。所有正式轨迹都要同时满足：
 
@@ -57,11 +57,11 @@
 
 | 关卡 | 场景 | SOP 表述 | 内部源/目标 | 目标物体 | 分值 |
 |---|---|---|---|---|---:|
-| L1 | FactorySorting1 | Pick 2 -> Place 3 | `input_5` -> `output_4` | `line_5_container_h01_near` | 10 |
-| L2 | FactorySorting3 | Pick 1 -> Place 3 | `input_6` -> `output_4` | `green_tote_b01_upper` | 15 |
-| L3 | FactorySorting5 | Pick/Placement 1 -> Place 2 | `input_6` -> `output_5` | `orange_tote_b01_upper` | 20 |
-| L4 | FactorySorting7 | Pick 5 -> Place 2 | `input_2` -> `output_5` | `blue_container_h01_back_upper` | 25 |
-| L5 | FactorySorting9 | Pick 6 -> Place 1 | `input_1` -> `output_6` | 三个 `white_tote_b01_left_*` | 30 |
+| L1 | FactorySorting1 | Pick 2 -> Place 3 | `input_5` -> `output_4` | `line_5_container_h01_near` 或 `_far` | 10 |
+| L2 | FactorySorting3 | Pick 1 -> Place 3 | `input_6` -> `output_4` | `green_tote_b01_upper` 或 `_lower` | 15 |
+| L3 | FactorySorting5 | Pick/Placement 1 -> Place 2 | `input_6` -> `output_5` | `blue_tote_b01_far_right` 或 `_near_right` | 20 |
+| L4 | FactorySorting7 | Pick 5 -> Place 2 | `input_2` -> `output_5` | `blue_container_h01_back_upper` 或 `_lower` | 25 |
+| L5 | FactorySorting9 | Pick 6 -> Place 1 | `input_1` -> `output_6` | 三个 `white_tote_b01_left_*` 全部 | 30 |
 
 精确坐标和对象数组见 [`config/tasks.json`](../config/tasks.json)。
 
@@ -71,6 +71,14 @@
 - 官方 Erratum 的 Case 3 对应第三个测试/L3：Prompt 中 Pick Station 1 更正为 Placement Point 1，Place Station 2 不变。
 
 命名本身仍不够统一，SOP 解析器必须把文本、图片、官方 `task_config.json` 和语义地图交叉验证，并保留证据来源。
+
+## 2026-07-26 任务物体更新（上游 f948609）
+
+- 官方 `task_config.json` 每关 `object` 字段从单个字符串改为**候选物体数组**，任一候选满足评分（成功抓取的物体优先计分）。
+- **L3 目标物体整体更换**：`orange_tote_b01_upper` → `blue_tote_b01_far_right` / `blue_tote_b01_near_right`。任何按旧物体名写的固定计划、SOP 笔记和抓取位姿都必须更新。
+- L1/L2/L4 各新增一个同位近/远（上/下）候选变体；L5 三个白 tote 不变，仍需全部搬运。
+- `pick_up.py` 与 `task_subprocess_runner.py` 对数组取第一个物体作为主目标；评分端 `_object_name_matches` 对候选做双向子串匹配。
+- 同批提交还修复了 `app.py` 注释乱码（无行为影响）。
 
 ## 允许修改的边界
 

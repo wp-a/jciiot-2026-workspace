@@ -1,7 +1,8 @@
 {
-  "snapshot_date": "2026-07-22",
-  "official_commit": "f4ab8fd2158b919a41b2ce350432259cd1ee6a11",
+  "snapshot_date": "2026-07-26",
+  "official_commit": "f948609f2f281176272287fa991fce96d1f9ff98",
   "coordinate_frame": "official semantic-map world XY in metres",
+  "object_semantics": "Since upstream f948609 each task lists multiple acceptable candidate objects; scoring accepts any candidate (grasped object preferred). L5 still requires all three listed totes.",
   "scoring": {
     "objective_weight_percent": 60,
     "innovation_weight_percent": 40,
@@ -20,7 +21,7 @@
       "source_center_xy": [7.186, 3.938],
       "target": "output_4",
       "target_center_xy": [-0.166, -7.29],
-      "objects": ["line_5_container_h01_near"],
+      "objects": ["line_5_container_h01_near", "line_5_container_h01_far"],
       "max_score": 10
     },
     {
@@ -31,7 +32,7 @@
       "source_center_xy": [11.937, 3.932],
       "target": "output_4",
       "target_center_xy": [-0.166, -7.29],
-      "objects": ["green_tote_b01_upper"],
+      "objects": ["green_tote_b01_upper", "green_tote_b01_lower"],
       "max_score": 15
     },
     {
@@ -42,7 +43,7 @@
       "source_center_xy": [11.937, 3.932],
       "target": "output_5",
       "target_center_xy": [4.872, -7.261],
-      "objects": ["orange_tote_b01_upper"],
+      "objects": ["blue_tote_b01_far_right", "blue_tote_b01_near_right"],
       "max_score": 20
     },
     {
@@ -53,7 +54,7 @@
       "source_center_xy": [-9.761, 5.01],
       "target": "output_5",
       "target_center_xy": [4.872, -7.261],
-      "objects": ["blue_container_h01_back_upper"],
+      "objects": ["blue_container_h01_back_upper", "blue_container_h01_back_lower"],
       "max_score": 25
     },
     {
