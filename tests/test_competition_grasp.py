@@ -280,6 +280,16 @@ class CompetitionGraspTests(unittest.TestCase):
             )
         )
 
+    def test_mirrored_open_grasp_is_limited_to_tote_geometry(self):
+        self.assertTrue(
+            self.module.uses_mirrored_open_grasp("green_tote_b01_lower")
+        )
+        self.assertFalse(
+            self.module.uses_mirrored_open_grasp(
+                "line_5_container_h01_near"
+            )
+        )
+
     def test_close_pose_can_hold_post_adjustment_gripper_positions(self):
         current = {
             "right": np.array([12.03, 2.98, 1.38]),

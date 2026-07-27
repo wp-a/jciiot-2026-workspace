@@ -41,6 +41,7 @@ class ScriptedGraspConfig:
         contact_confirmation_drop: float = 0.003,
         contact_settle_steps: int = 5,
         left_wrist_adjustment: float = 0.10,
+        single_wrist_adjustment_steps: int = 20,
         wrist_adjustment_steps: int = 80,
         wrist_height_trigger: float = 0.04,
         mirrored_ik_height_offset: float = 0.13,
@@ -80,6 +81,7 @@ class ScriptedGraspConfig:
         self.contact_confirmation_drop = float(contact_confirmation_drop)
         self.contact_settle_steps = int(contact_settle_steps)
         self.left_wrist_adjustment = float(left_wrist_adjustment)
+        self.single_wrist_adjustment_steps = int(single_wrist_adjustment_steps)
         self.wrist_adjustment_steps = int(wrist_adjustment_steps)
         self.wrist_height_trigger = float(wrist_height_trigger)
         self.mirrored_ik_height_offset = float(mirrored_ik_height_offset)
@@ -208,6 +210,11 @@ def wrist_adjustment_required(
 ) -> bool:
     """Detect when left-arm height reach needs the measured wrist correction."""
     return float(current_z) - float(target_z) > float(threshold)
+
+
+def uses_mirrored_open_grasp(object_name: str) -> bool:
+    """Select the mirrored rim grasp only for matching tote geometry."""
+    return "tote_b01" in str(object_name).lower()
 
 
 def mirrored_fingerpad_targets(
@@ -651,6 +658,55 @@ class OfficialScriptedGraspDriver:
             tolerance=config.approach_tolerance,
         )
 
+    def _adjust_single_wrist_for_reach(self, backend, config) -> bool:
+        raw_env = backend.env
+        robot = raw_env.robots[0]
+        joint_name = next(
+            (
+                raw_env.sim.model.joint_id2name(index)
+                for index in range(raw_env.sim.model.njnt)
+                if (raw_env.sim.model.joint_id2name(index) or "").endswith(
+                    "arm_left_5_joint"
+                )
+            ),
+            None,
+        )
+        if joint_name is None:
+            return False
+        joint_id = raw_env.sim.model.joint_name2id(joint_name)
+        qpos_addr = raw_env.sim.model.get_joint_qpos_addr(joint_name)
+        if isinstance(qpos_addr, tuple):
+            return False
+
+        start = float(raw_env.sim.data.qpos[qpos_addr])
+        target = start + config.left_wrist_adjustment
+        if bool(raw_env.sim.model.jnt_limited[joint_id]):
+            joint_range = raw_env.sim.model.jnt_range[joint_id]
+            target = float(np.clip(target, joint_range[0], joint_range[1]))
+
+        from robot_agent.environments.robosuite_backend import (
+            _navigation_collisions,
+        )
+
+        steps = max(1, config.single_wrist_adjustment_steps)
+        for value in np.linspace(start, target, steps + 1, dtype=float)[1:]:
+            raw_env.sim.data.qpos[qpos_addr] = value
+            raw_env.sim.forward()
+            collisions = _navigation_collisions(
+                raw_env,
+                robot,
+                getattr(backend, "_ignore_collision_geom", ()),
+            )
+            if collisions:
+                raw_env.sim.data.qpos[qpos_addr] = start
+                raw_env.sim.forward()
+                synchronize_controller_goals(robot)
+                self._record(backend, raw_env)
+                return False
+            self._record(backend, raw_env)
+        synchronize_controller_goals(robot)
+        return True
+
     def adjust_wrist_for_reach(self, backend, object_name, config) -> bool:
         helpers = self._helpers()
         raw_env = backend.env
@@ -668,6 +724,8 @@ class OfficialScriptedGraspDriver:
             threshold=config.wrist_height_trigger,
         ):
             return True
+        if not uses_mirrored_open_grasp(object_name):
+            return self._adjust_single_wrist_for_reach(backend, config)
 
         model = raw_env.sim.model
         data = raw_env.sim.data
