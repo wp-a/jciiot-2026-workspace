@@ -331,6 +331,60 @@ class CompetitionFlowTests(unittest.TestCase):
         self.assertTrue(success)
         self.assertEqual(calls, [("output_5", "blue_tote")])
 
+    def test_unregistered_release_preserves_current_transport_position(self):
+        calls = []
+        place_module = types.ModuleType(
+            "robosuite.environments.factory_sorting.place_on_table"
+        )
+        place_module.gripper_release_action = lambda _env: "release"
+        transport_module = types.ModuleType(
+            "robosuite.environments.factory_sorting.transport_attachment"
+        )
+        transport_module.clear_transport_attachment = (
+            lambda _env: calls.append("clear")
+        )
+
+        def stale_sync(_env):
+            raise AssertionError("stale attachment must not rewrite object pose")
+
+        transport_module.sync_transport_attachment = stale_sync
+        raw_env = SimpleNamespace(
+            output_ports={},
+            step=lambda action: (
+                calls.append(("step", action))
+                or (None, None, None, {"has_judge_collision": False})
+            ),
+        )
+        backend = SimpleNamespace(
+            env=raw_env,
+            _held_crate_name="blue_tote",
+            _held_crate_body_id=7,
+            _rp={"place": {"release_steps": 2}},
+        )
+        driver = object.__new__(self.module.OfficialCompetitionDriver)
+        driver.backend = backend
+        modules = {
+            "robosuite": types.ModuleType("robosuite"),
+            "robosuite.environments": types.ModuleType(
+                "robosuite.environments"
+            ),
+            "robosuite.environments.factory_sorting": types.ModuleType(
+                "robosuite.environments.factory_sorting"
+            ),
+            "robosuite.environments.factory_sorting.place_on_table": place_module,
+            "robosuite.environments.factory_sorting.transport_attachment": transport_module,
+        }
+
+        with patch.dict(sys.modules, modules):
+            success = driver._release_at_current_pose(
+                "output_5",
+                "blue_tote",
+            )
+
+        self.assertTrue(success)
+        self.assertEqual(calls, ["clear", ("step", "release"), ("step", "release")])
+        self.assertIsNone(backend._held_crate_name)
+
 
 if __name__ == "__main__":
     unittest.main()

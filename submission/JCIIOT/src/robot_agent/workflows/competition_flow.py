@@ -396,10 +396,8 @@ class OfficialCompetitionDriver:
             )
             from robosuite.environments.factory_sorting.transport_attachment import (
                 clear_transport_attachment,
-                sync_transport_attachment,
             )
 
-            sync_transport_attachment(raw_env)
             clear_transport_attachment(raw_env)
             self.backend._held_crate_name = None
             self.backend._held_crate_body_id = None
