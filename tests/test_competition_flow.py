@@ -320,6 +320,87 @@ class CompetitionFlowTests(unittest.TestCase):
 
         np.testing.assert_allclose(extended, current)
 
+    def test_l5_delivery_slots_separate_totes_inside_scoring_radius(self):
+        center = np.array([0.144, 8.473])
+        slots = [
+            self.module.delivery_slot_target(center, name)
+            for name in (
+                "white_tote_b01_left_front",
+                "white_tote_b01_left_center",
+                "white_tote_b01_left_back",
+            )
+        ]
+
+        np.testing.assert_allclose(slots[0], [-0.456, 8.473])
+        np.testing.assert_allclose(slots[1], [0.144, 8.473])
+        np.testing.assert_allclose(slots[2], [0.744, 8.473])
+        self.assertTrue(
+            all(float(np.linalg.norm(slot - center)) < 0.8 for slot in slots)
+        )
+        self.assertGreater(abs(slots[0][0] - slots[1][0]), 0.4)
+        self.assertGreater(abs(slots[1][0] - slots[2][0]), 0.4)
+        np.testing.assert_allclose(
+            self.module.delivery_slot_target(center, "green_tote_b01_lower"),
+            center,
+        )
+
+    def test_l5_delivery_uses_full_reach_to_its_assigned_slot(self):
+        self.assertEqual(
+            self.module.delivery_extension_parameters(
+                "white_tote_b01_left_back"
+            ),
+            {"goal_distance": 0.0, "max_extension": 1.2},
+        )
+        self.assertEqual(
+            self.module.delivery_extension_parameters("green_tote_b01_lower"),
+            {},
+        )
+
+    def test_l5_delivery_rotates_totes_and_waits_for_stability(self):
+        self.assertAlmostEqual(
+            self.module.delivery_object_world_yaw(
+                "white_tote_b01_left_front"
+            ),
+            np.pi / 2.0,
+        )
+        self.assertEqual(
+            self.module.delivery_release_steps(
+                "white_tote_b01_left_front",
+                configured=40,
+            ),
+            200,
+        )
+        self.assertIsNone(
+            self.module.delivery_object_world_yaw("green_tote_b01_lower")
+        )
+        self.assertEqual(
+            self.module.delivery_release_steps(
+                "green_tote_b01_lower",
+                configured=40,
+            ),
+            40,
+        )
+
+    def test_l5_delivery_enters_each_slot_along_its_own_column(self):
+        current = np.array([0.10, 7.60])
+        target = np.array([0.744, 8.473])
+
+        waypoints = self.module.delivery_extension_waypoints(
+            current,
+            target,
+            "white_tote_b01_left_back",
+        )
+
+        np.testing.assert_allclose(waypoints[0], [0.744, 7.60])
+        np.testing.assert_allclose(waypoints[1], target)
+        generic = self.module.delivery_extension_waypoints(
+            current,
+            target,
+            "green_tote_b01_lower",
+        )
+        self.assertEqual(len(generic), 1)
+        np.testing.assert_allclose(generic[0], target)
+
     def test_physical_output_availability_accepts_official_name_suffix(self):
         self.assertTrue(
             self.module.physical_output_available(

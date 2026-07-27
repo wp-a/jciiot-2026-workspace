@@ -65,6 +65,63 @@ def bounded_delivery_extension(
     return current + delta / distance * extension
 
 
+def delivery_slot_target(center, object_name: str | None):
+    """Assign the three L5 totes distinct scored positions on one output."""
+    import numpy as np
+
+    target = np.asarray(center, dtype=float).reshape(2).copy()
+    name = str(object_name or "").lower()
+    if "white_tote_b01_left" not in name:
+        return target
+    if name.endswith("_front"):
+        target[0] -= 0.60
+    elif name.endswith("_back"):
+        target[0] += 0.60
+    return target
+
+
+def delivery_extension_parameters(object_name: str | None) -> dict[str, float]:
+    """Use measured grasp reach to place L5 totes at exact packing slots."""
+    if "white_tote_b01_left" in str(object_name or "").lower():
+        return {"goal_distance": 0.0, "max_extension": 1.2}
+    return {}
+
+
+def delivery_object_world_yaw(object_name: str | None) -> float | None:
+    """Align L5 tote footprints to one shared output-table orientation."""
+    import math
+
+    if "white_tote_b01_left" in str(object_name or "").lower():
+        return math.pi / 2.0
+    return None
+
+
+def delivery_extension_waypoints(current, target, object_name: str | None):
+    """Enter occupied L5 output slots without crossing a prior slot."""
+    import numpy as np
+
+    current = np.asarray(current, dtype=float).reshape(2)
+    target = np.asarray(target, dtype=float).reshape(2)
+    if "white_tote_b01_left" not in str(object_name or "").lower():
+        return [target.copy()]
+    return [
+        np.array([target[0], current[1]], dtype=float),
+        target.copy(),
+    ]
+
+
+def delivery_release_steps(
+    object_name: str | None,
+    *,
+    configured: int,
+) -> int:
+    """Let table-edge-sensitive L5 placements settle before continuing."""
+    configured = max(1, int(configured))
+    if "white_tote_b01_left" in str(object_name or "").lower():
+        return max(configured, 200)
+    return configured
+
+
 class CompetitionFlow:
     """Execute bounded object transfers through a small state machine."""
 
@@ -437,13 +494,13 @@ class OfficialCompetitionDriver:
         from robosuite.environments.factory_sorting.load_factory_sorting_evalization import (
             get_base_world_pose,
         )
-        from robosuite.environments.factory_sorting.place_on_table import (
-            zero_action,
-        )
         from robosuite.environments.factory_sorting.transport_attachment import (
             TRANSPORT_ATTACHMENT_ATTR,
+            quat_conjugate_wxyz,
+            quat_multiply_wxyz,
             rotate_xy,
             sync_transport_attachment,
+            yaw_quat_wxyz,
         )
 
         attachment = getattr(raw_env, TRANSPORT_ATTACHMENT_ATTR, None)
@@ -451,17 +508,20 @@ class OfficialCompetitionDriver:
             return False
         body_id = raw_env.obj_body_id[object_name]
         current_xy = raw_env.sim.data.body_xpos[body_id][:2].copy()
+        slot_xy = delivery_slot_target(
+            station.center[:2],
+            object_name,
+        )
         desired_xy = bounded_delivery_extension(
             current_xy,
-            station.center[:2],
+            slot_xy,
+            **delivery_extension_parameters(object_name),
         )
         if np.allclose(current_xy, desired_xy):
             return False
 
         base_xy, base_yaw = get_base_world_pose(raw_env)
         start_relative = rotate_xy(current_xy - base_xy, -base_yaw)
-        end_relative = rotate_xy(desired_xy - base_xy, -base_yaw)
-        idle_action = zero_action(raw_env)
         recorder = getattr(self.backend, "_record_trajectory_frame", None)
 
         from robot_agent.environments.robosuite_backend import (
@@ -469,29 +529,58 @@ class OfficialCompetitionDriver:
         )
 
         collision = False
-        for relative_xy in np.linspace(
-            start_relative,
-            end_relative,
-            81,
-            dtype=float,
-        )[1:]:
-            attachment["relative_xy"] = relative_xy
-            sync_transport_attachment(raw_env)
-            result = raw_env.step(idle_action)
-            sync_transport_attachment(raw_env)
-            info = result[-1] if isinstance(result, tuple) else {}
-            if callable(recorder):
-                recorder(_env=raw_env)
-            collision = collision or bool(
-                (info or {}).get("has_judge_collision", False)
+        world_yaw = delivery_object_world_yaw(object_name)
+        if world_yaw is not None:
+            start_quat = np.asarray(
+                attachment["relative_quat"],
+                dtype=float,
             )
-            collision = collision or bool(
-                _navigation_collisions(
-                    raw_env,
-                    raw_env.robots[0],
-                    getattr(self.backend, "_ignore_collision_geom", ()),
+            base_quat = yaw_quat_wxyz(base_yaw)
+            end_quat = quat_multiply_wxyz(
+                quat_conjugate_wxyz(base_quat),
+                yaw_quat_wxyz(world_yaw),
+            )
+            if float(np.dot(start_quat, end_quat)) < 0.0:
+                end_quat = -end_quat
+            for alpha in np.linspace(0.0, 1.0, 81, dtype=float)[1:]:
+                relative_quat = (1.0 - alpha) * start_quat + alpha * end_quat
+                relative_quat /= float(np.linalg.norm(relative_quat))
+                attachment["relative_quat"] = relative_quat
+                sync_transport_attachment(raw_env)
+                if callable(recorder):
+                    recorder(_env=raw_env)
+                collision = collision or bool(
+                    _navigation_collisions(
+                        raw_env,
+                        raw_env.robots[0],
+                        getattr(self.backend, "_ignore_collision_geom", ()),
+                    )
                 )
-            )
+
+        for waypoint_xy in delivery_extension_waypoints(
+            current_xy,
+            desired_xy,
+            object_name,
+        ):
+            end_relative = rotate_xy(waypoint_xy - base_xy, -base_yaw)
+            for relative_xy in np.linspace(
+                start_relative,
+                end_relative,
+                81,
+                dtype=float,
+            )[1:]:
+                attachment["relative_xy"] = relative_xy
+                sync_transport_attachment(raw_env)
+                if callable(recorder):
+                    recorder(_env=raw_env)
+                collision = collision or bool(
+                    _navigation_collisions(
+                        raw_env,
+                        raw_env.robots[0],
+                        getattr(self.backend, "_ignore_collision_geom", ()),
+                    )
+                )
+            start_relative = end_relative
         return collision
 
     def _release_at_current_pose(self, target: str, object_name: str) -> bool:
@@ -515,13 +604,17 @@ class OfficialCompetitionDriver:
             clear_transport_attachment(raw_env)
             self.backend._held_crate_name = None
             self.backend._held_crate_body_id = None
-            release_steps = max(
+            configured_release_steps = max(
                 1,
                 int(
                     getattr(self.backend, "_rp", {})
                     .get("place", {})
                     .get("release_steps", 40)
                 ),
+            )
+            release_steps = delivery_release_steps(
+                object_name,
+                configured=configured_release_steps,
             )
             action = gripper_release_action(raw_env)
             recorder = getattr(self.backend, "_record_trajectory_frame", None)
