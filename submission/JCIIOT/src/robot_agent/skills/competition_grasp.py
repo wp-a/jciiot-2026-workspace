@@ -22,7 +22,7 @@ class ScriptedGraspConfig:
     def __init__(
         self,
         *,
-        clearance_height: float = 0.45,
+        clearance_height: float = 0.30,
         clearance_raise_steps: int = 180,
         clearance_translate_steps: int = 180,
         torso_drop: float = 0.04,
@@ -349,35 +349,53 @@ class OfficialScriptedGraspDriver:
         return False
 
     def lower_torso_for_reach(self, backend, config) -> bool:
-        helpers = self._helpers()
         raw_env = backend.env
         robot = raw_env.robots[0]
-        current = helpers["current_part_qpos"](robot, "torso")
-        if current is None:
+        torso_joint = next(
+            (
+                raw_env.sim.model.joint_id2name(index)
+                for index in range(raw_env.sim.model.njnt)
+                if (raw_env.sim.model.joint_id2name(index) or "").endswith(
+                    "torso_lift_joint"
+                )
+            ),
+            None,
+        )
+        if torso_joint is None:
             return False
-        target = lowered_torso_target(
-            current,
+        qpos_addr = raw_env.sim.model.get_joint_qpos_addr(torso_joint)
+        if isinstance(qpos_addr, tuple):
+            return False
+
+        start = float(raw_env.sim.data.qpos[qpos_addr])
+        target = float(lowered_torso_target(
+            np.array([start], dtype=float),
             drop=config.torso_drop,
             minimum=config.torso_minimum,
-        )
-        hold_targets = helpers["capture_hold_targets"](robot)
-        hold_targets["torso"] = target
+        )[0])
+        steps = max(1, config.torso_steps)
 
-        for _ in range(config.torso_steps):
-            current = helpers["current_part_qpos"](robot, "torso")
-            if current is not None and float(np.max(np.abs(current - target))) <= config.torso_tolerance:
-                return True
-            action = helpers["build_action"](
+        from robot_agent.environments.robosuite_backend import (
+            _navigation_collisions,
+        )
+
+        for value in np.linspace(start, target, steps + 1, dtype=float)[1:]:
+            raw_env.sim.data.qpos[qpos_addr] = value
+            raw_env.sim.forward()
+            collisions = _navigation_collisions(
+                raw_env,
                 robot,
-                arm_actions={},
-                gripper_value=-1.0,
-                hold_targets=hold_targets,
+                getattr(backend, "_ignore_collision_geom", ()),
             )
-            _, _, _, info = raw_env.step(action)
-            self._record(backend, raw_env)
-            if bool((info or {}).get("has_judge_collision", False)):
+            if collisions:
+                raw_env.sim.data.qpos[qpos_addr] = start
+                raw_env.sim.forward()
+                synchronize_controller_goals(robot)
+                self._record(backend, raw_env)
                 return False
-        return False
+            self._record(backend, raw_env)
+        synchronize_controller_goals(robot)
+        return abs(float(raw_env.sim.data.qpos[qpos_addr]) - target) <= config.torso_tolerance
 
     def _grasp_targets(self, backend, object_name, config, *, height_offset):
         helpers = self._helpers()
