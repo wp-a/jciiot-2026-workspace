@@ -79,6 +79,76 @@ class SubmissionBoundaryTests(unittest.TestCase):
             self.assertIn("official commit mismatch", result.stderr)
             self.assertFalse(output.exists())
 
+    def test_materializer_rejects_non_source_files_in_allowed_directories(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            workspace = root / "workspace"
+            official = root / "official"
+            overlay = root / "overlay"
+            output = root / "candidate"
+            (workspace / "config").mkdir(parents=True)
+            official.mkdir()
+            subprocess.run(
+                ["git", "init", "--quiet", "--initial-branch=main", str(official)],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(official), "config", "user.name", "Submission Test"],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(official), "config", "user.email", "test@example.invalid"],
+                check=True,
+            )
+            (official / "README.md").write_text("fixture\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(official), "add", "README.md"], check=True)
+            subprocess.run(
+                ["git", "-C", str(official), "commit", "--quiet", "-m", "fixture"],
+                check=True,
+            )
+            commit = subprocess.run(
+                ["git", "-C", str(official), "rev-parse", "HEAD"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            (workspace / "config" / "upstream-lock.json").write_text(
+                json.dumps({"repository": {"commit": commit}}),
+                encoding="utf-8",
+            )
+            cache_file = (
+                overlay
+                / "JCIIOT"
+                / "src"
+                / "robot_agent"
+                / "skills"
+                / "__pycache__"
+                / "cached.pyc"
+            )
+            cache_file.parent.mkdir(parents=True)
+            cache_file.write_bytes(b"not source")
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(MATERIALIZER),
+                    "--workspace",
+                    str(workspace),
+                    "--official-root",
+                    str(official),
+                    "--overlay",
+                    str(overlay),
+                    "--output",
+                    str(output),
+                ],
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("forbidden overlay path", result.stderr)
+            self.assertFalse(output.exists())
+
     def test_locked_commit_is_full_sha(self):
         lock = json.loads(
             (WORKSPACE / "config" / "upstream-lock.json").read_text(encoding="utf-8")

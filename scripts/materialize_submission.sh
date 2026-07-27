@@ -68,7 +68,7 @@ fi
 while IFS= read -r source_path; do
     relative_path="${source_path#"$overlay_dir"/}"
     case "$relative_path" in
-        README.md|JCIIOT/knowledge/robot_params.json|JCIIOT/src/robot_agent/skills/*|JCIIOT/src/robot_agent/workflows/*)
+        README.md|JCIIOT/knowledge/robot_params.json|JCIIOT/src/robot_agent/skills/*.py|JCIIOT/src/robot_agent/workflows/*.py)
             ;;
         *)
             printf 'forbidden overlay path: %s\n' "$relative_path" >&2
