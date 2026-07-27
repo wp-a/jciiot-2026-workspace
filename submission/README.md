@@ -124,10 +124,18 @@ provenance, checksums and the fixed model runtime are documented in
 
 ## Tests
 
-Workspace-side unit and boundary tests do not require the simulator:
+The Python unit and boundary tests are self-contained and do not require the
+simulator or the 1.7 GB official checkout:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3.13 -m pytest -q tests
+```
+
+The complete workspace audit additionally requires a Git checkout and the
+locked official repository at `vendor/JCIIOT2026`; reference checkouts may be
+absent:
+
+```bash
 bash scripts/check_workspace.sh
 git diff --check
 ```
