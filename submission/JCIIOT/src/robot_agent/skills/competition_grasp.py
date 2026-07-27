@@ -35,7 +35,7 @@ class ScriptedGraspConfig:
         approach_tolerance: float = 0.055,
         pregrasp_steps: int = 180,
         approach_steps: int = 180,
-        close_steps: int = 80,
+        close_steps: int = 300,
         max_action: float = 0.65,
         lift_height: float = 0.15,
         lift_steps: int = 300,
@@ -427,6 +427,9 @@ class OfficialScriptedGraspDriver:
             )
             raw_env.step(action)
             self._record(backend, raw_env)
+            contacts = helpers["grasp_status"](raw_env, robot, object_name)
+            if all(bool(contacts.get(arm, False)) for arm in ARMS):
+                return contacts
 
         return helpers["grasp_status"](raw_env, robot, object_name)
 
