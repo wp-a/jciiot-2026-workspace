@@ -130,10 +130,9 @@ class CompetitionGraspTests(unittest.TestCase):
             ]
         )
 
-        targets = self.module.mirrored_fingerpad_targets(
+        targets = self.module.world_x_mirrored_fingerpad_targets(
             right_fingerpads,
-            object_xy=np.array([11.8675, 3.0]),
-            mirror_normal_xy=np.array([1.0, 0.0]),
+            object_x=11.8675,
             height_offset=0.13,
         )
 
@@ -312,6 +311,21 @@ class CompetitionGraspTests(unittest.TestCase):
         self.assertFalse(
             self.module.uses_mirrored_open_grasp(
                 "line_5_container_h01_near"
+            )
+        )
+        self.assertFalse(
+            self.module.uses_axis_aware_fingerpad_mirror(
+                "green_tote_b01_lower"
+            )
+        )
+        self.assertTrue(
+            self.module.uses_axis_aware_fingerpad_mirror(
+                "blue_tote_b01_near_right"
+            )
+        )
+        self.assertTrue(
+            self.module.uses_axis_aware_fingerpad_mirror(
+                "white_tote_b01_left_front"
             )
         )
 

@@ -267,6 +267,12 @@ def uses_mirrored_open_grasp(object_name: str) -> bool:
     return "tote_b01" in str(object_name).lower()
 
 
+def uses_axis_aware_fingerpad_mirror(object_name: str) -> bool:
+    """Select heading-aware mirroring only for rotated tote stations."""
+    name = str(object_name).lower()
+    return "blue_tote_b01" in name or "white_tote_b01_left" in name
+
+
 def uses_legacy_container_grasp(object_name: str) -> bool:
     """Select the scored L1 controller for the matching container geometry."""
     return "container_h01" in str(object_name).lower()
@@ -388,6 +394,21 @@ def mirrored_fingerpad_targets(
     normal /= normal_norm
     signed_distances = (targets[:, :2] - center) @ normal
     targets[:, :2] -= 2.0 * signed_distances[:, None] * normal
+    targets[:, 2] -= float(height_offset)
+    return targets
+
+
+def world_x_mirrored_fingerpad_targets(
+    right_fingerpads: np.ndarray,
+    *,
+    object_x: float,
+    height_offset: float,
+) -> np.ndarray:
+    """Mirror the measured L2 pose across its world-aligned station axis."""
+    targets = np.asarray(right_fingerpads, dtype=float).copy()
+    if targets.shape != (2, 3):
+        raise ValueError("right_fingerpads must have shape (2, 3)")
+    targets[:, 0] = 2.0 * float(object_x) - targets[:, 0]
     targets[:, 2] -= float(height_offset)
     return targets
 
@@ -997,15 +1018,22 @@ class OfficialScriptedGraspDriver:
         right_fingerpads = fingerpad_positions("right")
         left_fingerpads = fingerpad_positions("left")
         body_id = raw_env.obj_body_id[object_name]
-        target_fingerpads = mirrored_fingerpad_targets(
-            right_fingerpads,
-            object_xy=data.body_xpos[body_id][:2],
-            mirror_normal_xy=(
-                np.mean(right_fingerpads[:, :2], axis=0)
-                - np.mean(left_fingerpads[:, :2], axis=0)
-            ),
-            height_offset=config.mirrored_ik_height_offset,
-        )
+        if uses_axis_aware_fingerpad_mirror(object_name):
+            target_fingerpads = mirrored_fingerpad_targets(
+                right_fingerpads,
+                object_xy=data.body_xpos[body_id][:2],
+                mirror_normal_xy=(
+                    np.mean(right_fingerpads[:, :2], axis=0)
+                    - np.mean(left_fingerpads[:, :2], axis=0)
+                ),
+                height_offset=config.mirrored_ik_height_offset,
+            )
+        else:
+            target_fingerpads = world_x_mirrored_fingerpad_targets(
+                right_fingerpads,
+                object_x=float(data.body_xpos[body_id][0]),
+                height_offset=config.mirrored_ik_height_offset,
+            )
         start = data.qpos[qpos_addrs].copy()
         lower = np.array(
             [model.jnt_range[joint_id][0] for joint_id in joint_ids],
