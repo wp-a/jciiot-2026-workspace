@@ -290,7 +290,7 @@ class OfficialCompetitionDriver:
             self._grasp_yaw = bounded_yaw_step(
                 current_yaw=reached_yaw,
                 target_yaw=float(orientation["yaw"]),
-                max_step=0.30,
+                max_step=0.15,
             )
             self._swap_arm_targets = bool(orientation["swap_arm_targets"])
             return bool(orient_base(self.backend, self._grasp_yaw))
