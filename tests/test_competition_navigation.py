@@ -38,6 +38,8 @@ class CompetitionNavigationTests(unittest.TestCase):
 
         self.assertAlmostEqual(pose["base_xy"][0], 8.0, places=3)
         self.assertAlmostEqual(pose["base_xy"][1], 4.619, places=3)
+        self.assertAlmostEqual(pose["staging_xy"][0], 8.0, places=3)
+        self.assertAlmostEqual(pose["staging_xy"][1], 4.619, places=3)
         self.assertAlmostEqual(abs(pose["yaw"]), math.pi, places=3)
         self.assertFalse(pose["swap_arm_targets"])
 
@@ -52,8 +54,19 @@ class CompetitionNavigationTests(unittest.TestCase):
 
         self.assertAlmostEqual(pose["base_xy"][0], 11.867624, places=3)
         self.assertAlmostEqual(pose["base_xy"][1], 5.565857, places=3)
+        self.assertAlmostEqual(pose["staging_xy"][0], 13.0, places=3)
+        self.assertAlmostEqual(pose["staging_xy"][1], 5.565857, places=3)
         self.assertAlmostEqual(pose["yaw"], -math.pi / 2.0, places=3)
         self.assertTrue(pose["swap_arm_targets"])
+
+    def test_bounded_yaw_step_uses_shortest_wrapped_rotation(self):
+        next_yaw = self.module.bounded_yaw_step(
+            current_yaw=-math.pi,
+            target_yaw=-math.pi / 2.0,
+            max_step=0.025,
+        )
+
+        self.assertAlmostEqual(next_yaw, -math.pi + 0.025)
 
 
 if __name__ == "__main__":

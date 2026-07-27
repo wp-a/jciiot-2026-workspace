@@ -8,6 +8,20 @@ import math
 REFERENCE_BASE_DISTANCE = 0.941001
 
 
+def bounded_yaw_step(
+    *,
+    current_yaw: float,
+    target_yaw: float,
+    max_step: float,
+) -> float:
+    """Advance toward a target yaw through the shortest wrapped angle."""
+    error = (float(target_yaw) - float(current_yaw) + math.pi) % (
+        2.0 * math.pi
+    ) - math.pi
+    delta = max(-float(max_step), min(float(max_step), error))
+    return (float(current_yaw) + delta + math.pi) % (2.0 * math.pi) - math.pi
+
+
 def grasp_aligned_base_pose(
     *,
     object_xy,
@@ -41,6 +55,14 @@ def grasp_aligned_base_pose(
         float(object_xy[0]) + float(base_distance) * base_direction[0],
         float(object_xy[1]) + float(base_distance) * base_direction[1],
     ]
+    projection = (
+        (float(station_approach[0]) - base_xy[0]) * axis[0]
+        + (float(station_approach[1]) - base_xy[1]) * axis[1]
+    )
+    staging_xy = [
+        base_xy[0] + projection * axis[0],
+        base_xy[1] + projection * axis[1],
+    ]
     yaw = math.atan2(-base_direction[1], -base_direction[0])
     expected_right_to_left_axis = (math.sin(yaw), -math.cos(yaw))
     swap_arm_targets = (
@@ -49,6 +71,7 @@ def grasp_aligned_base_pose(
     ) < 0.0
     return {
         "base_xy": base_xy,
+        "staging_xy": staging_xy,
         "yaw": yaw,
         "swap_arm_targets": swap_arm_targets,
     }
@@ -60,23 +83,23 @@ def orient_base(
     *,
     tolerance: float = 0.02,
     max_steps: int = 180,
-    gain: float = 1.5,
-    max_angular: float = 0.35,
+    max_yaw_step: float = 0.025,
 ) -> bool:
-    """Rotate through the official mobile-base action controller."""
+    """Rotate smoothly using the official direct-navigation yaw helper."""
     import numpy as np
 
     from robot_agent.environments.robosuite_backend import (
-        _build_base_action,
         _capture_upper_body_posture,
         _restore_upper_body_posture,
         _shortest_angle,
+        _set_base_world_yaw_direct,
     )
 
     raw_env = backend.env
     robot = raw_env.robots[0]
     posture = _capture_upper_body_posture(raw_env, robot)
     recorder = getattr(backend, "_record_trajectory_frame", None)
+    idle_action = np.zeros_like(raw_env.action_spec[0])
     reached = False
 
     for _ in range(int(max_steps)):
@@ -85,18 +108,21 @@ def orient_base(
         if abs(error) <= float(tolerance):
             reached = True
             break
-        angular = float(np.clip(float(gain) * error, -max_angular, max_angular))
-        action = _build_base_action(robot, 0.0, 0.0, angular)
-        _, _, _, info = raw_env.step(action)
+        next_yaw = bounded_yaw_step(
+            current_yaw=yaw,
+            target_yaw=target_yaw,
+            max_step=max_yaw_step,
+        )
+        _set_base_world_yaw_direct(raw_env, robot, next_yaw)
+        _, _, _, info = raw_env.step(idle_action)
         _restore_upper_body_posture(raw_env, posture)
         if callable(recorder):
             recorder(_env=raw_env)
         if bool((info or {}).get("has_judge_collision", False)):
             return False
 
-    stop_action = _build_base_action(robot, 0.0, 0.0, 0.0)
     for _ in range(5):
-        raw_env.step(stop_action)
+        raw_env.step(idle_action)
         _restore_upper_body_posture(raw_env, posture)
         if callable(recorder):
             recorder(_env=raw_env)
