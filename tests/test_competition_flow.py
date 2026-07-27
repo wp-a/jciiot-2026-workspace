@@ -28,8 +28,8 @@ class FlowDriver:
         self.failed_verifications = set(failed_verifications or set())
         self.calls = []
 
-    def move(self, target, *, carrying):
-        self.calls.append(("move", target, carrying))
+    def move(self, target, *, carrying, object_name=None):
+        self.calls.append(("move", target, carrying, object_name))
         return True
 
     def grasp(self, source, object_name):
@@ -77,6 +77,18 @@ class CompetitionFlowTests(unittest.TestCase):
                 {"object_name": "box_near", "state": "verified", "attempt": 1},
             ],
         )
+        self.assertIn(("move", "input_5", False, "box_near"), driver.calls)
+        self.assertIn(("move", "output_4", True, "box_near"), driver.calls)
+
+    def test_object_aligned_approach_preserves_station_offset(self):
+        result = self.module.object_aligned_approach(
+            station_center=[11.937, 3.932],
+            station_approach=[13.0, 3.932],
+            object_xy=[11.8, 4.646],
+        )
+
+        self.assertAlmostEqual(result[0], 12.863)
+        self.assertAlmostEqual(result[1], 4.646)
 
     def test_failed_grasp_never_moves_to_target(self):
         driver = FlowDriver(failed_grasps={"box_near": 2})
@@ -90,7 +102,7 @@ class CompetitionFlowTests(unittest.TestCase):
 
         self.assertFalse(result["success"])
         self.assertEqual(result["states"], {"box_near": "failed"})
-        self.assertNotIn(("move", "output_4", True), driver.calls)
+        self.assertNotIn(("move", "output_4", True, "box_near"), driver.calls)
         self.assertEqual(
             [call for call in driver.calls if call[0] == "grasp"],
             [

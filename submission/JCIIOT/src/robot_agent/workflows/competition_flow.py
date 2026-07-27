@@ -5,6 +5,19 @@ from __future__ import annotations
 from typing import Any, Iterable
 
 
+def object_aligned_approach(
+    *,
+    station_center,
+    station_approach,
+    object_xy,
+) -> list[float]:
+    """Translate a station approach point by the object's planar offset."""
+    return [
+        float(station_approach[0]) + float(object_xy[0]) - float(station_center[0]),
+        float(station_approach[1]) + float(object_xy[1]) - float(station_center[1]),
+    ]
+
+
 class CompetitionFlow:
     """Execute bounded object transfers through a small state machine."""
 
@@ -44,7 +57,11 @@ class CompetitionFlow:
                 states[object_name] = "pending"
                 history.append(self._event(object_name, "pending", attempt))
 
-                if not self.driver.move(source, carrying=False):
+                if not self.driver.move(
+                    source,
+                    carrying=False,
+                    object_name=object_name,
+                ):
                     stage = "move_source"
                 else:
                     states[object_name] = "approached"
@@ -60,7 +77,11 @@ class CompetitionFlow:
                         else:
                             states[object_name] = "lifted"
                             history.append(self._event(object_name, "lifted", attempt))
-                            if not self.driver.move(target, carrying=True):
+                            if not self.driver.move(
+                                target,
+                                carrying=True,
+                                object_name=object_name,
+                            ):
                                 stage = "transport"
                             else:
                                 states[object_name] = "transported"
@@ -135,11 +156,37 @@ class OfficialCompetitionDriver:
 
         return ExecutionContext(task=task, metadata={"inputs": inputs})
 
-    def move(self, target: str, *, carrying: bool) -> bool:
+    def move(
+        self,
+        target: str,
+        *,
+        carrying: bool,
+        object_name: str | None = None,
+    ) -> bool:
+        resolved_target = target
+        if not carrying and object_name:
+            try:
+                station = self.scene_context.input_ports[target]
+                station_approach = (
+                    station.approach
+                    if station.approach is not None
+                    else self.scene_context.approach_xy(target)
+                )
+                body_id = self.backend.env.obj_body_id[object_name]
+                object_xy = self.backend.env.sim.data.body_xpos[body_id][:2]
+                aligned_xy = object_aligned_approach(
+                    station_center=station.center,
+                    station_approach=station_approach,
+                    object_xy=object_xy,
+                )
+                resolved_target = f"{aligned_xy[0]:.6f}, {aligned_xy[1]:.6f}"
+            except (AttributeError, KeyError, TypeError, ValueError):
+                resolved_target = target
+
         result = self.move_skill.run(
             self._context(
-                f"move to {target}",
-                target=target,
+                f"move to {resolved_target}",
+                target=resolved_target,
                 carrying=bool(carrying),
             )
         )
