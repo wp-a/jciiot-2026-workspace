@@ -372,6 +372,30 @@ class CompetitionGraspTests(unittest.TestCase):
         self.assertAlmostEqual(profiled.station_side_reach_offset, 0.04)
         self.assertEqual(profiled.clearance_translate_steps, 360)
 
+    def test_l5_followup_totes_use_a_full_upper_body_clearance_seed(self):
+        self.assertIsNone(
+            self.module.station_side_clearance_joint_seed(
+                "white_tote_b01_left_front"
+            )
+        )
+
+        center = self.module.station_side_clearance_joint_seed(
+            "white_tote_b01_left_center"
+        )
+        back = self.module.station_side_clearance_joint_seed(
+            "white_tote_b01_left_back"
+        )
+
+        self.assertEqual(center.shape, (13,))
+        np.testing.assert_allclose(center, back)
+        center[0] = -1.0
+        self.assertGreater(
+            self.module.station_side_clearance_joint_seed(
+                "white_tote_b01_left_center"
+            )[0],
+            0.0,
+        )
+
     def test_l5_transport_starts_at_backend_center_attachment(self):
         np.testing.assert_allclose(
             self.module.transport_attachment_relative_xy(

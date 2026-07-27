@@ -15,6 +15,27 @@ import numpy as np
 
 ARMS = ("right", "left")
 
+# Measured in the official L5 scene at the collision-free clearance pose.
+# Order: torso, right arm joints 1-6, left arm joints 1-6.
+STATION_SIDE_CLEARANCE_JOINT_SEED = np.array(
+    [
+        0.349987,
+        1.061774,
+        -0.515986,
+        1.725133,
+        0.521535,
+        0.079322,
+        -0.544378,
+        1.498435,
+        -0.337203,
+        1.102509,
+        0.708113,
+        -0.656307,
+        -0.822341,
+    ],
+    dtype=float,
+)
+
 
 class ScriptedGraspConfig:
     """Small, explicit parameter set for the geometric grasp controller."""
@@ -49,6 +70,7 @@ class ScriptedGraspConfig:
         mirrored_ik_max_error: float = 0.08,
         mirrored_ik_max_nfev: int = 300,
         station_side_reach_offset: float = 0.0,
+        station_side_seed_steps: int = 120,
         hold_close_pose: bool = True,
         face_insertion: float = 0.0,
         close_follow_max_distance: float = 0.0,
@@ -90,6 +112,7 @@ class ScriptedGraspConfig:
         self.mirrored_ik_max_error = float(mirrored_ik_max_error)
         self.mirrored_ik_max_nfev = int(mirrored_ik_max_nfev)
         self.station_side_reach_offset = float(station_side_reach_offset)
+        self.station_side_seed_steps = int(station_side_seed_steps)
         self.hold_close_pose = bool(hold_close_pose)
         self.face_insertion = float(face_insertion)
         self.close_follow_max_distance = float(close_follow_max_distance)
@@ -252,6 +275,14 @@ def uses_legacy_container_grasp(object_name: str) -> bool:
 def uses_station_side_tote_grasp(object_name: str) -> bool:
     """Select the wall-side geometry used by the three L5 white totes."""
     return "white_tote_b01_left" in str(object_name).lower()
+
+
+def station_side_clearance_joint_seed(object_name: str) -> np.ndarray | None:
+    """Return the deterministic upper-body reset for later L5 transfers."""
+    name = str(object_name).lower()
+    if not uses_station_side_tote_grasp(name) or name.endswith("_front"):
+        return None
+    return STATION_SIDE_CLEARANCE_JOINT_SEED.copy()
 
 
 def should_swap_arm_targets(object_name: str, *, requested: bool) -> bool:
@@ -583,6 +614,68 @@ class OfficialScriptedGraspDriver:
         )
         self._transport_stow_steps = config.transport_stow_steps
 
+    def _seed_station_side_clearance(self, backend, object_name, config) -> bool:
+        target = station_side_clearance_joint_seed(object_name)
+        if target is None:
+            return True
+
+        raw_env = backend.env
+        robot = raw_env.robots[0]
+        model = raw_env.sim.model
+        data = raw_env.sim.data
+        torso_joint = next(
+            (
+                model.joint_id2name(index)
+                for index in range(model.njnt)
+                if (model.joint_id2name(index) or "").endswith(
+                    "torso_lift_joint"
+                )
+            ),
+            None,
+        )
+        if torso_joint is None:
+            return False
+        joint_names = [torso_joint]
+        joint_names.extend(
+            f"robot0_arm_{arm}_{index}_joint"
+            for arm in ARMS
+            for index in range(1, 7)
+        )
+        try:
+            qpos_addrs = [model.get_joint_qpos_addr(name) for name in joint_names]
+        except Exception:
+            return False
+        if any(isinstance(addr, tuple) for addr in qpos_addrs):
+            return False
+
+        from robot_agent.environments.robosuite_backend import (
+            _navigation_collisions,
+        )
+
+        start = data.qpos[qpos_addrs].copy()
+        path = joint_interpolation_path(
+            start,
+            target,
+            steps=config.station_side_seed_steps,
+        )
+        for values in path:
+            data.qpos[qpos_addrs] = values
+            raw_env.sim.forward()
+            collisions = _navigation_collisions(
+                raw_env,
+                robot,
+                getattr(backend, "_ignore_collision_geom", ()),
+            )
+            if collisions:
+                data.qpos[qpos_addrs] = start
+                raw_env.sim.forward()
+                synchronize_controller_goals(robot)
+                self._record(backend, raw_env)
+                return False
+            self._record(backend, raw_env)
+        synchronize_controller_goals(robot)
+        return True
+
     def _move_to_targets(
         self,
         backend,
@@ -755,6 +848,12 @@ class OfficialScriptedGraspDriver:
 
     def move_above_grasp_sites(self, backend, object_name, config) -> bool:
         self._remember_transport_stow(backend.env, config)
+        if not self._seed_station_side_clearance(
+            backend,
+            object_name,
+            config,
+        ):
+            return False
         targets = self._grasp_targets(
             backend,
             object_name,
