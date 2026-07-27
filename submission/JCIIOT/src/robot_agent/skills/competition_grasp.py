@@ -32,7 +32,7 @@ class ScriptedGraspConfig:
         pregrasp_height: float = 0.10,
         site_below_offset: float = 0.015,
         position_tolerance: float = 0.012,
-        approach_tolerance: float = 0.055,
+        approach_tolerance: float = 0.08,
         pregrasp_steps: int = 180,
         approach_steps: int = 180,
         close_steps: int = 300,

@@ -251,6 +251,7 @@ class CompetitionGraspTests(unittest.TestCase):
                 tolerance=config.approach_tolerance,
             )
         )
+        self.assertEqual(config.approach_tolerance, 0.08)
 
     def test_vertical_clearance_targets_only_raise_grippers(self):
         current = {
