@@ -143,6 +143,17 @@ class CompetitionGraspTests(unittest.TestCase):
             ],
         )
 
+    def test_transport_stow_path_excludes_start_and_reaches_target(self):
+        path = self.module.joint_interpolation_path(
+            np.array([0.8, -0.2, 2.3]),
+            np.array([0.7, -0.1, 1.6]),
+            steps=4,
+        )
+
+        self.assertEqual(path.shape, (4, 3))
+        self.assertFalse(np.allclose(path[0], [0.8, -0.2, 2.3]))
+        np.testing.assert_allclose(path[-1], [0.7, -0.1, 1.6])
+
     def test_contact_confirmation_requires_depth_beyond_first_touch(self):
         self.assertFalse(
             self.module.contact_margin_reached(

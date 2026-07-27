@@ -57,6 +57,7 @@ class ScriptedGraspConfig:
         lift_hold_steps: int = 0,
         lift_tolerance: float = 0.01,
         lift_follower_lead: float = 0.003,
+        transport_stow_steps: int = 120,
         swap_arm_targets: bool = False,
         clearance_prepared: bool = False,
     ) -> None:
@@ -95,6 +96,7 @@ class ScriptedGraspConfig:
         self.lift_hold_steps = int(lift_hold_steps)
         self.lift_tolerance = float(lift_tolerance)
         self.lift_follower_lead = float(lift_follower_lead)
+        self.transport_stow_steps = int(transport_stow_steps)
         self.swap_arm_targets = bool(swap_arm_targets)
         self.clearance_prepared = bool(clearance_prepared)
 
@@ -221,6 +223,22 @@ def mirrored_fingerpad_targets(
     targets[:, 0] = 2.0 * float(object_x) - targets[:, 0]
     targets[:, 2] -= float(height_offset)
     return targets
+
+
+def joint_interpolation_path(
+    start: np.ndarray,
+    target: np.ndarray,
+    *,
+    steps: int,
+) -> np.ndarray:
+    """Return a fixed-size joint path that excludes start and includes target."""
+    start = np.asarray(start, dtype=float)
+    target = np.asarray(target, dtype=float)
+    if start.shape != target.shape:
+        raise ValueError("start and target joints must have the same shape")
+    if int(steps) < 1:
+        raise ValueError("steps must be at least 1")
+    return np.linspace(start, target, int(steps) + 1, dtype=float)[1:]
 
 
 def close_pose_targets(
@@ -410,6 +428,23 @@ class OfficialScriptedGraspDriver:
         if callable(recorder):
             recorder(_env=raw_env)
 
+    def _remember_transport_stow(self, raw_env, config) -> None:
+        if hasattr(self, "_transport_stow"):
+            return
+        model = raw_env.sim.model
+        data = raw_env.sim.data
+        joint_names = [
+            f"robot0_arm_{arm}_{index}_joint"
+            for arm in ARMS
+            for index in range(1, 7)
+        ]
+        qpos_addrs = [model.get_joint_qpos_addr(name) for name in joint_names]
+        self._transport_stow = (
+            joint_names,
+            data.qpos[qpos_addrs].copy(),
+        )
+        self._transport_stow_steps = config.transport_stow_steps
+
     def _move_to_targets(
         self,
         backend,
@@ -545,6 +580,7 @@ class OfficialScriptedGraspDriver:
         helpers = self._helpers()
         raw_env = backend.env
         robot = raw_env.robots[0]
+        self._remember_transport_stow(raw_env, config)
         current = {
             arm: helpers["gripper_position"](raw_env, robot, arm)
             for arm in ARMS
@@ -569,6 +605,7 @@ class OfficialScriptedGraspDriver:
         )
 
     def move_above_grasp_sites(self, backend, object_name, config) -> bool:
+        self._remember_transport_stow(backend.env, config)
         targets = self._grasp_targets(
             backend,
             object_name,
@@ -970,6 +1007,45 @@ class OfficialScriptedGraspDriver:
         backend._held_crate_name = object_name
         backend._held_crate_body_id = backend.env.obj_body_id.get(object_name)
         self._record(backend, backend.env)
+
+        stow = getattr(self, "_transport_stow", None)
+        if stow is None:
+            return
+        raw_env = backend.env
+        robot = raw_env.robots[0]
+        model = raw_env.sim.model
+        data = raw_env.sim.data
+        joint_names, target = stow
+        qpos_addrs = [model.get_joint_qpos_addr(name) for name in joint_names]
+        start = data.qpos[qpos_addrs].copy()
+
+        from robot_agent.environments.robosuite_backend import (
+            _navigation_collisions,
+        )
+
+        path = joint_interpolation_path(
+            start,
+            target,
+            steps=getattr(self, "_transport_stow_steps", 120),
+        )
+        for values in path:
+            data.qpos[qpos_addrs] = values
+            raw_env.sim.forward()
+            collisions = _navigation_collisions(
+                raw_env,
+                robot,
+                getattr(backend, "_ignore_collision_geom", ()),
+            )
+            if collisions:
+                data.qpos[qpos_addrs] = start
+                raw_env.sim.forward()
+                synchronize_controller_goals(robot)
+                self._record(backend, raw_env)
+                raise RuntimeError(
+                    f"transport stow path collided: {collisions[0]}"
+                )
+            self._record(backend, raw_env)
+        synchronize_controller_goals(robot)
 
 
 def run_scripted_grasp(
