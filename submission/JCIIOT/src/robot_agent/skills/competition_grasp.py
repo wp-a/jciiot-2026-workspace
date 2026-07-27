@@ -253,7 +253,7 @@ def apply_object_grasp_profile(
     elif uses_station_side_tote_grasp(object_name):
         config.mirrored_ik_height_offset = 0.06
         config.station_side_reach_offset = 0.04
-        config.clearance_translate_steps = 240
+        config.clearance_translate_steps = 360
     return config
 
 

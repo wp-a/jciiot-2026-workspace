@@ -369,7 +369,7 @@ class CompetitionGraspTests(unittest.TestCase):
 
         self.assertAlmostEqual(profiled.mirrored_ik_height_offset, 0.06)
         self.assertAlmostEqual(profiled.station_side_reach_offset, 0.04)
-        self.assertEqual(profiled.clearance_translate_steps, 240)
+        self.assertEqual(profiled.clearance_translate_steps, 360)
 
     def test_l5_transport_starts_at_backend_center_attachment(self):
         np.testing.assert_allclose(
