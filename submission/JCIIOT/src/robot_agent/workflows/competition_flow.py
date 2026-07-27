@@ -155,6 +155,71 @@ class OfficialCompetitionDriver:
         )
         return bool(result.success)
 
+    def _grasp_pose(self, source: str, object_name: str) -> dict:
+        from robosuite.environments.factory_sorting.load_factory_sorting_evalization import (
+            get_target_positions,
+        )
+        from robot_agent.skills.competition_navigation import (
+            grasp_aligned_base_pose,
+        )
+
+        station = self.scene_context.input_ports[source]
+        body_id = self.backend.env.obj_body_id[object_name]
+        object_xy = self.backend.env.sim.data.body_xpos[body_id][:2]
+        raw_targets, _ = get_target_positions(
+            self.backend.env,
+            object_name,
+            0.035,
+        )
+        station_approach = (
+            station.approach
+            if station.approach is not None
+            else self.scene_context.approach_xy(source)
+        )
+        return grasp_aligned_base_pose(
+            object_xy=object_xy,
+            right_site_xy=raw_targets["right"][:2],
+            left_site_xy=raw_targets["left"][:2],
+            station_center=station.center,
+            station_approach=station_approach,
+        )
+
+    def rank_objects(self, source: str, object_names: Iterable[str]) -> list[str]:
+        from robot_agent.skills.competition_navigation import (
+            select_grasp_candidate,
+        )
+
+        names = [str(name) for name in object_names]
+        station = self.scene_context.input_ports[source]
+        station_approach = (
+            station.approach
+            if station.approach is not None
+            else self.scene_context.approach_xy(source)
+        )
+        entries = []
+        for name in names:
+            pose = self._grasp_pose(source, name)
+            body_id = self.backend.env.obj_body_id[name]
+            object_xy = self.backend.env.sim.data.body_xpos[body_id][:2]
+            entries.append(
+                {
+                    "name": name,
+                    "base_xy": pose["base_xy"],
+                    "object_xy": object_xy,
+                }
+            )
+
+        ranked = []
+        remaining = entries
+        while remaining:
+            selected = select_grasp_candidate(
+                remaining,
+                station_approach=station_approach,
+            )
+            ranked.append(selected)
+            remaining = [entry for entry in remaining if entry["name"] != selected]
+        return ranked
+
     def move(
         self,
         target: str,
@@ -167,33 +232,7 @@ class OfficialCompetitionDriver:
         orient_for_grasp = False
         if not carrying and object_name:
             try:
-                from robosuite.environments.factory_sorting.load_factory_sorting_evalization import (
-                    get_target_positions,
-                )
-                from robot_agent.skills.competition_navigation import (
-                    grasp_aligned_base_pose,
-                )
-
-                station = self.scene_context.input_ports[target]
-                body_id = self.backend.env.obj_body_id[object_name]
-                object_xy = self.backend.env.sim.data.body_xpos[body_id][:2]
-                raw_targets, _ = get_target_positions(
-                    self.backend.env,
-                    object_name,
-                    0.035,
-                )
-                station_approach = (
-                    station.approach
-                    if station.approach is not None
-                    else self.scene_context.approach_xy(target)
-                )
-                grasp_pose = grasp_aligned_base_pose(
-                    object_xy=object_xy,
-                    right_site_xy=raw_targets["right"][:2],
-                    left_site_xy=raw_targets["left"][:2],
-                    station_center=station.center,
-                    station_approach=station_approach,
-                )
+                grasp_pose = self._grasp_pose(target, object_name)
                 base_xy = grasp_pose["base_xy"]
                 staging_xy = grasp_pose["staging_xy"]
                 resolved_target = f"{base_xy[0]:.6f}, {base_xy[1]:.6f}"
@@ -284,13 +323,18 @@ def run_official_task(
         candidates = [raw_objects]
     else:
         candidates = [str(name) for name in raw_objects if name]
-    object_names = candidates if task.get("level") == "L5" else candidates[:1]
 
     driver = OfficialCompetitionDriver(
         backend=backend,
         scene_context=scene_context,
         grid=grid,
         grasp_config=grasp_config,
+    )
+    ranked_candidates = driver.rank_objects(str(task["source"]), candidates)
+    object_names = (
+        ranked_candidates
+        if task.get("level") == "L5"
+        else ranked_candidates[:1]
     )
     return CompetitionFlow(driver, max_attempts=max_attempts).run(
         source=str(task["source"]),

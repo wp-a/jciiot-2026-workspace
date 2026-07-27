@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 
 
-REFERENCE_BASE_DISTANCE = 0.941001
+REFERENCE_BASE_TO_GRASP_CENTER = 0.651001
 
 
 def bounded_yaw_step(
@@ -29,7 +29,7 @@ def grasp_aligned_base_pose(
     left_site_xy,
     station_center,
     station_approach,
-    base_distance: float = REFERENCE_BASE_DISTANCE,
+    base_standoff: float = REFERENCE_BASE_TO_GRASP_CENTER,
 ) -> dict:
     """Choose a collision-aware side perpendicular to the grasp-site axis."""
     axis_x = float(right_site_xy[0]) - float(left_site_xy[0])
@@ -39,21 +39,33 @@ def grasp_aligned_base_pose(
         raise ValueError("grasp sites must have distinct planar positions")
     axis = (axis_x / axis_norm, axis_y / axis_norm)
 
-    clockwise = (axis[1], -axis[0])
-    guidance = (
-        float(station_approach[0]) - float(station_center[0])
-        + float(object_xy[0]) - float(station_center[0]),
-        float(station_approach[1]) - float(station_center[1])
-        + float(object_xy[1]) - float(station_center[1]),
+    grasp_center = (
+        (float(right_site_xy[0]) + float(left_site_xy[0])) / 2.0,
+        (float(right_site_xy[1]) + float(left_site_xy[1])) / 2.0,
     )
-    if clockwise[0] * guidance[0] + clockwise[1] * guidance[1] >= 0.0:
-        base_direction = clockwise
+    face = (
+        grasp_center[0] - float(object_xy[0]),
+        grasp_center[1] - float(object_xy[1]),
+    )
+    face_norm = math.hypot(face[0], face[1])
+    if face_norm >= 0.05:
+        base_direction = (face[0] / face_norm, face[1] / face_norm)
     else:
-        base_direction = (-clockwise[0], -clockwise[1])
+        clockwise = (axis[1], -axis[0])
+        guidance = (
+            float(station_approach[0]) - float(station_center[0])
+            + float(object_xy[0]) - float(station_center[0]),
+            float(station_approach[1]) - float(station_center[1])
+            + float(object_xy[1]) - float(station_center[1]),
+        )
+        if clockwise[0] * guidance[0] + clockwise[1] * guidance[1] >= 0.0:
+            base_direction = clockwise
+        else:
+            base_direction = (-clockwise[0], -clockwise[1])
 
     base_xy = [
-        float(object_xy[0]) + float(base_distance) * base_direction[0],
-        float(object_xy[1]) + float(base_distance) * base_direction[1],
+        grasp_center[0] + float(base_standoff) * base_direction[0],
+        grasp_center[1] + float(base_standoff) * base_direction[1],
     ]
     projection = (
         (float(station_approach[0]) - base_xy[0]) * axis[0]
@@ -75,6 +87,38 @@ def grasp_aligned_base_pose(
         "yaw": yaw,
         "swap_arm_targets": swap_arm_targets,
     }
+
+
+def select_grasp_candidate(candidates, *, station_approach) -> str:
+    """Prefer an approach pose clear of other task objects, then the station path."""
+    entries = list(candidates)
+    if not entries:
+        raise ValueError("candidates must not be empty")
+
+    def score(entry):
+        base_xy = entry["base_xy"]
+        other_positions = [
+            other["object_xy"]
+            for other in entries
+            if other["name"] != entry["name"]
+        ]
+        if other_positions:
+            clearance = min(
+                math.hypot(
+                    float(base_xy[0]) - float(position[0]),
+                    float(base_xy[1]) - float(position[1]),
+                )
+                for position in other_positions
+            )
+        else:
+            clearance = math.inf
+        approach_distance = math.hypot(
+            float(base_xy[0]) - float(station_approach[0]),
+            float(base_xy[1]) - float(station_approach[1]),
+        )
+        return clearance, -approach_distance
+
+    return str(max(entries, key=score)["name"])
 
 
 def orient_base(
