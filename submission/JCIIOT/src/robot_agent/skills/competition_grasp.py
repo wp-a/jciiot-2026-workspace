@@ -36,6 +36,8 @@ class ScriptedGraspConfig:
         pregrasp_steps: int = 180,
         approach_steps: int = 180,
         close_steps: int = 300,
+        contact_polish_steps: int = 80,
+        contact_polish_downward: float = 0.10,
         max_action: float = 0.65,
         lift_height: float = 0.15,
         lift_steps: int = 300,
@@ -58,6 +60,8 @@ class ScriptedGraspConfig:
         self.pregrasp_steps = int(pregrasp_steps)
         self.approach_steps = int(approach_steps)
         self.close_steps = int(close_steps)
+        self.contact_polish_steps = int(contact_polish_steps)
+        self.contact_polish_downward = float(contact_polish_downward)
         self.max_action = float(max_action)
         self.lift_height = float(lift_height)
         self.lift_steps = int(lift_steps)
@@ -433,6 +437,54 @@ class OfficialScriptedGraspDriver:
 
         return helpers["grasp_status"](raw_env, robot, object_name)
 
+    def polish_contacts(self, backend, object_name, config, contacts):
+        helpers = self._helpers()
+        raw_env = backend.env
+        robot = raw_env.robots[0]
+        hold_targets = helpers["capture_hold_targets"](robot)
+
+        for _ in range(config.contact_polish_steps):
+            current_contacts = helpers["grasp_status"](
+                raw_env,
+                robot,
+                object_name,
+            )
+            if all(bool(current_contacts.get(arm, False)) for arm in ARMS):
+                return current_contacts
+
+            arm_actions = {}
+            for arm in ARMS:
+                if bool(current_contacts.get(arm, False)):
+                    world_delta = np.zeros(3, dtype=float)
+                else:
+                    world_delta = np.array(
+                        [0.0, 0.0, -config.contact_polish_downward],
+                        dtype=float,
+                    )
+                controller_delta = helpers["world_delta"](
+                    robot,
+                    arm,
+                    world_delta,
+                )
+                arm_actions[arm] = helpers["arm_action"](
+                    robot,
+                    arm,
+                    controller_delta,
+                    config.max_action,
+                )
+            action = helpers["build_action"](
+                robot,
+                arm_actions=arm_actions,
+                gripper_value=1.0,
+                hold_targets=hold_targets,
+            )
+            _, _, _, info = raw_env.step(action)
+            self._record(backend, raw_env)
+            if bool((info or {}).get("has_judge_collision", False)):
+                break
+
+        return helpers["grasp_status"](raw_env, robot, object_name)
+
     def lift_and_verify(self, backend, object_name, config) -> bool:
         helpers = self._helpers()
         result = helpers["lift"](
@@ -500,11 +552,20 @@ def run_scripted_grasp(
         else:
             contacts = dict(driver.close_and_check_contacts(backend, object_name, config))
             if not all(bool(contacts.get(arm, False)) for arm in ARMS):
-                failure_stage = "contact"
-            else:
+                contacts = dict(
+                    driver.polish_contacts(
+                        backend,
+                        object_name,
+                        config,
+                        contacts,
+                    )
+                )
+            if all(bool(contacts.get(arm, False)) for arm in ARMS):
                 lift_success = bool(driver.lift_and_verify(backend, object_name, config))
                 if not lift_success:
                     failure_stage = "lift"
+            else:
+                failure_stage = "contact"
     except Exception as exc:  # preserve the physical failure for the run manifest
         failure_stage = failure_stage or "exception"
         error = f"{type(exc).__name__}: {exc}"

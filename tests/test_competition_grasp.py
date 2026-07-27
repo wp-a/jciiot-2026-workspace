@@ -33,8 +33,16 @@ class RecordingBackend:
 
 
 class ScriptedDriver:
-    def __init__(self, *, contacts=None, lift_success=True, clearance_success=True):
+    def __init__(
+        self,
+        *,
+        contacts=None,
+        polished_contacts=None,
+        lift_success=True,
+        clearance_success=True,
+    ):
         self.contacts = contacts or {"right": True, "left": True}
+        self.polished_contacts = polished_contacts or self.contacts
         self.lift_success = lift_success
         self.clearance_success = clearance_success
         self.calls = []
@@ -58,6 +66,10 @@ class ScriptedDriver:
     def close_and_check_contacts(self, backend, object_name, config):
         self.calls.append("close")
         return self.contacts
+
+    def polish_contacts(self, backend, object_name, config, contacts):
+        self.calls.append("polish")
+        return self.polished_contacts
 
     def lift_and_verify(self, backend, object_name, config):
         self.calls.append("lift")
@@ -249,9 +261,45 @@ class CompetitionGraspTests(unittest.TestCase):
         self.assertEqual(result["failure_stage"], "contact")
         self.assertEqual(
             driver.calls,
-            ["raise_clearance", "move_above", "pregrasp", "approach", "close"],
+            [
+                "raise_clearance",
+                "move_above",
+                "pregrasp",
+                "approach",
+                "close",
+                "polish",
+            ],
         )
         self.assertFalse(backend.events[-1]["success"])
+
+    def test_contact_polish_can_recover_one_missing_arm(self):
+        backend = RecordingBackend()
+        driver = ScriptedDriver(
+            contacts={"right": True, "left": False},
+            polished_contacts={"right": True, "left": True},
+        )
+
+        result = self.module.run_scripted_grasp(
+            backend,
+            source="input_6",
+            object_name="green_tote_b01_lower",
+            driver=driver,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(
+            driver.calls,
+            [
+                "raise_clearance",
+                "move_above",
+                "pregrasp",
+                "approach",
+                "close",
+                "polish",
+                "lift",
+                "attach",
+            ],
+        )
 
     def test_scripted_grasp_stops_when_vertical_clearance_fails(self):
         backend = RecordingBackend()
