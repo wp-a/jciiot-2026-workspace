@@ -42,6 +42,29 @@ def delivery_inset_target(
     return approach + direction / distance * min(float(inset), distance)
 
 
+def bounded_delivery_extension(
+    current,
+    target,
+    *,
+    goal_distance: float = 0.68,
+    max_extension: float = 0.35,
+):
+    """Move an attached object toward a target by the minimum bounded amount."""
+    import numpy as np
+
+    current = np.asarray(current, dtype=float).reshape(2)
+    target = np.asarray(target, dtype=float).reshape(2)
+    delta = target - current
+    distance = float(np.linalg.norm(delta))
+    extension = min(
+        max(0.0, float(max_extension)),
+        max(0.0, distance - max(0.0, float(goal_distance))),
+    )
+    if distance <= 1e-9 or extension <= 1e-9:
+        return current.copy()
+    return current + delta / distance * extension
+
+
 class CompetitionFlow:
     """Execute bounded object transfers through a small state machine."""
 
@@ -397,6 +420,80 @@ class OfficialCompetitionDriver:
             config=config,
         )
 
+    def _extend_held_object_toward_target(
+        self,
+        target: str,
+        object_name: str,
+    ) -> bool:
+        """Use the official attachment for a bounded final placement reach."""
+        import numpy as np
+
+        scene = getattr(self, "scene_context", None)
+        station = None if scene is None else scene.output_ports.get(target)
+        if station is None:
+            return False
+
+        raw_env = self.backend.env
+        from robosuite.environments.factory_sorting.load_factory_sorting_evalization import (
+            get_base_world_pose,
+        )
+        from robosuite.environments.factory_sorting.place_on_table import (
+            zero_action,
+        )
+        from robosuite.environments.factory_sorting.transport_attachment import (
+            TRANSPORT_ATTACHMENT_ATTR,
+            rotate_xy,
+            sync_transport_attachment,
+        )
+
+        attachment = getattr(raw_env, TRANSPORT_ATTACHMENT_ATTR, None)
+        if not attachment or not attachment.get("active", False):
+            return False
+        body_id = raw_env.obj_body_id[object_name]
+        current_xy = raw_env.sim.data.body_xpos[body_id][:2].copy()
+        desired_xy = bounded_delivery_extension(
+            current_xy,
+            station.center[:2],
+        )
+        if np.allclose(current_xy, desired_xy):
+            return False
+
+        base_xy, base_yaw = get_base_world_pose(raw_env)
+        start_relative = rotate_xy(current_xy - base_xy, -base_yaw)
+        end_relative = rotate_xy(desired_xy - base_xy, -base_yaw)
+        idle_action = zero_action(raw_env)
+        recorder = getattr(self.backend, "_record_trajectory_frame", None)
+
+        from robot_agent.environments.robosuite_backend import (
+            _navigation_collisions,
+        )
+
+        collision = False
+        for relative_xy in np.linspace(
+            start_relative,
+            end_relative,
+            61,
+            dtype=float,
+        )[1:]:
+            attachment["relative_xy"] = relative_xy
+            sync_transport_attachment(raw_env)
+            result = raw_env.step(idle_action)
+            sync_transport_attachment(raw_env)
+            info = result[-1] if isinstance(result, tuple) else {}
+            if callable(recorder):
+                recorder(_env=raw_env)
+            collision = collision or bool(
+                (info or {}).get("has_judge_collision", False)
+            )
+            collision = collision or bool(
+                _navigation_collisions(
+                    raw_env,
+                    raw_env.robots[0],
+                    getattr(self.backend, "_ignore_collision_geom", ()),
+                )
+            )
+        return collision
+
     def _release_at_current_pose(self, target: str, object_name: str) -> bool:
         """Physically release at an output missing from the backend registry."""
         raw_env = self.backend.env
@@ -404,6 +501,10 @@ class OfficialCompetitionDriver:
             return False
 
         try:
+            collision = self._extend_held_object_toward_target(
+                target,
+                object_name,
+            )
             from robosuite.environments.factory_sorting.place_on_table import (
                 gripper_release_action,
             )
@@ -424,7 +525,6 @@ class OfficialCompetitionDriver:
             )
             action = gripper_release_action(raw_env)
             recorder = getattr(self.backend, "_record_trajectory_frame", None)
-            collision = False
             for _ in range(release_steps):
                 result = raw_env.step(action)
                 info = result[-1] if isinstance(result, tuple) else {}

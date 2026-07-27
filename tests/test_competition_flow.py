@@ -293,6 +293,35 @@ class CompetitionFlowTests(unittest.TestCase):
 
         np.testing.assert_allclose(target, [4.170, -7.261])
 
+    def test_bounded_delivery_extension_reaches_target_margin(self):
+        current = np.array([0.093737, 7.596847])
+        target = np.array([0.144, 8.473])
+
+        extended = self.module.bounded_delivery_extension(
+            current,
+            target,
+            goal_distance=0.68,
+            max_extension=0.35,
+        )
+
+        self.assertAlmostEqual(
+            float(np.linalg.norm(extended - target)),
+            0.68,
+        )
+
+    def test_bounded_delivery_extension_keeps_sufficient_position(self):
+        current = np.array([4.15, -7.25])
+        target = np.array([4.872, -7.261])
+
+        extended = self.module.bounded_delivery_extension(
+            current,
+            target,
+            goal_distance=0.75,
+            max_extension=0.35,
+        )
+
+        np.testing.assert_allclose(extended, current)
+
     def test_physical_output_availability_accepts_official_name_suffix(self):
         self.assertTrue(
             self.module.physical_output_available(
