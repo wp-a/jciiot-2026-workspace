@@ -30,7 +30,7 @@ class ScriptedGraspConfig:
         torso_steps: int = 80,
         torso_tolerance: float = 0.005,
         pregrasp_height: float = 0.10,
-        site_below_offset: float = 0.035,
+        site_below_offset: float = 0.015,
         position_tolerance: float = 0.012,
         approach_tolerance: float = 0.055,
         pregrasp_steps: int = 180,

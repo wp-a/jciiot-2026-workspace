@@ -133,7 +133,7 @@ class CompetitionFlowTests(unittest.TestCase):
         )
         self.assertLess(first_verified_index, second_failed_index)
 
-    def test_clearance_preparation_lowers_workspace_after_raising_arms(self):
+    def test_clearance_preparation_keeps_nominal_torso_height(self):
         calls = []
 
         class GraspDriver:
@@ -163,7 +163,7 @@ class CompetitionFlowTests(unittest.TestCase):
             success = driver._prepare_grasp_clearance("green_tote_b01_lower")
 
         self.assertTrue(success)
-        self.assertEqual(calls, ["raise_clearance", "lower_torso"])
+        self.assertEqual(calls, ["raise_clearance"])
 
     def test_prepared_clearance_preserves_official_grasp_depth(self):
         captured = {}

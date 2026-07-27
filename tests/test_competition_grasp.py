@@ -276,6 +276,11 @@ class CompetitionGraspTests(unittest.TestCase):
 
         self.assertEqual(config.clearance_height, 0.30)
 
+    def test_default_grasp_depth_interpolates_reach_and_side_contact(self):
+        config = self.module.ScriptedGraspConfig()
+
+        self.assertEqual(config.site_below_offset, 0.015)
+
     def test_grasp_targets_can_be_swapped_after_base_rotation(self):
         raw_targets = {
             "right": np.array([12.03, 4.41, 1.36]),
