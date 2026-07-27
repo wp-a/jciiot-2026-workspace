@@ -102,6 +102,15 @@ class CompetitionNavigationTests(unittest.TestCase):
 
         self.assertAlmostEqual(next_yaw, -math.pi + 0.025)
 
+    def test_scanned_grasp_yaw_limit_stays_below_collision_boundary(self):
+        next_yaw = self.module.bounded_yaw_step(
+            current_yaw=1.5701,
+            target_yaw=2.2585,
+            max_step=self.module.SAFE_GRASP_YAW_CORRECTION,
+        )
+
+        self.assertAlmostEqual(next_yaw, 1.8501)
+
     def test_reached_base_orientation_faces_grasp_center(self):
         orientation = self.module.grasp_orientation_from_base(
             base_xy=[12.4061, 2.353],
