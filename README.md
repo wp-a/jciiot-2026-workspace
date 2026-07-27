@@ -24,9 +24,11 @@
 7. [模块路线图](docs/08-module-roadmap.md)：SOP、编排、导航、抓放、恢复、数据与评测的优化顺序。
 8. [当前技术路线与优化计划](docs/09-current-route-and-optimization-plan.md)：已实现架构、竞争优势、创新边界和下一阶段门槛。
 9. [五关性能基线](experiments/2026-07-28-five-level-performance-baseline.md)：固定种子 100/100、零碰撞和 L5 收敛证据。
-10. [资料索引](docs/04-source-index.md)和[来源台账](research/source-ledger.csv)：网页、代码、论文、固定版本和采用状态。
-11. [架构决策](decisions/README.md)：路线选择和第三方代码隔离政策。
-12. [提交合规清单](docs/06-submission-compliance.md)：组队、依赖、复现、报告和发布要求。
+10. [多种子稳定性](experiments/2026-07-28-multiseed-stability.md)：L2-L5 各 20 次，80/80 满分和置信区间。
+11. [官方 Agent 入口验收](experiments/2026-07-28-official-agent-entrypoint.md)：干净候选通过 `RobotAgent.run()` 五关 100/100。
+12. [资料索引](docs/04-source-index.md)和[来源台账](research/source-ledger.csv)：网页、代码、论文、固定版本和采用状态。
+13. [架构决策](decisions/README.md)：路线选择和第三方代码隔离政策。
+14. [提交合规清单](docs/06-submission-compliance.md)：组队、依赖、复现、报告和发布要求。
 
 ## 工作区结构
 
@@ -71,4 +73,4 @@ bash tests/test_workspace_check.sh
 
 ## 下一阶段的最小成功标准
 
-固定种子五关满分闭环已经完成。下一阶段最小成功标准是：L2-L5 各至少 20 种子，保留全部失败并统计满分率/碰撞率；在干净 Linux 环境一键复现；完成 SOP 证据链、模块消融和技术报告。达到这些门槛前，不启动大规模 VLA 微调。
+固定种子五关满分、L2-L5 每关 20 次重复执行和干净官方 Agent 五关验收已经完成。下一阶段最小成功标准是：显式扰动物体位姿/底盘误差并统计鲁棒性；完善一键复现；完成原创 SOP 证据链、模块消融和技术报告。达到这些门槛前，不启动大规模 VLA 微调。
