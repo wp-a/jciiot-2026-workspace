@@ -1,6 +1,7 @@
 import importlib.util
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -613,6 +614,30 @@ class CompetitionGraspTests(unittest.TestCase):
         self.assertEqual(backend.events[0]["name"], "grasp_start")
         self.assertEqual(backend.events[-1]["name"], "grasp_end")
         self.assertTrue(backend.events[-1]["success"])
+
+    def test_white_tote_refreshes_controller_before_grasp_stages(self):
+        calls = []
+
+        class Composite:
+            part_controllers = {}
+
+            def update_state(self):
+                calls.append("update_state")
+
+        backend = RecordingBackend()
+        backend.env = SimpleNamespace(
+            robots=[SimpleNamespace(composite_controller=Composite())]
+        )
+
+        result = self.module.run_scripted_grasp(
+            backend,
+            source="input_1",
+            object_name="white_tote_b01_left_center",
+            driver=ScriptedDriver(),
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(calls, ["update_state"])
 
     def test_scripted_grasp_stops_before_lift_when_contact_is_incomplete(self):
         backend = RecordingBackend()

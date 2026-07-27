@@ -1269,6 +1269,8 @@ def run_scripted_grasp(
         object_name,
     )
     driver = driver or OfficialScriptedGraspDriver()
+    if uses_station_side_tote_grasp(object_name):
+        synchronize_controller_goals(backend.env.robots[0])
     backend._mark_trajectory_event(
         "grasp_start",
         source=source,
