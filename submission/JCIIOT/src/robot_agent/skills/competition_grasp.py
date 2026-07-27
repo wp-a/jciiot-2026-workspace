@@ -44,6 +44,7 @@ class ScriptedGraspConfig:
         lift_steps: int = 300,
         lift_hold_steps: int = 0,
         lift_tolerance: float = 0.01,
+        lift_follower_lead: float = 0.003,
         swap_arm_targets: bool = False,
         clearance_prepared: bool = False,
     ) -> None:
@@ -69,6 +70,7 @@ class ScriptedGraspConfig:
         self.lift_steps = int(lift_steps)
         self.lift_hold_steps = int(lift_hold_steps)
         self.lift_tolerance = float(lift_tolerance)
+        self.lift_follower_lead = float(lift_follower_lead)
         self.swap_arm_targets = bool(swap_arm_targets)
         self.clearance_prepared = bool(clearance_prepared)
 
@@ -126,6 +128,19 @@ def contact_margin_reached(
 ) -> bool:
     """Return whether a contact search moved far enough beyond first touch."""
     return float(first_contact) - float(current) >= float(required_drop) - 1e-12
+
+
+def follower_lift_offset(
+    *,
+    object_lift: float,
+    lead: float,
+    lift_height: float,
+) -> float:
+    """Track the object with a small bounded lead instead of a fixed arm goal."""
+    return min(
+        float(lift_height),
+        max(0.0, float(object_lift)) + max(0.0, float(lead)),
+    )
 
 
 def targets_reached(
@@ -223,7 +238,7 @@ class OfficialScriptedGraspDriver:
             build_action,
             capture_hold_targets,
             current_part_qpos,
-            lift_grasped_object,
+            object_center_pos,
             world_delta_to_controller_frame,
         )
         from robosuite.environments.factory_sorting.load_factory_sorting_evalization import (
@@ -240,7 +255,7 @@ class OfficialScriptedGraspDriver:
             "build_action": build_action,
             "capture_hold_targets": capture_hold_targets,
             "current_part_qpos": current_part_qpos,
-            "lift": lift_grasped_object,
+            "object_center": object_center_pos,
             "world_delta": world_delta_to_controller_frame,
             "get_targets": get_target_positions,
             "grasp_status": grasp_status,
@@ -532,25 +547,81 @@ class OfficialScriptedGraspDriver:
 
     def lift_and_verify(self, backend, object_name, config) -> bool:
         helpers = self._helpers()
-        result = helpers["lift"](
-            env=backend.env,
-            object_name=object_name,
-            lift_height=config.lift_height,
-            max_steps=config.lift_steps,
-            hold_steps=config.lift_hold_steps,
-            tolerance=config.lift_tolerance,
-            max_action=config.max_action,
-            render=False,
-            render_callback=lambda: self._record(backend, backend.env),
-        )
-        if not bool(result.get("success", False)):
+        raw_env = backend.env
+        robot = raw_env.robots[0]
+        contacts = helpers["grasp_status"](raw_env, robot, object_name)
+        if not all(bool(contacts.get(arm, False)) for arm in ARMS):
             return False
-        contacts = helpers["grasp_status"](
-            backend.env,
-            backend.env.robots[0],
-            object_name,
+
+        start_object_z = float(
+            helpers["object_center"](raw_env, object_name)[2]
         )
-        return all(bool(contacts.get(arm, False)) for arm in ARMS)
+        target_object_z = start_object_z + config.lift_height
+        starts = {
+            arm: helpers["gripper_position"](raw_env, robot, arm)
+            for arm in ARMS
+        }
+        leader = min(ARMS, key=lambda arm: float(starts[arm][2]))
+        follower = next(arm for arm in ARMS if arm != leader)
+        hold_targets = helpers["capture_hold_targets"](robot)
+        success = False
+
+        for _ in range(config.lift_steps):
+            current_object_z = float(
+                helpers["object_center"](raw_env, object_name)[2]
+            )
+            if current_object_z >= target_object_z - config.lift_tolerance:
+                success = True
+                break
+
+            contacts = helpers["grasp_status"](raw_env, robot, object_name)
+            if not all(bool(contacts.get(arm, False)) for arm in ARMS):
+                return False
+
+            object_lift = current_object_z - start_object_z
+            offsets = {
+                leader: config.lift_height,
+                follower: follower_lift_offset(
+                    object_lift=object_lift,
+                    lead=config.lift_follower_lead,
+                    lift_height=config.lift_height,
+                ),
+            }
+            robot.composite_controller.update_state()
+            arm_actions = {}
+            for arm in ARMS:
+                target = starts[arm] + np.array(
+                    [0.0, 0.0, offsets[arm]],
+                    dtype=float,
+                )
+                current = helpers["gripper_position"](raw_env, robot, arm)
+                controller_delta = helpers["world_delta"](
+                    robot,
+                    arm,
+                    target - current,
+                )
+                arm_actions[arm] = helpers["arm_action"](
+                    robot,
+                    arm,
+                    controller_delta,
+                    config.max_action,
+                )
+            action = helpers["build_action"](
+                robot,
+                arm_actions=arm_actions,
+                gripper_value=1.0,
+                hold_targets=hold_targets,
+            )
+            _, _, _, info = raw_env.step(action)
+            self._record(backend, raw_env)
+            if bool((info or {}).get("has_judge_collision", False)):
+                return False
+
+        contacts = helpers["grasp_status"](raw_env, robot, object_name)
+        return bool(
+            success
+            and all(bool(contacts.get(arm, False)) for arm in ARMS)
+        )
 
     def attach_for_transport(self, backend, object_name) -> None:
         helpers = self._helpers()

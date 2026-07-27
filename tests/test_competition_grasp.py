@@ -133,6 +133,32 @@ class CompetitionGraspTests(unittest.TestCase):
             )
         )
 
+    def test_follower_lift_offset_tracks_object_with_bounded_lead(self):
+        self.assertAlmostEqual(
+            self.module.follower_lift_offset(
+                object_lift=0.0,
+                lead=0.003,
+                lift_height=0.05,
+            ),
+            0.003,
+        )
+        self.assertAlmostEqual(
+            self.module.follower_lift_offset(
+                object_lift=0.018,
+                lead=0.003,
+                lift_height=0.05,
+            ),
+            0.021,
+        )
+        self.assertAlmostEqual(
+            self.module.follower_lift_offset(
+                object_lift=0.060,
+                lead=0.003,
+                lift_height=0.05,
+            ),
+            0.05,
+        )
+
     def test_stage_requires_every_arm_within_tolerance(self):
         targets = {
             "right": np.array([1.0, 2.0, 3.0]),
