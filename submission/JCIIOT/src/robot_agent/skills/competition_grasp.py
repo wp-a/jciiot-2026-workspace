@@ -227,6 +227,11 @@ def uses_station_side_tote_grasp(object_name: str) -> bool:
     return "white_tote_b01_left" in str(object_name).lower()
 
 
+def should_swap_arm_targets(object_name: str, *, requested: bool) -> bool:
+    """Keep the dynamic wall-side assignment from being swapped twice."""
+    return bool(requested) and not uses_station_side_tote_grasp(object_name)
+
+
 def apply_object_grasp_profile(
     config: ScriptedGraspConfig,
     object_name: str,
@@ -655,7 +660,10 @@ class OfficialScriptedGraspDriver:
             )
         grasp_targets = assigned_grasp_targets(
             raw_targets,
-            swap=config.swap_arm_targets,
+            swap=should_swap_arm_targets(
+                object_name,
+                requested=config.swap_arm_targets,
+            ),
         )
         object_xy = backend.env.sim.data.body_xpos[body_id][:2]
         grasp_targets = inward_face_targets(

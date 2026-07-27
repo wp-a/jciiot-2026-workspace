@@ -325,6 +325,18 @@ class CompetitionGraspTests(unittest.TestCase):
                 "green_tote_b01_lower"
             )
         )
+        self.assertFalse(
+            self.module.should_swap_arm_targets(
+                "white_tote_b01_left_front",
+                requested=True,
+            )
+        )
+        self.assertTrue(
+            self.module.should_swap_arm_targets(
+                "green_tote_b01_lower",
+                requested=True,
+            )
+        )
 
     def test_wall_side_tote_targets_reflect_near_site_across_heading(self):
         targets = self.module.station_side_tote_grasp_targets(
