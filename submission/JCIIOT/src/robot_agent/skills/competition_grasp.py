@@ -143,6 +143,18 @@ def follower_lift_offset(
     )
 
 
+def synchronize_controller_goals(robot) -> None:
+    """Reset moving-base controller goals to the current simulated posture."""
+    composite = robot.composite_controller
+    composite.update_state()
+    for part_name in (*ARMS, "torso"):
+        controller = composite.part_controllers.get(part_name)
+        if controller is None:
+            continue
+        controller.update(force=True)
+        controller.reset_goal()
+
+
 def targets_reached(
     current: Mapping[str, np.ndarray],
     targets: Mapping[str, np.ndarray],
@@ -536,12 +548,14 @@ class OfficialScriptedGraspDriver:
                     current=target,
                     required_drop=config.contact_confirmation_drop,
                 ):
+                    synchronize_controller_goals(robot)
                     return current_contacts
             if bool(getattr(raw_env, "has_judge_collision", False)):
                 break
 
         raw_env.sim.data.qpos[qpos_addr] = start
         raw_env.sim.forward()
+        synchronize_controller_goals(robot)
         self._record(backend, raw_env)
         return helpers["grasp_status"](raw_env, robot, object_name)
 

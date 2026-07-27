@@ -159,6 +159,38 @@ class CompetitionGraspTests(unittest.TestCase):
             0.05,
         )
 
+    def test_controller_goals_are_refreshed_after_kinematic_adjustment(self):
+        calls = []
+
+        class Controller:
+            def __init__(self, name):
+                self.name = name
+
+            def update(self, *, force):
+                calls.append((self.name, "update", force))
+
+            def reset_goal(self):
+                calls.append((self.name, "reset"))
+
+        class Composite:
+            def __init__(self):
+                self.part_controllers = {
+                    name: Controller(name)
+                    for name in ("right", "left", "torso")
+                }
+
+            def update_state(self):
+                calls.append(("composite", "update_state"))
+
+        robot = type("Robot", (), {"composite_controller": Composite()})()
+
+        self.module.synchronize_controller_goals(robot)
+
+        self.assertEqual(calls[0], ("composite", "update_state"))
+        for part in ("right", "left", "torso"):
+            self.assertIn((part, "update", True), calls)
+            self.assertIn((part, "reset"), calls)
+
     def test_stage_requires_every_arm_within_tolerance(self):
         targets = {
             "right": np.array([1.0, 2.0, 3.0]),
