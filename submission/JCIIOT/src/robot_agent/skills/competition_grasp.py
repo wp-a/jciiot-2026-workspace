@@ -36,6 +36,7 @@ class ScriptedGraspConfig:
         lift_steps: int = 300,
         lift_hold_steps: int = 20,
         lift_tolerance: float = 0.02,
+        swap_arm_targets: bool = False,
     ) -> None:
         self.clearance_height = float(clearance_height)
         self.clearance_raise_steps = int(clearance_raise_steps)
@@ -51,6 +52,7 @@ class ScriptedGraspConfig:
         self.lift_steps = int(lift_steps)
         self.lift_hold_steps = int(lift_hold_steps)
         self.lift_tolerance = float(lift_tolerance)
+        self.swap_arm_targets = bool(swap_arm_targets)
 
 
 def normalized_position_action(
@@ -105,6 +107,23 @@ def vertical_clearance_targets(
         target[2] = safe_z
         targets[arm] = target
     return targets
+
+
+def assigned_grasp_targets(
+    raw_targets: Mapping[str, np.ndarray],
+    *,
+    swap: bool,
+) -> dict[str, np.ndarray]:
+    """Assign object grasp sites to arms after base-orientation selection."""
+    if swap:
+        return {
+            "right": np.asarray(raw_targets["left"], dtype=float).copy(),
+            "left": np.asarray(raw_targets["right"], dtype=float).copy(),
+        }
+    return {
+        arm: np.asarray(raw_targets[arm], dtype=float).copy()
+        for arm in ARMS
+    }
 
 
 def verified_grasp(contacts: Mapping[str, Any], *, lift_success: bool) -> bool:
@@ -228,10 +247,14 @@ class OfficialScriptedGraspDriver:
 
     def _grasp_targets(self, backend, object_name, config, *, height_offset):
         helpers = self._helpers()
-        grasp_targets, _ = helpers["get_targets"](
+        raw_targets, _ = helpers["get_targets"](
             backend.env,
             object_name,
             config.site_below_offset,
+        )
+        grasp_targets = assigned_grasp_targets(
+            raw_targets,
+            swap=config.swap_arm_targets,
         )
         offset = np.array([0.0, 0.0, float(height_offset)], dtype=float)
         return {
@@ -315,10 +338,14 @@ class OfficialScriptedGraspDriver:
         helpers = self._helpers()
         raw_env = backend.env
         robot = raw_env.robots[0]
-        grasp_targets, _ = helpers["get_targets"](
+        raw_targets, _ = helpers["get_targets"](
             raw_env,
             object_name,
             config.site_below_offset,
+        )
+        grasp_targets = assigned_grasp_targets(
+            raw_targets,
+            swap=config.swap_arm_targets,
         )
         hold_targets = helpers["capture_hold_targets"](robot)
 

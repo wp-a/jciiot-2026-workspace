@@ -116,6 +116,17 @@ class CompetitionGraspTests(unittest.TestCase):
         np.testing.assert_allclose(targets["right"], [12.48, 4.87, 1.66])
         np.testing.assert_allclose(targets["left"], [12.47, 4.42, 1.66])
 
+    def test_grasp_targets_can_be_swapped_after_base_rotation(self):
+        raw_targets = {
+            "right": np.array([12.03, 4.41, 1.36]),
+            "left": np.array([11.70, 4.41, 1.36]),
+        }
+
+        targets = self.module.assigned_grasp_targets(raw_targets, swap=True)
+
+        np.testing.assert_allclose(targets["right"], raw_targets["left"])
+        np.testing.assert_allclose(targets["left"], raw_targets["right"])
+
     def test_success_requires_both_contacts_and_lift(self):
         self.assertTrue(
             self.module.verified_grasp(

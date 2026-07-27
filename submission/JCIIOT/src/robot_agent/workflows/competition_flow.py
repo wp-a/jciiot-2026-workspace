@@ -5,21 +5,6 @@ from __future__ import annotations
 from typing import Any, Iterable
 
 
-REFERENCE_GRASP_BASE_OFFSET_XY = (0.941001, -0.019)
-
-
-def object_aligned_approach(
-    *,
-    object_xy,
-    base_offset=REFERENCE_GRASP_BASE_OFFSET_XY,
-) -> list[float]:
-    """Place the base at the public reference grasp offset from an object."""
-    return [
-        float(object_xy[0]) + float(base_offset[0]),
-        float(object_xy[1]) + float(base_offset[1]),
-    ]
-
-
 class CompetitionFlow:
     """Execute bounded object transfers through a small state machine."""
 
@@ -141,6 +126,8 @@ class OfficialCompetitionDriver:
         self.backend = backend
         self.scene_context = scene_context
         self.grasp_config = grasp_config
+        self._grasp_yaw: float | None = None
+        self._swap_arm_targets = False
         self.move_skill = MoveSkill(
             backend=backend,
             scene_context=scene_context,
@@ -166,15 +153,41 @@ class OfficialCompetitionDriver:
         object_name: str | None = None,
     ) -> bool:
         resolved_target = target
+        orient_for_grasp = False
         if not carrying and object_name:
             try:
-                self.scene_context.input_ports[target]
+                from robosuite.environments.factory_sorting.load_factory_sorting_evalization import (
+                    get_target_positions,
+                )
+                from robot_agent.skills.competition_navigation import (
+                    grasp_aligned_base_pose,
+                )
+
+                station = self.scene_context.input_ports[target]
                 body_id = self.backend.env.obj_body_id[object_name]
                 object_xy = self.backend.env.sim.data.body_xpos[body_id][:2]
-                aligned_xy = object_aligned_approach(
-                    object_xy=object_xy,
+                raw_targets, _ = get_target_positions(
+                    self.backend.env,
+                    object_name,
+                    0.035,
                 )
-                resolved_target = f"{aligned_xy[0]:.6f}, {aligned_xy[1]:.6f}"
+                station_approach = (
+                    station.approach
+                    if station.approach is not None
+                    else self.scene_context.approach_xy(target)
+                )
+                grasp_pose = grasp_aligned_base_pose(
+                    object_xy=object_xy,
+                    right_site_xy=raw_targets["right"][:2],
+                    left_site_xy=raw_targets["left"][:2],
+                    station_center=station.center,
+                    station_approach=station_approach,
+                )
+                base_xy = grasp_pose["base_xy"]
+                resolved_target = f"{base_xy[0]:.6f}, {base_xy[1]:.6f}"
+                self._grasp_yaw = float(grasp_pose["yaw"])
+                self._swap_arm_targets = bool(grasp_pose["swap_arm_targets"])
+                orient_for_grasp = True
             except (AttributeError, KeyError, TypeError, ValueError):
                 resolved_target = target
 
@@ -185,16 +198,28 @@ class OfficialCompetitionDriver:
                 carrying=bool(carrying),
             )
         )
-        return bool(result.success)
+        if not bool(result.success):
+            return False
+        if orient_for_grasp and self._grasp_yaw is not None:
+            from robot_agent.skills.competition_navigation import orient_base
+
+            return bool(orient_base(self.backend, self._grasp_yaw))
+        return True
 
     def grasp(self, source: str, object_name: str) -> dict[str, Any]:
-        from robot_agent.skills.competition_grasp import run_scripted_grasp
+        from robot_agent.skills.competition_grasp import (
+            ScriptedGraspConfig,
+            run_scripted_grasp,
+        )
+
+        config = self.grasp_config or ScriptedGraspConfig()
+        config.swap_arm_targets = self._swap_arm_targets
 
         return run_scripted_grasp(
             self.backend,
             source=source,
             object_name=object_name,
-            config=self.grasp_config,
+            config=config,
         )
 
     def place(self, target: str, object_name: str) -> bool:
