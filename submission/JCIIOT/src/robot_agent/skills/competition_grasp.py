@@ -25,6 +25,10 @@ class ScriptedGraspConfig:
         clearance_height: float = 0.30,
         clearance_raise_steps: int = 180,
         clearance_translate_steps: int = 180,
+        torso_drop: float = 0.04,
+        torso_minimum: float = 0.10,
+        torso_steps: int = 80,
+        torso_tolerance: float = 0.005,
         pregrasp_height: float = 0.10,
         site_below_offset: float = 0.035,
         position_tolerance: float = 0.012,
@@ -43,6 +47,10 @@ class ScriptedGraspConfig:
         self.clearance_height = float(clearance_height)
         self.clearance_raise_steps = int(clearance_raise_steps)
         self.clearance_translate_steps = int(clearance_translate_steps)
+        self.torso_drop = float(torso_drop)
+        self.torso_minimum = float(torso_minimum)
+        self.torso_steps = int(torso_steps)
+        self.torso_tolerance = float(torso_tolerance)
         self.pregrasp_height = float(pregrasp_height)
         self.site_below_offset = float(site_below_offset)
         self.position_tolerance = float(position_tolerance)
@@ -70,6 +78,12 @@ def normalized_position_action(
     normalized = np.divide(delta, scale, out=np.zeros(3), where=scale > 0)
     normalized = np.clip(normalized, -float(max_action), float(max_action))
     return np.concatenate([normalized, np.zeros(3, dtype=float)])
+
+
+def lowered_torso_target(current, *, drop: float, minimum: float) -> np.ndarray:
+    """Return a bounded absolute torso target for improved low reach."""
+    current = np.asarray(current, dtype=float).copy()
+    return np.maximum(current - float(drop), float(minimum))
 
 
 def targets_reached(
@@ -166,6 +180,7 @@ class OfficialScriptedGraspDriver:
             arm_delta_to_normalized_action,
             build_action,
             capture_hold_targets,
+            current_part_qpos,
             lift_grasped_object,
             world_delta_to_controller_frame,
         )
@@ -182,6 +197,7 @@ class OfficialScriptedGraspDriver:
             "arm_action": arm_delta_to_normalized_action,
             "build_action": build_action,
             "capture_hold_targets": capture_hold_targets,
+            "current_part_qpos": current_part_qpos,
             "lift": lift_grasped_object,
             "world_delta": world_delta_to_controller_frame,
             "get_targets": get_target_positions,
@@ -246,6 +262,37 @@ class OfficialScriptedGraspDriver:
                 robot,
                 arm_actions=arm_actions,
                 gripper_value=gripper_value,
+                hold_targets=hold_targets,
+            )
+            _, _, _, info = raw_env.step(action)
+            self._record(backend, raw_env)
+            if bool((info or {}).get("has_judge_collision", False)):
+                return False
+        return False
+
+    def lower_torso_for_reach(self, backend, config) -> bool:
+        helpers = self._helpers()
+        raw_env = backend.env
+        robot = raw_env.robots[0]
+        current = helpers["current_part_qpos"](robot, "torso")
+        if current is None:
+            return False
+        target = lowered_torso_target(
+            current,
+            drop=config.torso_drop,
+            minimum=config.torso_minimum,
+        )
+        hold_targets = helpers["capture_hold_targets"](robot)
+        hold_targets["torso"] = target
+
+        for _ in range(config.torso_steps):
+            current = helpers["current_part_qpos"](robot, "torso")
+            if current is not None and float(np.max(np.abs(current - target))) <= config.torso_tolerance:
+                return True
+            action = helpers["build_action"](
+                robot,
+                arm_actions={},
+                gripper_value=-1.0,
                 hold_targets=hold_targets,
             )
             _, _, _, info = raw_env.step(action)

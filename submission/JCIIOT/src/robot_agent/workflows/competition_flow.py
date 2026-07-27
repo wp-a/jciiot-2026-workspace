@@ -229,6 +229,8 @@ class OfficialCompetitionDriver:
 
         config = self.grasp_config or ScriptedGraspConfig()
         driver = OfficialScriptedGraspDriver()
+        if not driver.lower_torso_for_reach(self.backend, config):
+            return False
         return bool(driver.raise_to_clearance(self.backend, object_name, config))
 
     def move(

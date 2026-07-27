@@ -80,6 +80,15 @@ class CompetitionGraspTests(unittest.TestCase):
 
         np.testing.assert_allclose(result, [0.75, -0.75, 0.25, 0.0, 0.0, 0.0])
 
+    def test_torso_target_drops_by_bounded_reach_offset(self):
+        target = self.module.lowered_torso_target(
+            np.array([0.35]),
+            drop=0.04,
+            minimum=0.10,
+        )
+
+        np.testing.assert_allclose(target, [0.31])
+
     def test_stage_requires_every_arm_within_tolerance(self):
         targets = {
             "right": np.array([1.0, 2.0, 3.0]),
