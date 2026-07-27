@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "audited_at": "2026-07-26T20:30:00+08:00",
+  "audited_at": "2026-07-27T19:27:04+08:00",
   "repository": {
     "name": "JCIIOT2026/JCIIOT2026",
     "url": "https://github.com/JCIIOT2026/JCIIOT2026.git",
     "branch": "master",
-    "commit": "f948609f2f281176272287fa991fce96d1f9ff98",
-    "commit_date": "2026-07-26T12:46:44+08:00",
+    "commit": "0dcdddf18a9e694569aa1433cdfc04eb097fed78",
+    "commit_date": "2026-07-27T17:56:06+08:00",
     "local_path": "vendor/JCIIOT2026"
   },
   "tracked_files": [
@@ -27,13 +27,28 @@
     },
     {
       "path": "JCIIOT/knowledge/task_config.json",
-      "sha256": "4d6ad4f2caeccd045b9802de1a76085e91f8f344474c5118b730214ebe130ef8",
+      "sha256": "4ab0b19ed3599421f1de91aebdcc777d0bded83ed56cebe12f937cfc95d62331",
       "role": "locked task mapping"
     },
     {
       "path": "JCIIOT/knowledge/robot_params.json",
       "sha256": "bd2c739c003d233c9f760f0ea11034ef55136c5f02bc9113e01682091d11e0df",
       "role": "allowed parameter baseline"
+    },
+    {
+      "path": "JCIIOT/robosuite/robosuite/environments/factory_sorting/generated_maps/factory_sorting_5_3fo3ertpxeut_scene_regenerated_semantic_map.json",
+      "sha256": "2735e3e54fa37018c386e0623027729239d1a4c482fe5502326f012d59cf431c",
+      "role": "L3 auxiliary input station definition"
+    },
+    {
+      "path": "JCIIOT/robosuite/robosuite/environments/factory_sorting/generated_maps/factory_sorting_9_3fo3ert2c5fp_scene_regenerated_semantic_map.json",
+      "sha256": "652b8d6c64d9cc80c6a9430ec9d9a3cc657467e57a6a4117b03f9718f81d5279",
+      "role": "L5 auxiliary output station definition"
+    },
+    {
+      "path": "JCIIOT/src/robot_agent/environments/robosuite_backend.py",
+      "sha256": "48cdfac347606452025bcc36a5d31d4501562b7707ffec677c0ff5aaab79df41",
+      "role": "official environment backend"
     }
   ],
   "allowed_modification_roots": [

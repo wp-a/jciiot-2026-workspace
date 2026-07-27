@@ -1,6 +1,6 @@
 {
-  "snapshot_date": "2026-07-26",
-  "official_commit": "f948609f2f281176272287fa991fce96d1f9ff98",
+  "snapshot_date": "2026-07-27",
+  "official_commit": "0dcdddf18a9e694569aa1433cdfc04eb097fed78",
   "coordinate_frame": "official semantic-map world XY in metres",
   "object_semantics": "Since upstream f948609 each task lists multiple acceptable candidate objects; scoring accepts any candidate (grasped object preferred). L5 still requires all three listed totes.",
   "scoring": {
@@ -39,8 +39,8 @@
       "level": "L3",
       "scene": "FactorySorting5_3FO3ERTPXEUT",
       "human_prompt": "Pick Station 1 / Placement Point 1 -> Place Station 2",
-      "source": "input_6",
-      "source_center_xy": [11.937, 3.932],
+      "source": "aux_input_1",
+      "source_center_xy": [0.144, 8.473],
       "target": "output_5",
       "target_center_xy": [4.872, -7.261],
       "objects": ["blue_tote_b01_far_right", "blue_tote_b01_near_right"],
@@ -63,8 +63,8 @@
       "human_prompt": "Pick Station 6 -> Place Station 1; move all three white totes",
       "source": "input_1",
       "source_center_xy": [-14.544, 5.01],
-      "target": "output_6",
-      "target_center_xy": [10.032, -7.267],
+      "target": "aux_output_1",
+      "target_center_xy": [0.144, 8.473],
       "objects": [
         "white_tote_b01_left_center",
         "white_tote_b01_left_front",

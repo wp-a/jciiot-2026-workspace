@@ -44,7 +44,7 @@
 
 ### 必须兼容的评分口径冲突
 
-比赛说明文档把“离开”描述为相对物体初始位置，且没有写抓取事件门控；当前官方 `app.py`（提交 `f948609...`，2026-07-26）则要求匹配的 `grasp_end` 成功事件，并按源工位中心计算位移。L5 也只在成功抓取后检查三件物体。f948609 起物体匹配改为对候选物体列表做双向子串匹配，成功抓取的物体优先参与计分，兜底“取距目标最近物体”也只在候选列表内选择。
+比赛说明文档把“离开”描述为相对物体初始位置，且没有写抓取事件门控；当前官方 `app.py`（提交 `0dcdddf...`，2026-07-27）则要求匹配的 `grasp_end` 成功事件，并按源工位中心计算位移。L5 也只在成功抓取后检查三件物体。f948609 起物体匹配改为对候选物体列表做双向子串匹配，成功抓取的物体优先参与计分，兜底“取距目标最近物体”也只在候选列表内选择。
 
 工程上不应赌某一口径。所有正式轨迹都要同时满足：
 
@@ -59,9 +59,9 @@
 |---|---|---|---|---|---:|
 | L1 | FactorySorting1 | Pick 2 -> Place 3 | `input_5` -> `output_4` | `line_5_container_h01_near` 或 `_far` | 10 |
 | L2 | FactorySorting3 | Pick 1 -> Place 3 | `input_6` -> `output_4` | `green_tote_b01_upper` 或 `_lower` | 15 |
-| L3 | FactorySorting5 | Pick/Placement 1 -> Place 2 | `input_6` -> `output_5` | `blue_tote_b01_far_right` 或 `_near_right` | 20 |
+| L3 | FactorySorting5 | Pick/Placement 1 -> Place 2 | `aux_input_1` -> `output_5` | `blue_tote_b01_far_right` 或 `_near_right` | 20 |
 | L4 | FactorySorting7 | Pick 5 -> Place 2 | `input_2` -> `output_5` | `blue_container_h01_back_upper` 或 `_lower` | 25 |
-| L5 | FactorySorting9 | Pick 6 -> Place 1 | `input_1` -> `output_6` | 三个 `white_tote_b01_left_*` 全部 | 30 |
+| L5 | FactorySorting9 | Pick 6 -> Place 1 | `input_1` -> `aux_output_1` | 三个 `white_tote_b01_left_*` 全部 | 30 |
 
 精确坐标和对象数组见 [`config/tasks.json`](../config/tasks.json)。
 
@@ -79,6 +79,13 @@
 - L1/L2/L4 各新增一个同位近/远（上/下）候选变体；L5 三个白 tote 不变，仍需全部搬运。
 - `pick_up.py` 与 `task_subprocess_runner.py` 对数组取第一个物体作为主目标；评分端 `_object_name_matches` 对候选做双向子串匹配。
 - 同批提交还修复了 `app.py` 注释乱码（无行为影响）。
+
+## 2026-07-27 辅助工位更新（上游 0dcdddf）
+
+- L3 的内部源工位由 `input_6` 改为 `aux_input_1`，语义地图中心为 `[0.144, 8.473]`，接近点为 `[0.11, 7.55]`。
+- L5 的内部目标工位由 `output_6` 改为 `aux_output_1`，中心和接近点与上述辅助桌一致。
+- 两个新工位只加入对应场景的生成语义地图；固定路线、评分复算和报告中的旧工位名必须同步更新。
+- 同批提交把物理策略初始化提前到导航环境构造前，避免带物理策略时初始化顺序不一致。
 
 ## 允许修改的边界
 

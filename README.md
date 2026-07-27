@@ -62,9 +62,9 @@ bash tests/test_workspace_check.sh
 ## 上游状态
 
 - 官方仓库：<https://github.com/JCIIOT2026/JCIIOT2026>
-- 已审计提交：`f948609f2f281176272287fa991fce96d1f9ff98`
-- 上游提交时间：2026-07-26 12:46:44 +08:00
-- 本地 `vendor/JCIIOT2026` 已扩展为完整代码检出（约 1.4 GB，含全部 robosuite 场景/网格/地图，均为普通 git 对象）。
+- 已审计提交：`0dcdddf18a9e694569aa1433cdfc04eb097fed78`
+- 上游提交时间：2026-07-27 17:56:06 +08:00
+- 本地 `vendor/JCIIOT2026` 已扩展为完整源码检出（约 1.7 GB，含全部 robosuite 场景/网格/地图，均为普通 git 对象）。源码完整不等于运行环境已验证，五场景冒烟结果以 `STATUS.md` 为准。
 - 本机已安装 Git LFS，但**上游仓库 LFS 配额已超限**（"exceeded its LFS budget"），`model_epoch_150.pth`、示例 `.hdf5`、USD `.zip` 目前从 GitHub 无法下载，仅保留 133/134 字节指针。默认权重 `model_epoch_500.pth` 从未入库。桌面网格 zip 只是建模源档案，解压后的 `.obj/.stl` 已在库内，不阻碍仿真运行。需通过官方 QQ 群获取权重或反馈配额问题。
 
 ## 下一阶段的最小成功标准
