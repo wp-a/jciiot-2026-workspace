@@ -250,6 +250,26 @@ class CompetitionFlowTests(unittest.TestCase):
 
         self.assertEqual(ranked, ["box_near"])
 
+    def test_auxiliary_source_uses_verified_upper_crossing_corridor(self):
+        detour = self.module.auxiliary_source_detour(
+            target="aux_input_1",
+            carrying=False,
+        )
+
+        self.assertEqual(detour, [12.4, 7.2])
+        self.assertIsNone(
+            self.module.auxiliary_source_detour(
+                target="output_5",
+                carrying=False,
+            )
+        )
+        self.assertIsNone(
+            self.module.auxiliary_source_detour(
+                target="aux_input_1",
+                carrying=True,
+            )
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -5,6 +5,13 @@ from __future__ import annotations
 from typing import Any, Iterable
 
 
+def auxiliary_source_detour(*, target: str, carrying: bool) -> list[float] | None:
+    """Use the verified upper corridor when approaching the auxiliary input."""
+    if str(target) == "aux_input_1" and not bool(carrying):
+        return [12.4, 7.2]
+    return None
+
+
 class CompetitionFlow:
     """Execute bounded object transfers through a small state machine."""
 
@@ -267,6 +274,15 @@ class OfficialCompetitionDriver:
         if orient_for_grasp and self._grasp_yaw is not None:
             from robot_agent.skills.competition_navigation import orient_base
 
+            detour = auxiliary_source_detour(
+                target=target,
+                carrying=carrying,
+            )
+            if detour is not None and not self._move_to(
+                f"{detour[0]:.6f}, {detour[1]:.6f}",
+                carrying=False,
+            ):
+                return False
             if staging_target is None or not self._move_to(
                 staging_target,
                 carrying=False,
