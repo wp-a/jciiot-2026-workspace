@@ -271,6 +271,11 @@ class CompetitionGraspTests(unittest.TestCase):
         np.testing.assert_allclose(targets["right"], [12.48, 4.87, 1.66])
         np.testing.assert_allclose(targets["left"], [12.47, 4.42, 1.66])
 
+    def test_default_clearance_passes_above_the_l2_machine_module(self):
+        config = self.module.ScriptedGraspConfig()
+
+        self.assertEqual(config.clearance_height, 0.45)
+
     def test_grasp_targets_can_be_swapped_after_base_rotation(self):
         raw_targets = {
             "right": np.array([12.03, 4.41, 1.36]),

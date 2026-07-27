@@ -22,7 +22,7 @@ class ScriptedGraspConfig:
     def __init__(
         self,
         *,
-        clearance_height: float = 0.30,
+        clearance_height: float = 0.45,
         clearance_raise_steps: int = 180,
         clearance_translate_steps: int = 180,
         torso_drop: float = 0.04,
