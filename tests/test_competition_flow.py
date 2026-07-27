@@ -80,15 +80,13 @@ class CompetitionFlowTests(unittest.TestCase):
         self.assertIn(("move", "input_5", False, "box_near"), driver.calls)
         self.assertIn(("move", "output_4", True, "box_near"), driver.calls)
 
-    def test_object_aligned_approach_preserves_station_offset(self):
+    def test_object_aligned_approach_uses_verified_grasp_base_offset(self):
         result = self.module.object_aligned_approach(
-            station_center=[11.937, 3.932],
-            station_approach=[13.0, 3.932],
-            object_xy=[11.8, 4.646],
+            object_xy=[11.867624, 4.624856],
         )
 
-        self.assertAlmostEqual(result[0], 12.863)
-        self.assertAlmostEqual(result[1], 4.646)
+        self.assertAlmostEqual(result[0], 12.808625)
+        self.assertAlmostEqual(result[1], 4.605856)
 
     def test_failed_grasp_never_moves_to_target(self):
         driver = FlowDriver(failed_grasps={"box_near": 2})

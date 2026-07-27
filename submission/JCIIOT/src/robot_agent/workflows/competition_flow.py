@@ -5,16 +5,18 @@ from __future__ import annotations
 from typing import Any, Iterable
 
 
+REFERENCE_GRASP_BASE_OFFSET_XY = (0.941001, -0.019)
+
+
 def object_aligned_approach(
     *,
-    station_center,
-    station_approach,
     object_xy,
+    base_offset=REFERENCE_GRASP_BASE_OFFSET_XY,
 ) -> list[float]:
-    """Translate a station approach point by the object's planar offset."""
+    """Place the base at the public reference grasp offset from an object."""
     return [
-        float(station_approach[0]) + float(object_xy[0]) - float(station_center[0]),
-        float(station_approach[1]) + float(object_xy[1]) - float(station_center[1]),
+        float(object_xy[0]) + float(base_offset[0]),
+        float(object_xy[1]) + float(base_offset[1]),
     ]
 
 
@@ -166,17 +168,10 @@ class OfficialCompetitionDriver:
         resolved_target = target
         if not carrying and object_name:
             try:
-                station = self.scene_context.input_ports[target]
-                station_approach = (
-                    station.approach
-                    if station.approach is not None
-                    else self.scene_context.approach_xy(target)
-                )
+                self.scene_context.input_ports[target]
                 body_id = self.backend.env.obj_body_id[object_name]
                 object_xy = self.backend.env.sim.data.body_xpos[body_id][:2]
                 aligned_xy = object_aligned_approach(
-                    station_center=station.center,
-                    station_approach=station_approach,
                     object_xy=object_xy,
                 )
                 resolved_target = f"{aligned_xy[0]:.6f}, {aligned_xy[1]:.6f}"
