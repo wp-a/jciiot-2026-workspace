@@ -270,6 +270,67 @@ class CompetitionFlowTests(unittest.TestCase):
             )
         )
 
+    def test_delivery_inset_moves_unregistered_output_toward_center(self):
+        target = self.module.delivery_inset_target(
+            center=np.array([4.872, -7.261]),
+            approach=np.array([4.020, -7.261]),
+            inset=0.15,
+        )
+
+        np.testing.assert_allclose(target, [4.170, -7.261])
+
+    def test_physical_output_availability_accepts_official_name_suffix(self):
+        self.assertTrue(
+            self.module.physical_output_available(
+                ["output_4_shelf"],
+                "output_4",
+            )
+        )
+        self.assertFalse(
+            self.module.physical_output_available(
+                ["output_4_shelf"],
+                "output_5",
+            )
+        )
+
+    def test_carrying_move_insets_output_without_physical_registration(self):
+        calls = []
+        driver = object.__new__(self.module.OfficialCompetitionDriver)
+        driver.backend = SimpleNamespace(
+            env=SimpleNamespace(output_ports={"output_4_shelf": {}})
+        )
+        driver.scene_context = SimpleNamespace(
+            output_ports={
+                "output_5": SimpleNamespace(
+                    center=np.array([4.872, -7.261]),
+                    approach=np.array([4.020, -7.261]),
+                )
+            }
+        )
+        driver._move_to = lambda target, *, carrying: (
+            calls.append((target, carrying)) or True
+        )
+
+        success = driver.move("output_5", carrying=True, object_name="box")
+
+        self.assertTrue(success)
+        self.assertEqual(calls, [("4.170000, -7.261000", True)])
+
+    def test_place_uses_physical_release_for_unregistered_output(self):
+        calls = []
+        driver = object.__new__(self.module.OfficialCompetitionDriver)
+        driver.backend = SimpleNamespace(
+            env=SimpleNamespace(output_ports={"output_4_shelf": {}})
+        )
+        driver._release_at_current_pose = lambda target, object_name: (
+            calls.append((target, object_name)) or True
+        )
+
+        success = driver.place("output_5", "blue_tote")
+
+        self.assertTrue(success)
+        self.assertEqual(calls, [("output_5", "blue_tote")])
+
 
 if __name__ == "__main__":
     unittest.main()

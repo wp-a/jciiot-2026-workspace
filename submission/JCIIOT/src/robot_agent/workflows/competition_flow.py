@@ -12,6 +12,33 @@ def auxiliary_source_detour(*, target: str, carrying: bool) -> list[float] | Non
     return None
 
 
+def physical_output_available(output_names: Iterable[str], target: str) -> bool:
+    """Return whether the physics backend registered the semantic output."""
+    target = str(target)
+    return any(
+        str(name) == target or str(name).startswith(f"{target}_")
+        for name in output_names
+    )
+
+
+def delivery_inset_target(
+    *,
+    center,
+    approach,
+    inset: float = 0.15,
+):
+    """Move a semantic approach point toward its center by a bounded inset."""
+    import numpy as np
+
+    center = np.asarray(center, dtype=float).reshape(2)
+    approach = np.asarray(approach, dtype=float).reshape(2)
+    direction = center - approach
+    distance = float(np.linalg.norm(direction))
+    if distance <= 1e-9:
+        return approach.copy()
+    return approach + direction / distance * min(float(inset), distance)
+
+
 class CompetitionFlow:
     """Execute bounded object transfers through a small state machine."""
 
@@ -163,6 +190,11 @@ class OfficialCompetitionDriver:
         )
         return bool(result.success)
 
+    def _physical_output_available(self, target: str) -> bool:
+        ports = getattr(self.backend.env, "output_ports", {})
+        names = ports.keys() if hasattr(ports, "keys") else ports
+        return physical_output_available(names, target)
+
     def _grasp_pose(self, source: str, object_name: str) -> dict:
         from robosuite.environments.factory_sorting.load_factory_sorting_evalization import (
             get_target_positions,
@@ -256,6 +288,21 @@ class OfficialCompetitionDriver:
         staging_target: str | None = None
         active_grasp_pose = None
         orient_for_grasp = False
+        if carrying and not self._physical_output_available(target):
+            station = self.scene_context.output_ports.get(target)
+            if station is not None:
+                approach = (
+                    station.approach
+                    if station.approach is not None
+                    else self.scene_context.approach_xy(target)
+                )
+                delivery_xy = delivery_inset_target(
+                    center=station.center[:2],
+                    approach=approach,
+                )
+                resolved_target = (
+                    f"{delivery_xy[0]:.6f}, {delivery_xy[1]:.6f}"
+                )
         if not carrying and object_name:
             self._clearance_prepared = False
             try:
@@ -337,7 +384,60 @@ class OfficialCompetitionDriver:
             config=config,
         )
 
+    def _release_at_current_pose(self, target: str, object_name: str) -> bool:
+        """Physically release at an output missing from the backend registry."""
+        raw_env = self.backend.env
+        if getattr(self.backend, "_held_crate_name", None) != object_name:
+            return False
+
+        try:
+            from robosuite.environments.factory_sorting.place_on_table import (
+                gripper_release_action,
+            )
+            from robosuite.environments.factory_sorting.transport_attachment import (
+                clear_transport_attachment,
+                sync_transport_attachment,
+            )
+
+            sync_transport_attachment(raw_env)
+            clear_transport_attachment(raw_env)
+            self.backend._held_crate_name = None
+            self.backend._held_crate_body_id = None
+            release_steps = max(
+                1,
+                int(
+                    getattr(self.backend, "_rp", {})
+                    .get("place", {})
+                    .get("release_steps", 40)
+                ),
+            )
+            action = gripper_release_action(raw_env)
+            recorder = getattr(self.backend, "_record_trajectory_frame", None)
+            collision = False
+            for _ in range(release_steps):
+                result = raw_env.step(action)
+                info = result[-1] if isinstance(result, tuple) else {}
+                if callable(recorder):
+                    recorder(_env=raw_env)
+                collision = collision or bool(
+                    (info or {}).get("has_judge_collision", False)
+                )
+            marker = getattr(self.backend, "_mark_trajectory_event", None)
+            if callable(marker):
+                marker(
+                    "place_end",
+                    target=target,
+                    object_name=object_name,
+                    success=not collision,
+                    method="physical_release_at_semantic_output",
+                )
+            return not collision
+        except Exception:
+            return False
+
     def place(self, target: str, object_name: str) -> bool:
+        if not self._physical_output_available(target):
+            return self._release_at_current_pose(target, object_name)
         result = self.place_skill.run(
             self._context(
                 f"place {object_name} at {target}",
