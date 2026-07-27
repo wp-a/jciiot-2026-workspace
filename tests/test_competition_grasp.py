@@ -368,6 +368,7 @@ class CompetitionGraspTests(unittest.TestCase):
         )
 
         self.assertAlmostEqual(profiled.mirrored_ik_height_offset, 0.06)
+        self.assertAlmostEqual(profiled.station_side_reach_offset, 0.04)
 
     def test_container_profile_restores_scored_l1_grasp_parameters(self):
         config = self.module.ScriptedGraspConfig()

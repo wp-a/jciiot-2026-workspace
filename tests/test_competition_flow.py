@@ -300,13 +300,11 @@ class CompetitionFlowTests(unittest.TestCase):
         extended = self.module.bounded_delivery_extension(
             current,
             target,
-            goal_distance=0.68,
-            max_extension=0.35,
         )
 
         self.assertAlmostEqual(
             float(np.linalg.norm(extended - target)),
-            0.68,
+            0.25,
         )
 
     def test_bounded_delivery_extension_keeps_sufficient_position(self):

@@ -46,8 +46,8 @@ def bounded_delivery_extension(
     current,
     target,
     *,
-    goal_distance: float = 0.68,
-    max_extension: float = 0.35,
+    goal_distance: float = 0.25,
+    max_extension: float = 0.70,
 ):
     """Move an attached object toward a target by the minimum bounded amount."""
     import numpy as np
@@ -472,7 +472,7 @@ class OfficialCompetitionDriver:
         for relative_xy in np.linspace(
             start_relative,
             end_relative,
-            61,
+            81,
             dtype=float,
         )[1:]:
             attachment["relative_xy"] = relative_xy

@@ -48,6 +48,7 @@ class ScriptedGraspConfig:
         mirrored_ik_regularization: float = 0.05,
         mirrored_ik_max_error: float = 0.08,
         mirrored_ik_max_nfev: int = 300,
+        station_side_reach_offset: float = 0.0,
         hold_close_pose: bool = True,
         face_insertion: float = 0.0,
         close_follow_max_distance: float = 0.0,
@@ -88,6 +89,7 @@ class ScriptedGraspConfig:
         self.mirrored_ik_regularization = float(mirrored_ik_regularization)
         self.mirrored_ik_max_error = float(mirrored_ik_max_error)
         self.mirrored_ik_max_nfev = int(mirrored_ik_max_nfev)
+        self.station_side_reach_offset = float(station_side_reach_offset)
         self.hold_close_pose = bool(hold_close_pose)
         self.face_insertion = float(face_insertion)
         self.close_follow_max_distance = float(close_follow_max_distance)
@@ -250,6 +252,7 @@ def apply_object_grasp_profile(
         config.lift_tolerance = 0.02
     elif uses_station_side_tote_grasp(object_name):
         config.mirrored_ik_height_offset = 0.06
+        config.station_side_reach_offset = 0.04
     return config
 
 
@@ -258,6 +261,7 @@ def station_side_tote_grasp_targets(
     *,
     object_xy: np.ndarray,
     base_xy: np.ndarray,
+    reach_offset: float = 0.0,
 ) -> dict[str, np.ndarray]:
     """Reflect the reachable marked site across the robot heading axis."""
     targets = {
@@ -287,8 +291,14 @@ def station_side_tote_grasp_targets(
         dtype=float,
     )
     if float(np.dot(reflected[:2] - near[:2], expected_right_minus_left)) >= 0.0:
-        return {"right": reflected, "left": near}
-    return {"right": near, "left": reflected}
+        result = {"right": reflected, "left": near}
+    else:
+        result = {"right": near, "left": reflected}
+    toward_base = base - grasp_center
+    toward_base /= float(np.linalg.norm(toward_base))
+    for target in result.values():
+        target[:2] += max(0.0, float(reach_offset)) * toward_base
+    return result
 
 
 def mirrored_fingerpad_targets(
@@ -657,6 +667,7 @@ class OfficialScriptedGraspDriver:
                 raw_targets,
                 object_xy=backend.env.sim.data.body_xpos[body_id][:2],
                 base_xy=base_xy,
+                reach_offset=config.station_side_reach_offset,
             )
         grasp_targets = assigned_grasp_targets(
             raw_targets,
