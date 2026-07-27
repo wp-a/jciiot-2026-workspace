@@ -191,6 +191,24 @@ class CompetitionGraspTests(unittest.TestCase):
             self.assertIn((part, "update", True), calls)
             self.assertIn((part, "reset"), calls)
 
+    def test_contact_stability_resets_when_either_arm_loses_contact(self):
+        stable_steps = 0
+        stable_steps = self.module.next_contact_stability(
+            {"right": True, "left": True},
+            stable_steps,
+        )
+        stable_steps = self.module.next_contact_stability(
+            {"right": True, "left": True},
+            stable_steps,
+        )
+        self.assertEqual(stable_steps, 2)
+
+        stable_steps = self.module.next_contact_stability(
+            {"right": True, "left": False},
+            stable_steps,
+        )
+        self.assertEqual(stable_steps, 0)
+
     def test_stage_requires_every_arm_within_tolerance(self):
         targets = {
             "right": np.array([1.0, 2.0, 3.0]),

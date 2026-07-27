@@ -39,6 +39,7 @@ class ScriptedGraspConfig:
         contact_polish_step: float = 0.001,
         contact_polish_max_drop: float = 0.030,
         contact_confirmation_drop: float = 0.003,
+        contact_settle_steps: int = 5,
         max_action: float = 0.65,
         lift_height: float = 0.05,
         lift_steps: int = 300,
@@ -65,6 +66,7 @@ class ScriptedGraspConfig:
         self.contact_polish_step = float(contact_polish_step)
         self.contact_polish_max_drop = float(contact_polish_max_drop)
         self.contact_confirmation_drop = float(contact_confirmation_drop)
+        self.contact_settle_steps = int(contact_settle_steps)
         self.max_action = float(max_action)
         self.lift_height = float(lift_height)
         self.lift_steps = int(lift_steps)
@@ -153,6 +155,13 @@ def synchronize_controller_goals(robot) -> None:
             continue
         controller.update(force=True)
         controller.reset_goal()
+
+
+def next_contact_stability(contacts: Mapping[str, Any], stable_steps: int) -> int:
+    """Advance consecutive bilateral-contact count, or reset on contact loss."""
+    if all(bool(contacts.get(arm, False)) for arm in ARMS):
+        return int(stable_steps) + 1
+    return 0
 
 
 def targets_reached(
@@ -549,7 +558,31 @@ class OfficialScriptedGraspDriver:
                     required_drop=config.contact_confirmation_drop,
                 ):
                     synchronize_controller_goals(robot)
-                    return current_contacts
+                    hold_targets = helpers["capture_hold_targets"](robot)
+                    stable_steps = 0
+                    for _ in range(config.contact_settle_steps):
+                        action = helpers["build_action"](
+                            robot,
+                            arm_actions={},
+                            gripper_value=1.0,
+                            hold_targets=hold_targets,
+                        )
+                        _, _, _, info = raw_env.step(action)
+                        self._record(backend, raw_env)
+                        current_contacts = helpers["grasp_status"](
+                            raw_env,
+                            robot,
+                            object_name,
+                        )
+                        stable_steps = next_contact_stability(
+                            current_contacts,
+                            stable_steps,
+                        )
+                        if bool((info or {}).get("has_judge_collision", False)):
+                            break
+                    if stable_steps >= config.contact_settle_steps:
+                        return current_contacts
+                    first_full_contact = None
             if bool(getattr(raw_env, "has_judge_collision", False)):
                 break
 
