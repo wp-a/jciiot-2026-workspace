@@ -271,6 +271,14 @@ class CompetitionGraspTests(unittest.TestCase):
 
         np.testing.assert_allclose(offset, [0.018, 0.024])
 
+    def test_gripper_close_uses_spaced_positive_pulses(self):
+        commands = [
+            self.module.gripper_close_command(step, interval=20)
+            for step in range(41)
+        ]
+
+        self.assertEqual([i for i, value in enumerate(commands) if value > 0], [0, 20, 40])
+
     def test_stage_requires_every_arm_within_tolerance(self):
         targets = {
             "right": np.array([1.0, 2.0, 3.0]),

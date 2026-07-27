@@ -45,7 +45,8 @@ class ScriptedGraspConfig:
         wrist_height_trigger: float = 0.04,
         hold_close_pose: bool = True,
         face_insertion: float = 0.0,
-        close_follow_max_distance: float = 0.05,
+        close_follow_max_distance: float = 0.0,
+        close_increment_interval: int = 20,
         max_action: float = 0.65,
         lift_height: float = 0.05,
         lift_steps: int = 300,
@@ -79,6 +80,7 @@ class ScriptedGraspConfig:
         self.hold_close_pose = bool(hold_close_pose)
         self.face_insertion = float(face_insertion)
         self.close_follow_max_distance = float(close_follow_max_distance)
+        self.close_increment_interval = int(close_increment_interval)
         self.max_action = float(max_action)
         self.lift_height = float(lift_height)
         self.lift_steps = int(lift_steps)
@@ -233,6 +235,14 @@ def bounded_planar_follow_offset(delta: np.ndarray, *, max_distance: float) -> n
     if distance <= limit or distance <= 1e-12:
         return delta.copy()
     return delta / distance * limit
+
+
+def gripper_close_command(step: int, *, interval: int) -> float:
+    """Pulse the binary Robotiq close command to reduce contact impulse."""
+    interval = int(interval)
+    if interval < 1:
+        raise ValueError("interval must be at least 1")
+    return 1.0 if int(step) % interval == 0 else 0.0
 
 
 def targets_reached(
@@ -652,7 +662,7 @@ class OfficialScriptedGraspDriver:
         start_object_xy = raw_env.sim.data.body_xpos[body_id][:2].copy()
         hold_targets = helpers["capture_hold_targets"](robot)
 
-        for _ in range(config.close_steps):
+        for step in range(config.close_steps):
             robot.composite_controller.update_state()
             object_xy = raw_env.sim.data.body_xpos[body_id][:2]
             follow_offset = bounded_planar_follow_offset(
@@ -675,7 +685,10 @@ class OfficialScriptedGraspDriver:
             action = helpers["build_action"](
                 robot,
                 arm_actions=arm_actions,
-                gripper_value=1.0,
+                gripper_value=gripper_close_command(
+                    step,
+                    interval=config.close_increment_interval,
+                ),
                 hold_targets=hold_targets,
             )
             raw_env.step(action)
