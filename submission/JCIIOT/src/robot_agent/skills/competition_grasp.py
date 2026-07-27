@@ -40,6 +40,9 @@ class ScriptedGraspConfig:
         contact_polish_max_drop: float = 0.030,
         contact_confirmation_drop: float = 0.003,
         contact_settle_steps: int = 5,
+        left_wrist_adjustment: float = 0.10,
+        wrist_adjustment_steps: int = 20,
+        wrist_height_trigger: float = 0.04,
         max_action: float = 0.65,
         lift_height: float = 0.05,
         lift_steps: int = 300,
@@ -67,6 +70,9 @@ class ScriptedGraspConfig:
         self.contact_polish_max_drop = float(contact_polish_max_drop)
         self.contact_confirmation_drop = float(contact_confirmation_drop)
         self.contact_settle_steps = int(contact_settle_steps)
+        self.left_wrist_adjustment = float(left_wrist_adjustment)
+        self.wrist_adjustment_steps = int(wrist_adjustment_steps)
+        self.wrist_height_trigger = float(wrist_height_trigger)
         self.max_action = float(max_action)
         self.lift_height = float(lift_height)
         self.lift_steps = int(lift_steps)
@@ -162,6 +168,16 @@ def next_contact_stability(contacts: Mapping[str, Any], stable_steps: int) -> in
     if all(bool(contacts.get(arm, False)) for arm in ARMS):
         return int(stable_steps) + 1
     return 0
+
+
+def wrist_adjustment_required(
+    *,
+    current_z: float,
+    target_z: float,
+    threshold: float,
+) -> bool:
+    """Detect when left-arm height reach needs the measured wrist correction."""
+    return float(current_z) - float(target_z) > float(threshold)
 
 
 def targets_reached(
@@ -487,6 +503,73 @@ class OfficialScriptedGraspDriver:
             tolerance=config.approach_tolerance,
         )
 
+    def adjust_wrist_for_reach(self, backend, object_name, config) -> bool:
+        helpers = self._helpers()
+        raw_env = backend.env
+        robot = raw_env.robots[0]
+        raw_targets, _ = helpers["get_targets"](
+            raw_env,
+            object_name,
+            config.site_below_offset,
+        )
+        targets = assigned_grasp_targets(
+            raw_targets,
+            swap=config.swap_arm_targets,
+        )
+        current = helpers["gripper_position"](raw_env, robot, "left")
+        if not wrist_adjustment_required(
+            current_z=current[2],
+            target_z=targets["left"][2],
+            threshold=config.wrist_height_trigger,
+        ):
+            return True
+
+        joint_name = next(
+            (
+                raw_env.sim.model.joint_id2name(index)
+                for index in range(raw_env.sim.model.njnt)
+                if (raw_env.sim.model.joint_id2name(index) or "").endswith(
+                    "arm_left_5_joint"
+                )
+            ),
+            None,
+        )
+        if joint_name is None:
+            return False
+        joint_id = raw_env.sim.model.joint_name2id(joint_name)
+        qpos_addr = raw_env.sim.model.get_joint_qpos_addr(joint_name)
+        if isinstance(qpos_addr, tuple):
+            return False
+
+        start = float(raw_env.sim.data.qpos[qpos_addr])
+        target = start + config.left_wrist_adjustment
+        if bool(raw_env.sim.model.jnt_limited[joint_id]):
+            joint_range = raw_env.sim.model.jnt_range[joint_id]
+            target = float(np.clip(target, joint_range[0], joint_range[1]))
+
+        from robot_agent.environments.robosuite_backend import (
+            _navigation_collisions,
+        )
+
+        steps = max(1, config.wrist_adjustment_steps)
+        for value in np.linspace(start, target, steps + 1, dtype=float)[1:]:
+            raw_env.sim.data.qpos[qpos_addr] = value
+            raw_env.sim.forward()
+            collisions = _navigation_collisions(
+                raw_env,
+                robot,
+                getattr(backend, "_ignore_collision_geom", ()),
+            )
+            if collisions:
+                raw_env.sim.data.qpos[qpos_addr] = start
+                raw_env.sim.forward()
+                synchronize_controller_goals(robot)
+                self._record(backend, raw_env)
+                return False
+            self._record(backend, raw_env)
+        synchronize_controller_goals(robot)
+        return True
+
     def close_and_check_contacts(self, backend, object_name, config):
         helpers = self._helpers()
         raw_env = backend.env
@@ -730,6 +813,8 @@ def run_scripted_grasp(
             failure_stage = "pregrasp"
         elif not driver.approach_grasp_sites(backend, object_name, config):
             failure_stage = "approach"
+        elif not driver.adjust_wrist_for_reach(backend, object_name, config):
+            failure_stage = "wrist_adjustment"
         else:
             contacts = dict(driver.close_and_check_contacts(backend, object_name, config))
             if not all(bool(contacts.get(arm, False)) for arm in ARMS):

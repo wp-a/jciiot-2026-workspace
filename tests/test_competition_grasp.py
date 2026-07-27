@@ -63,6 +63,10 @@ class ScriptedDriver:
         self.calls.append("approach")
         return True
 
+    def adjust_wrist_for_reach(self, backend, object_name, config):
+        self.calls.append("wrist_adjust")
+        return True
+
     def close_and_check_contacts(self, backend, object_name, config):
         self.calls.append("close")
         return self.contacts
@@ -208,6 +212,22 @@ class CompetitionGraspTests(unittest.TestCase):
             stable_steps,
         )
         self.assertEqual(stable_steps, 0)
+
+    def test_wrist_adjustment_only_triggers_for_large_left_height_residual(self):
+        self.assertTrue(
+            self.module.wrist_adjustment_required(
+                current_z=1.443,
+                target_z=1.385,
+                threshold=0.04,
+            )
+        )
+        self.assertFalse(
+            self.module.wrist_adjustment_required(
+                current_z=1.402,
+                target_z=1.385,
+                threshold=0.04,
+            )
+        )
 
     def test_stage_requires_every_arm_within_tolerance(self):
         targets = {
@@ -356,6 +376,7 @@ class CompetitionGraspTests(unittest.TestCase):
                 "move_above",
                 "pregrasp",
                 "approach",
+                "wrist_adjust",
                 "close",
                 "lift",
                 "attach",
@@ -385,6 +406,7 @@ class CompetitionGraspTests(unittest.TestCase):
                 "move_above",
                 "pregrasp",
                 "approach",
+                "wrist_adjust",
                 "close",
                 "polish",
             ],
@@ -413,6 +435,7 @@ class CompetitionGraspTests(unittest.TestCase):
                 "move_above",
                 "pregrasp",
                 "approach",
+                "wrist_adjust",
                 "close",
                 "polish",
                 "lift",
@@ -451,7 +474,15 @@ class CompetitionGraspTests(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertEqual(
             driver.calls,
-            ["move_above", "pregrasp", "approach", "close", "lift", "attach"],
+            [
+                "move_above",
+                "pregrasp",
+                "approach",
+                "wrist_adjust",
+                "close",
+                "lift",
+                "attach",
+            ],
         )
 
 
