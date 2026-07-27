@@ -22,6 +22,9 @@ class ScriptedGraspConfig:
     def __init__(
         self,
         *,
+        clearance_height: float = 0.30,
+        clearance_raise_steps: int = 180,
+        clearance_translate_steps: int = 180,
         pregrasp_height: float = 0.10,
         site_below_offset: float = 0.035,
         position_tolerance: float = 0.012,
@@ -34,6 +37,9 @@ class ScriptedGraspConfig:
         lift_hold_steps: int = 20,
         lift_tolerance: float = 0.02,
     ) -> None:
+        self.clearance_height = float(clearance_height)
+        self.clearance_raise_steps = int(clearance_raise_steps)
+        self.clearance_translate_steps = int(clearance_translate_steps)
         self.pregrasp_height = float(pregrasp_height)
         self.site_below_offset = float(site_below_offset)
         self.position_tolerance = float(position_tolerance)
@@ -79,6 +85,26 @@ def targets_reached(
         if distance > float(tolerance):
             return False
     return True
+
+
+def vertical_clearance_targets(
+    current: Mapping[str, np.ndarray],
+    grasp_targets: Mapping[str, np.ndarray],
+    *,
+    clearance_height: float,
+) -> dict[str, np.ndarray]:
+    """Raise both grippers vertically above the highest grasp target."""
+    safe_z = max(
+        max(float(np.asarray(grasp_targets[arm], dtype=float)[2]) for arm in ARMS)
+        + float(clearance_height),
+        max(float(np.asarray(current[arm], dtype=float)[2]) for arm in ARMS),
+    )
+    targets = {}
+    for arm in ARMS:
+        target = np.asarray(current[arm], dtype=float).copy()
+        target[2] = safe_z
+        targets[arm] = target
+    return targets
 
 
 def verified_grasp(contacts: Mapping[str, Any], *, lift_success: bool) -> bool:
@@ -147,26 +173,22 @@ class OfficialScriptedGraspDriver:
         if callable(recorder):
             recorder(_env=raw_env)
 
-    def _move(
+    def _move_to_targets(
         self,
         backend,
-        object_name: str,
+        targets: Mapping[str, np.ndarray],
         config: ScriptedGraspConfig,
         *,
-        height_offset: float,
         max_steps: int,
         gripper_value: float,
     ) -> bool:
         helpers = self._helpers()
         raw_env = backend.env
         robot = raw_env.robots[0]
-        grasp_targets, _ = helpers["get_targets"](
-            raw_env,
-            object_name,
-            config.site_below_offset,
-        )
-        offset = np.array([0.0, 0.0, float(height_offset)], dtype=float)
-        targets = {arm: np.asarray(grasp_targets[arm], dtype=float) + offset for arm in ARMS}
+        fixed_targets = {
+            arm: np.asarray(targets[arm], dtype=float).copy()
+            for arm in ARMS
+        }
         hold_targets = helpers["capture_hold_targets"](robot)
 
         for _ in range(max_steps):
@@ -175,12 +197,16 @@ class OfficialScriptedGraspDriver:
                 arm: helpers["gripper_position"](raw_env, robot, arm)
                 for arm in ARMS
             }
-            if targets_reached(current, targets, tolerance=config.position_tolerance):
+            if targets_reached(
+                current,
+                fixed_targets,
+                tolerance=config.position_tolerance,
+            ):
                 return True
 
             arm_actions = {}
             for arm in ARMS:
-                world_delta = targets[arm] - current[arm]
+                world_delta = fixed_targets[arm] - current[arm]
                 controller_delta = helpers["world_delta"](robot, arm, world_delta)
                 arm_actions[arm] = helpers["arm_action"](
                     robot,
@@ -200,22 +226,87 @@ class OfficialScriptedGraspDriver:
                 return False
         return False
 
+    def _grasp_targets(self, backend, object_name, config, *, height_offset):
+        helpers = self._helpers()
+        grasp_targets, _ = helpers["get_targets"](
+            backend.env,
+            object_name,
+            config.site_below_offset,
+        )
+        offset = np.array([0.0, 0.0, float(height_offset)], dtype=float)
+        return {
+            arm: np.asarray(grasp_targets[arm], dtype=float) + offset
+            for arm in ARMS
+        }
+
+    def raise_to_clearance(self, backend, object_name, config) -> bool:
+        helpers = self._helpers()
+        raw_env = backend.env
+        robot = raw_env.robots[0]
+        current = {
+            arm: helpers["gripper_position"](raw_env, robot, arm)
+            for arm in ARMS
+        }
+        grasp_targets = self._grasp_targets(
+            backend,
+            object_name,
+            config,
+            height_offset=0.0,
+        )
+        targets = vertical_clearance_targets(
+            current,
+            grasp_targets,
+            clearance_height=config.clearance_height,
+        )
+        return self._move_to_targets(
+            backend,
+            targets,
+            config,
+            max_steps=config.clearance_raise_steps,
+            gripper_value=-1.0,
+        )
+
+    def move_above_grasp_sites(self, backend, object_name, config) -> bool:
+        targets = self._grasp_targets(
+            backend,
+            object_name,
+            config,
+            height_offset=config.clearance_height,
+        )
+        return self._move_to_targets(
+            backend,
+            targets,
+            config,
+            max_steps=config.clearance_translate_steps,
+            gripper_value=-1.0,
+        )
+
     def move_to_pregrasp(self, backend, object_name, config) -> bool:
-        return self._move(
+        targets = self._grasp_targets(
             backend,
             object_name,
             config,
             height_offset=config.pregrasp_height,
+        )
+        return self._move_to_targets(
+            backend,
+            targets,
+            config,
             max_steps=config.pregrasp_steps,
             gripper_value=-1.0,
         )
 
     def approach_grasp_sites(self, backend, object_name, config) -> bool:
-        return self._move(
+        targets = self._grasp_targets(
             backend,
             object_name,
             config,
             height_offset=0.0,
+        )
+        return self._move_to_targets(
+            backend,
+            targets,
+            config,
             max_steps=config.approach_steps,
             gripper_value=-1.0,
         )
@@ -308,7 +399,11 @@ def run_scripted_grasp(
     failure_stage = None
     error = None
     try:
-        if not driver.move_to_pregrasp(backend, object_name, config):
+        if not driver.raise_to_clearance(backend, object_name, config):
+            failure_stage = "raise_clearance"
+        elif not driver.move_above_grasp_sites(backend, object_name, config):
+            failure_stage = "move_above"
+        elif not driver.move_to_pregrasp(backend, object_name, config):
             failure_stage = "pregrasp"
         elif not driver.approach_grasp_sites(backend, object_name, config):
             failure_stage = "approach"

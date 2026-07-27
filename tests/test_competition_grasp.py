@@ -33,10 +33,19 @@ class RecordingBackend:
 
 
 class ScriptedDriver:
-    def __init__(self, *, contacts=None, lift_success=True):
+    def __init__(self, *, contacts=None, lift_success=True, clearance_success=True):
         self.contacts = contacts or {"right": True, "left": True}
         self.lift_success = lift_success
+        self.clearance_success = clearance_success
         self.calls = []
+
+    def raise_to_clearance(self, backend, object_name, config):
+        self.calls.append("raise_clearance")
+        return self.clearance_success
+
+    def move_above_grasp_sites(self, backend, object_name, config):
+        self.calls.append("move_above")
+        return True
 
     def move_to_pregrasp(self, backend, object_name, config):
         self.calls.append("pregrasp")
@@ -87,6 +96,25 @@ class CompetitionGraspTests(unittest.TestCase):
 
         self.assertFalse(self.module.targets_reached(almost, targets, tolerance=0.01))
         self.assertTrue(self.module.targets_reached(reached, targets, tolerance=0.01))
+
+    def test_vertical_clearance_targets_only_raise_grippers(self):
+        current = {
+            "right": np.array([12.48, 4.87, 1.16]),
+            "left": np.array([12.47, 4.42, 1.14]),
+        }
+        grasp_targets = {
+            "right": np.array([12.03, 4.41, 1.36]),
+            "left": np.array([11.70, 4.41, 1.36]),
+        }
+
+        targets = self.module.vertical_clearance_targets(
+            current,
+            grasp_targets,
+            clearance_height=0.30,
+        )
+
+        np.testing.assert_allclose(targets["right"], [12.48, 4.87, 1.66])
+        np.testing.assert_allclose(targets["left"], [12.47, 4.42, 1.66])
 
     def test_success_requires_both_contacts_and_lift(self):
         self.assertTrue(
@@ -144,7 +172,18 @@ class CompetitionGraspTests(unittest.TestCase):
         )
 
         self.assertTrue(result["success"])
-        self.assertEqual(driver.calls, ["pregrasp", "approach", "close", "lift", "attach"])
+        self.assertEqual(
+            driver.calls,
+            [
+                "raise_clearance",
+                "move_above",
+                "pregrasp",
+                "approach",
+                "close",
+                "lift",
+                "attach",
+            ],
+        )
         self.assertEqual(backend.events[0]["name"], "grasp_start")
         self.assertEqual(backend.events[-1]["name"], "grasp_end")
         self.assertTrue(backend.events[-1]["success"])
@@ -162,8 +201,26 @@ class CompetitionGraspTests(unittest.TestCase):
 
         self.assertFalse(result["success"])
         self.assertEqual(result["failure_stage"], "contact")
-        self.assertEqual(driver.calls, ["pregrasp", "approach", "close"])
+        self.assertEqual(
+            driver.calls,
+            ["raise_clearance", "move_above", "pregrasp", "approach", "close"],
+        )
         self.assertFalse(backend.events[-1]["success"])
+
+    def test_scripted_grasp_stops_when_vertical_clearance_fails(self):
+        backend = RecordingBackend()
+        driver = ScriptedDriver(clearance_success=False)
+
+        result = self.module.run_scripted_grasp(
+            backend,
+            source="input_6",
+            object_name="green_tote_b01_upper",
+            driver=driver,
+        )
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["failure_stage"], "raise_clearance")
+        self.assertEqual(driver.calls, ["raise_clearance"])
 
 
 if __name__ == "__main__":
