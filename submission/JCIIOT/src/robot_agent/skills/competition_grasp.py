@@ -194,7 +194,32 @@ def synchronize_controller_goals(robot) -> None:
         if controller is None:
             continue
         controller.update(force=True)
-        controller.reset_goal()
+    reset = getattr(composite, "reset", None)
+    if callable(reset):
+        reset()
+    else:
+        for controller in composite.part_controllers.values():
+            controller.reset_goal()
+
+
+def quiesce_robot_for_grasp(raw_env) -> None:
+    """Clear navigation velocity state before a new wall-side grasp."""
+    robot = raw_env.robots[0]
+    sim = getattr(raw_env, "sim", None)
+    if sim is not None:
+        joint_names = list(getattr(robot, "robot_arm_joints", []))
+        joint_names.extend(getattr(robot.robot_model, "torso_joints", []))
+        joint_names.extend(getattr(robot.robot_model, "head_joints", []))
+        for gripper_joints in getattr(robot, "gripper_joints", {}).values():
+            joint_names.extend(gripper_joints)
+        for joint_name in dict.fromkeys(joint_names):
+            try:
+                qvel_addr = sim.model.get_joint_qvel_addr(joint_name)
+                sim.data.qvel[qvel_addr] = 0.0
+            except Exception:
+                continue
+        sim.forward()
+    synchronize_controller_goals(robot)
 
 
 def next_contact_stability(contacts: Mapping[str, Any], stable_steps: int) -> int:
@@ -1270,7 +1295,7 @@ def run_scripted_grasp(
     )
     driver = driver or OfficialScriptedGraspDriver()
     if uses_station_side_tote_grasp(object_name):
-        synchronize_controller_goals(backend.env.robots[0])
+        quiesce_robot_for_grasp(backend.env)
     backend._mark_trajectory_event(
         "grasp_start",
         source=source,
