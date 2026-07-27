@@ -38,6 +38,7 @@ class ScriptedGraspConfig:
         close_steps: int = 300,
         contact_polish_step: float = 0.001,
         contact_polish_max_drop: float = 0.030,
+        contact_confirmation_drop: float = 0.007,
         max_action: float = 0.65,
         lift_height: float = 0.05,
         lift_steps: int = 300,
@@ -62,6 +63,7 @@ class ScriptedGraspConfig:
         self.close_steps = int(close_steps)
         self.contact_polish_step = float(contact_polish_step)
         self.contact_polish_max_drop = float(contact_polish_max_drop)
+        self.contact_confirmation_drop = float(contact_confirmation_drop)
         self.max_action = float(max_action)
         self.lift_height = float(lift_height)
         self.lift_steps = int(lift_steps)
@@ -114,6 +116,16 @@ def contact_micro_adjustment_targets(
     if not targets or not np.isclose(targets[-1], lower):
         targets.append(lower)
     return targets
+
+
+def contact_margin_reached(
+    *,
+    first_contact: float,
+    current: float,
+    required_drop: float,
+) -> bool:
+    """Return whether a contact search moved far enough beyond first touch."""
+    return float(first_contact) - float(current) >= float(required_drop) - 1e-12
 
 
 def targets_reached(
@@ -491,6 +503,7 @@ class OfficialScriptedGraspDriver:
             minimum=config.torso_minimum,
         )
 
+        first_full_contact = None
         for target in targets:
             raw_env.sim.data.qpos[qpos_addr] = target
             raw_env.sim.forward()
@@ -501,7 +514,14 @@ class OfficialScriptedGraspDriver:
                 object_name,
             )
             if all(bool(current_contacts.get(arm, False)) for arm in ARMS):
-                return current_contacts
+                if first_full_contact is None:
+                    first_full_contact = target
+                if contact_margin_reached(
+                    first_contact=first_full_contact,
+                    current=target,
+                    required_drop=config.contact_confirmation_drop,
+                ):
+                    return current_contacts
             if bool(getattr(raw_env, "has_judge_collision", False)):
                 break
 

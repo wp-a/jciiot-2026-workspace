@@ -117,6 +117,22 @@ class CompetitionGraspTests(unittest.TestCase):
         self.assertEqual(config.lift_height, 0.05)
         self.assertEqual(config.lift_hold_steps, 0)
 
+    def test_contact_confirmation_requires_depth_beyond_first_touch(self):
+        self.assertFalse(
+            self.module.contact_margin_reached(
+                first_contact=0.3095,
+                current=0.3050,
+                required_drop=0.007,
+            )
+        )
+        self.assertTrue(
+            self.module.contact_margin_reached(
+                first_contact=0.3095,
+                current=0.3025,
+                required_drop=0.007,
+            )
+        )
+
     def test_stage_requires_every_arm_within_tolerance(self):
         targets = {
             "right": np.array([1.0, 2.0, 3.0]),
