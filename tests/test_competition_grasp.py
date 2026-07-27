@@ -233,6 +233,25 @@ class CompetitionGraspTests(unittest.TestCase):
         self.assertEqual(result["failure_stage"], "raise_clearance")
         self.assertEqual(driver.calls, ["raise_clearance"])
 
+    def test_scripted_grasp_skips_redundant_raise_when_clearance_is_prepared(self):
+        backend = RecordingBackend()
+        driver = ScriptedDriver()
+        config = self.module.ScriptedGraspConfig(clearance_prepared=True)
+
+        result = self.module.run_scripted_grasp(
+            backend,
+            source="input_6",
+            object_name="green_tote_b01_lower",
+            config=config,
+            driver=driver,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(
+            driver.calls,
+            ["move_above", "pregrasp", "approach", "close", "lift", "attach"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

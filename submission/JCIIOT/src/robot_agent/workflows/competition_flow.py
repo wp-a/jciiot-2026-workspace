@@ -128,6 +128,7 @@ class OfficialCompetitionDriver:
         self.grasp_config = grasp_config
         self._grasp_yaw: float | None = None
         self._swap_arm_targets = False
+        self._clearance_prepared = False
         self.move_skill = MoveSkill(
             backend=backend,
             scene_context=scene_context,
@@ -242,6 +243,7 @@ class OfficialCompetitionDriver:
         active_grasp_pose = None
         orient_for_grasp = False
         if not carrying and object_name:
+            self._clearance_prepared = False
             try:
                 grasp_pose = self._grasp_pose(target, object_name)
                 base_xy = grasp_pose["base_xy"]
@@ -269,6 +271,7 @@ class OfficialCompetitionDriver:
                 return True
             if object_name is None or not self._prepare_grasp_clearance(object_name):
                 return False
+            self._clearance_prepared = True
         if not self._move_to(resolved_target, carrying=carrying):
             return False
         if active_grasp_pose is not None:
@@ -301,6 +304,7 @@ class OfficialCompetitionDriver:
 
         config = self.grasp_config or ScriptedGraspConfig()
         config.swap_arm_targets = self._swap_arm_targets
+        config.clearance_prepared = self._clearance_prepared
 
         return run_scripted_grasp(
             self.backend,

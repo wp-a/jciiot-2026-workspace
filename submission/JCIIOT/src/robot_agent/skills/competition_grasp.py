@@ -37,6 +37,7 @@ class ScriptedGraspConfig:
         lift_hold_steps: int = 20,
         lift_tolerance: float = 0.02,
         swap_arm_targets: bool = False,
+        clearance_prepared: bool = False,
     ) -> None:
         self.clearance_height = float(clearance_height)
         self.clearance_raise_steps = int(clearance_raise_steps)
@@ -53,6 +54,7 @@ class ScriptedGraspConfig:
         self.lift_hold_steps = int(lift_hold_steps)
         self.lift_tolerance = float(lift_tolerance)
         self.swap_arm_targets = bool(swap_arm_targets)
+        self.clearance_prepared = bool(clearance_prepared)
 
 
 def normalized_position_action(
@@ -426,7 +428,10 @@ def run_scripted_grasp(
     failure_stage = None
     error = None
     try:
-        if not driver.raise_to_clearance(backend, object_name, config):
+        if (
+            not config.clearance_prepared
+            and not driver.raise_to_clearance(backend, object_name, config)
+        ):
             failure_stage = "raise_clearance"
         elif not driver.move_above_grasp_sites(backend, object_name, config):
             failure_stage = "move_above"
