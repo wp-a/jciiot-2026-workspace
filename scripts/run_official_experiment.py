@@ -337,11 +337,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--required-score", type=int)
     args = parser.parse_args(argv)
 
+    started_at = _utc_now()
     report = run_experiment(args)
     report["runner"] = {
         "python": sys.version,
         "platform": platform.platform(),
-        "started_at": _utc_now(),
+        "started_at": started_at,
     }
     write_json_atomic(args.output, report)
     print(json.dumps(_json_safe(report), ensure_ascii=True, indent=2))

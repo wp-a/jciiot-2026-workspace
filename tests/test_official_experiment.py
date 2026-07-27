@@ -2,7 +2,9 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
+from scripts import run_official_experiment as experiment_module
 from scripts.run_official_experiment import (
     acceptance_met,
     audit_trajectory,
@@ -95,6 +97,50 @@ class OfficialExperimentTests(unittest.TestCase):
                 {"status": "complete", "score": 10},
             )
             self.assertFalse(path.with_name("result.json.tmp").exists())
+
+    def test_main_captures_started_at_before_running_experiment(self):
+        clock_calls = []
+
+        def fake_clock():
+            clock_calls.append("start")
+            return "2026-07-27T12:00:00+00:00"
+
+        def fake_run(_args):
+            self.assertEqual(clock_calls, ["start"])
+            return {
+                "status": "complete",
+                "official_score": 10,
+                "successful_grasp_events": 1,
+                "required_grasp_events": 1,
+                "collision_frames": 0,
+                "final_target_distance_m": 0.1,
+                "execution_result": {"success": True},
+            }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = Path(temp_dir) / "manifest.json"
+            with (
+                mock.patch.object(experiment_module, "_utc_now", side_effect=fake_clock),
+                mock.patch.object(experiment_module, "run_experiment", side_effect=fake_run),
+                mock.patch("builtins.print"),
+            ):
+                exit_code = experiment_module.main(
+                    [
+                        "--candidate-root", temp_dir,
+                        "--expected-official-commit", "a" * 40,
+                        "--workspace-commit", "b" * 40,
+                        "--trajectory", str(Path(temp_dir) / "trajectory.json"),
+                        "--output", str(output),
+                        "--required-score", "10",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            manifest = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(
+                manifest["runner"]["started_at"],
+                "2026-07-27T12:00:00+00:00",
+            )
 
 
 if __name__ == "__main__":

@@ -1,2 +1,7 @@
 iteration	candidate	change	status	official_score	grasp_and_lift	collision_frames	target_distance_m	elapsed_s	artifact	notes
 0	official-recorded-reference	unmodified public reference trajectory	kept	10	1	0	0.12		vendor/JCIIOT2026/JCIIOT/recordings/FactorySorting1_3FO3ERFHISEM/trajectory_20260629_164216_OK.json	Scorer invocation verified on server; this is reference evidence, not our generated result.
+1	scripted-osc-v1	geometric two-arm OSC grasp plus deterministic flow	kept	10	1	0	0.164965	76.064765	artifacts/remote-l1-scripted-20260727/results/manifest-iter1.json	First generated run met the full L1 gate.
+2	scripted-osc-v1	unchanged candidate; seed 20260728	kept	10	1	0	0.164965	64.959380	artifacts/remote-l1-scripted-20260727/results/manifest-20260728.json	Repeat 2/5 passed.
+3	scripted-osc-v1	unchanged candidate; seed 20260729	kept	10	1	0	0.164965	64.003480	artifacts/remote-l1-scripted-20260727/results/manifest-20260729.json	Repeat 3/5 passed.
+4	scripted-osc-v1	unchanged candidate; seed 20260730	kept	10	1	0	0.164965	64.374842	artifacts/remote-l1-scripted-20260727/results/manifest-20260730.json	Repeat 4/5 passed.
+5	scripted-osc-v1	unchanged candidate; seed 20260731	kept	10	1	0	0.164965	65.185490	artifacts/remote-l1-scripted-20260727/results/manifest-20260731.json	Repeat 5/5 passed; promote as L1 development baseline.
