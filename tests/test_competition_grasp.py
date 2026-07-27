@@ -185,6 +185,24 @@ class CompetitionGraspTests(unittest.TestCase):
             0.05,
         )
 
+    def test_lift_goal_counts_motion_that_happened_during_close(self):
+        self.assertTrue(
+            self.module.lift_goal_reached(
+                reference_z=1.200,
+                current_z=1.231,
+                lift_height=0.040,
+                tolerance=0.010,
+            )
+        )
+        self.assertFalse(
+            self.module.lift_goal_reached(
+                reference_z=1.200,
+                current_z=1.229,
+                lift_height=0.040,
+                tolerance=0.010,
+            )
+        )
+
     def test_controller_goals_are_refreshed_after_kinematic_adjustment(self):
         calls = []
 

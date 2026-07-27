@@ -167,6 +167,18 @@ def follower_lift_offset(
     )
 
 
+def lift_goal_reached(
+    *,
+    reference_z: float,
+    current_z: float,
+    lift_height: float,
+    tolerance: float,
+) -> bool:
+    """Measure lift from the pre-close height, including close-stage motion."""
+    required = float(reference_z) + float(lift_height) - float(tolerance)
+    return float(current_z) >= required
+
+
 def synchronize_controller_goals(robot) -> None:
     """Reset moving-base controller goals to the current simulated posture."""
     composite = robot.composite_controller
@@ -737,6 +749,10 @@ class OfficialScriptedGraspDriver:
         )
         body_id = raw_env.obj_body_id[object_name]
         start_object_xy = raw_env.sim.data.body_xpos[body_id][:2].copy()
+        self._close_lift_reference = (
+            object_name,
+            float(raw_env.sim.data.body_xpos[body_id][2]),
+        )
         hold_targets = helpers["capture_hold_targets"](robot)
         stable_steps = 0
 
@@ -867,10 +883,16 @@ class OfficialScriptedGraspDriver:
         if not all(bool(contacts.get(arm, False)) for arm in ARMS):
             return False
 
-        start_object_z = float(
+        lift_start_object_z = float(
             helpers["object_center"](raw_env, object_name)[2]
         )
-        target_object_z = start_object_z + config.lift_height
+        reference_name, reference_z = getattr(
+            self,
+            "_close_lift_reference",
+            (object_name, lift_start_object_z),
+        )
+        if reference_name != object_name:
+            reference_z = lift_start_object_z
         starts = {
             arm: helpers["gripper_position"](raw_env, robot, arm)
             for arm in ARMS
@@ -884,7 +906,12 @@ class OfficialScriptedGraspDriver:
             current_object_z = float(
                 helpers["object_center"](raw_env, object_name)[2]
             )
-            if current_object_z >= target_object_z - config.lift_tolerance:
+            if lift_goal_reached(
+                reference_z=reference_z,
+                current_z=current_object_z,
+                lift_height=config.lift_height,
+                tolerance=config.lift_tolerance,
+            ):
                 success = True
                 break
 
@@ -892,7 +919,7 @@ class OfficialScriptedGraspDriver:
             if not all(bool(contacts.get(arm, False)) for arm in ARMS):
                 return False
 
-            object_lift = current_object_z - start_object_z
+            object_lift = current_object_z - lift_start_object_z
             offsets = {
                 leader: config.lift_height,
                 follower: follower_lift_offset(
