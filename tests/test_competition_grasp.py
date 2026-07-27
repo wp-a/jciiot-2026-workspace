@@ -369,6 +369,23 @@ class CompetitionGraspTests(unittest.TestCase):
 
         self.assertAlmostEqual(profiled.mirrored_ik_height_offset, 0.06)
         self.assertAlmostEqual(profiled.station_side_reach_offset, 0.04)
+        self.assertEqual(profiled.clearance_translate_steps, 240)
+
+    def test_l5_transport_starts_at_backend_center_attachment(self):
+        np.testing.assert_allclose(
+            self.module.transport_attachment_relative_xy(
+                "white_tote_b01_left_front",
+                np.array([1.03, -0.21]),
+            ),
+            [0.0, 0.0],
+        )
+        np.testing.assert_allclose(
+            self.module.transport_attachment_relative_xy(
+                "green_tote_b01_lower",
+                np.array([1.03, -0.21]),
+            ),
+            [1.03, -0.21],
+        )
 
     def test_container_profile_restores_scored_l1_grasp_parameters(self):
         config = self.module.ScriptedGraspConfig()

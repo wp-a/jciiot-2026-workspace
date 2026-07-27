@@ -253,7 +253,19 @@ def apply_object_grasp_profile(
     elif uses_station_side_tote_grasp(object_name):
         config.mirrored_ik_height_offset = 0.06
         config.station_side_reach_offset = 0.04
+        config.clearance_translate_steps = 240
     return config
+
+
+def transport_attachment_relative_xy(
+    object_name: str,
+    captured_relative_xy: np.ndarray,
+) -> np.ndarray:
+    """Avoid sweeping remaining L5 objects with a stale grasp offset."""
+    relative_xy = np.asarray(captured_relative_xy, dtype=float).reshape(2)
+    if uses_station_side_tote_grasp(object_name):
+        return np.zeros(2, dtype=float)
+    return relative_xy.copy()
 
 
 def station_side_tote_grasp_targets(
@@ -1193,7 +1205,12 @@ class OfficialScriptedGraspDriver:
 
     def attach_for_transport(self, backend, object_name) -> None:
         helpers = self._helpers()
-        helpers["attach"](backend.env, object_name)
+        attachment = helpers["attach"](backend.env, object_name)
+        if isinstance(attachment, dict) and "relative_xy" in attachment:
+            attachment["relative_xy"] = transport_attachment_relative_xy(
+                object_name,
+                attachment["relative_xy"],
+            )
         backend._held_crate_name = object_name
         backend._held_crate_body_id = backend.env.obj_body_id.get(object_name)
         self._record(backend, backend.env)
