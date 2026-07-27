@@ -261,17 +261,22 @@ class OfficialCompetitionDriver:
             return False
         if active_grasp_pose is not None:
             from robot_agent.skills.competition_navigation import (
+                bounded_yaw_step,
                 grasp_orientation_from_base,
                 orient_base,
             )
 
-            reached_xy, _ = self.backend.get_base_pose()
+            reached_xy, reached_yaw = self.backend.get_base_pose()
             orientation = grasp_orientation_from_base(
                 base_xy=reached_xy,
                 right_site_xy=active_grasp_pose["right_site_xy"],
                 left_site_xy=active_grasp_pose["left_site_xy"],
             )
-            self._grasp_yaw = float(orientation["yaw"])
+            self._grasp_yaw = bounded_yaw_step(
+                current_yaw=reached_yaw,
+                target_yaw=float(orientation["yaw"]),
+                max_step=0.30,
+            )
             self._swap_arm_targets = bool(orientation["swap_arm_targets"])
             return bool(orient_base(self.backend, self._grasp_yaw))
         return True
