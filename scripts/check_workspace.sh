@@ -158,6 +158,9 @@ while IFS=$'\t' read -r expected_hash file_rel; do
   fi
 done < <(jq -r '.tracked_files[] | [.sha256, .path] | @tsv' "${upstream_lock}")
 
+python3 "${workspace_dir}/scripts/check_official_tasks.py" \
+  --workspace "${workspace_dir}"
+
 bash "${workspace_dir}/scripts/check_references.sh" \
   --manifest "${reference_manifest}" \
   --dest "${workspace_dir}/references/repos" \
