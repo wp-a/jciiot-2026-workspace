@@ -38,7 +38,7 @@ class ScriptedGraspConfig:
         close_steps: int = 300,
         contact_polish_step: float = 0.001,
         contact_polish_max_drop: float = 0.030,
-        contact_confirmation_drop: float = 0.007,
+        contact_confirmation_drop: float = 0.003,
         max_action: float = 0.65,
         lift_height: float = 0.05,
         lift_steps: int = 300,

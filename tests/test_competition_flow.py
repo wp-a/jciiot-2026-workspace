@@ -1,6 +1,10 @@
 import importlib.util
+import sys
+import types
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 
 MODULE_PATH = (
@@ -128,6 +132,71 @@ class CompetitionFlowTests(unittest.TestCase):
             }
         )
         self.assertLess(first_verified_index, second_failed_index)
+
+    def test_clearance_preparation_keeps_nominal_torso_height(self):
+        calls = []
+
+        class GraspDriver:
+            def lower_torso_for_reach(self, backend, config):
+                calls.append("lower_torso")
+                return True
+
+            def raise_to_clearance(self, backend, object_name, config):
+                calls.append("raise_clearance")
+                return True
+
+        fake_module = types.ModuleType("robot_agent.skills.competition_grasp")
+        fake_module.OfficialScriptedGraspDriver = GraspDriver
+        fake_module.ScriptedGraspConfig = SimpleNamespace
+        package = types.ModuleType("robot_agent")
+        skills_package = types.ModuleType("robot_agent.skills")
+        modules = {
+            "robot_agent": package,
+            "robot_agent.skills": skills_package,
+            "robot_agent.skills.competition_grasp": fake_module,
+        }
+        driver = object.__new__(self.module.OfficialCompetitionDriver)
+        driver.backend = object()
+        driver.grasp_config = SimpleNamespace()
+
+        with patch.dict(sys.modules, modules):
+            success = driver._prepare_grasp_clearance("green_tote_b01_lower")
+
+        self.assertTrue(success)
+        self.assertEqual(calls, ["raise_clearance"])
+
+    def test_prepared_clearance_preserves_official_grasp_depth(self):
+        captured = {}
+
+        def run_scripted_grasp(backend, **kwargs):
+            captured.update(kwargs)
+            return {"success": False}
+
+        fake_module = types.ModuleType("robot_agent.skills.competition_grasp")
+        fake_module.ScriptedGraspConfig = SimpleNamespace
+        fake_module.run_scripted_grasp = run_scripted_grasp
+        package = types.ModuleType("robot_agent")
+        skills_package = types.ModuleType("robot_agent.skills")
+        modules = {
+            "robot_agent": package,
+            "robot_agent.skills": skills_package,
+            "robot_agent.skills.competition_grasp": fake_module,
+        }
+        config = SimpleNamespace(
+            site_below_offset=0.035,
+            swap_arm_targets=False,
+            clearance_prepared=False,
+        )
+        driver = object.__new__(self.module.OfficialCompetitionDriver)
+        driver.backend = object()
+        driver.grasp_config = config
+        driver._swap_arm_targets = False
+        driver._clearance_prepared = True
+
+        with patch.dict(sys.modules, modules):
+            driver.grasp("input_6", "green_tote_b01_lower")
+
+        self.assertEqual(captured["config"].site_below_offset, 0.035)
 
 
 if __name__ == "__main__":
