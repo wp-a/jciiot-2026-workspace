@@ -111,6 +111,12 @@ class CompetitionGraspTests(unittest.TestCase):
 
         np.testing.assert_allclose(targets, [0.111, 0.107, 0.103, 0.100])
 
+    def test_lift_defaults_use_official_short_verification_motion(self):
+        config = self.module.ScriptedGraspConfig()
+
+        self.assertEqual(config.lift_height, 0.05)
+        self.assertEqual(config.lift_hold_steps, 0)
+
     def test_stage_requires_every_arm_within_tolerance(self):
         targets = {
             "right": np.array([1.0, 2.0, 3.0]),

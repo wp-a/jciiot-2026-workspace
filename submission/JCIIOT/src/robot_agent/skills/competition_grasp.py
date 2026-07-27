@@ -39,10 +39,10 @@ class ScriptedGraspConfig:
         contact_polish_step: float = 0.001,
         contact_polish_max_drop: float = 0.030,
         max_action: float = 0.65,
-        lift_height: float = 0.15,
+        lift_height: float = 0.05,
         lift_steps: int = 300,
-        lift_hold_steps: int = 20,
-        lift_tolerance: float = 0.02,
+        lift_hold_steps: int = 0,
+        lift_tolerance: float = 0.01,
         swap_arm_targets: bool = False,
         clearance_prepared: bool = False,
     ) -> None:
