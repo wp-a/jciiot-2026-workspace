@@ -217,6 +217,30 @@ def uses_mirrored_open_grasp(object_name: str) -> bool:
     return "tote_b01" in str(object_name).lower()
 
 
+def uses_legacy_container_grasp(object_name: str) -> bool:
+    """Select the scored L1 controller for the matching container geometry."""
+    return "container_h01" in str(object_name).lower()
+
+
+def apply_object_grasp_profile(
+    config: ScriptedGraspConfig,
+    object_name: str,
+) -> ScriptedGraspConfig:
+    """Apply parameters validated for an official object geometry family."""
+    if uses_legacy_container_grasp(object_name):
+        config.site_below_offset = 0.035
+        config.approach_tolerance = config.position_tolerance
+        config.close_steps = 80
+        config.close_increment_interval = 1
+        config.contact_settle_steps = config.close_steps + 1
+        config.hold_close_pose = False
+        config.wrist_height_trigger = float("inf")
+        config.lift_height = 0.15
+        config.lift_hold_steps = 20
+        config.lift_tolerance = 0.02
+    return config
+
+
 def mirrored_fingerpad_targets(
     right_fingerpads: np.ndarray,
     *,
@@ -404,6 +428,7 @@ class OfficialScriptedGraspDriver:
             build_action,
             capture_hold_targets,
             current_part_qpos,
+            lift_grasped_object,
             object_center_pos,
             world_delta_to_controller_frame,
         )
@@ -421,6 +446,7 @@ class OfficialScriptedGraspDriver:
             "build_action": build_action,
             "capture_hold_targets": capture_hold_targets,
             "current_part_qpos": current_part_qpos,
+            "lift": lift_grasped_object,
             "object_center": object_center_pos,
             "world_delta": world_delta_to_controller_frame,
             "get_targets": get_target_positions,
@@ -978,6 +1004,27 @@ class OfficialScriptedGraspDriver:
         if not all(bool(contacts.get(arm, False)) for arm in ARMS):
             return False
 
+        if uses_legacy_container_grasp(object_name):
+            result = helpers["lift"](
+                env=raw_env,
+                object_name=object_name,
+                lift_height=config.lift_height,
+                max_steps=config.lift_steps,
+                hold_steps=config.lift_hold_steps,
+                tolerance=config.lift_tolerance,
+                max_action=config.max_action,
+                render=False,
+                render_callback=lambda: self._record(backend, raw_env),
+            )
+            if not bool(result.get("success", False)):
+                return False
+            contacts = helpers["grasp_status"](
+                raw_env,
+                robot,
+                object_name,
+            )
+            return all(bool(contacts.get(arm, False)) for arm in ARMS)
+
         lift_start_object_z = float(
             helpers["object_center"](raw_env, object_name)[2]
         )
@@ -1115,7 +1162,10 @@ def run_scripted_grasp(
     driver=None,
 ) -> dict[str, Any]:
     """Run the bounded stage sequence and return an auditable result."""
-    config = config or ScriptedGraspConfig()
+    config = apply_object_grasp_profile(
+        config or ScriptedGraspConfig(),
+        object_name,
+    )
     driver = driver or OfficialScriptedGraspDriver()
     backend._mark_trajectory_event(
         "grasp_start",

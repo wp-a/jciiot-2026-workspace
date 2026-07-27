@@ -228,9 +228,13 @@ class OfficialCompetitionDriver:
         from robot_agent.skills.competition_grasp import (
             OfficialScriptedGraspDriver,
             ScriptedGraspConfig,
+            apply_object_grasp_profile,
         )
 
-        config = self.grasp_config or ScriptedGraspConfig()
+        config = apply_object_grasp_profile(
+            self.grasp_config or ScriptedGraspConfig(),
+            object_name,
+        )
         driver = OfficialScriptedGraspDriver()
         return bool(driver.raise_to_clearance(self.backend, object_name, config))
 

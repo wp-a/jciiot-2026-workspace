@@ -290,6 +290,25 @@ class CompetitionGraspTests(unittest.TestCase):
             )
         )
 
+    def test_container_profile_restores_scored_l1_grasp_parameters(self):
+        config = self.module.ScriptedGraspConfig()
+
+        profiled = self.module.apply_object_grasp_profile(
+            config,
+            "line_5_container_h01_near",
+        )
+
+        self.assertIs(profiled, config)
+        self.assertEqual(config.site_below_offset, 0.035)
+        self.assertEqual(config.approach_tolerance, 0.012)
+        self.assertEqual(config.close_steps, 80)
+        self.assertEqual(config.close_increment_interval, 1)
+        self.assertEqual(config.contact_settle_steps, 81)
+        self.assertFalse(config.hold_close_pose)
+        self.assertEqual(config.lift_height, 0.15)
+        self.assertEqual(config.lift_hold_steps, 20)
+        self.assertEqual(config.lift_tolerance, 0.02)
+
     def test_close_pose_can_hold_post_adjustment_gripper_positions(self):
         current = {
             "right": np.array([12.03, 2.98, 1.38]),

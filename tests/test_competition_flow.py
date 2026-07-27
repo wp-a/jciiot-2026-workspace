@@ -150,6 +150,7 @@ class CompetitionFlowTests(unittest.TestCase):
         fake_module = types.ModuleType("robot_agent.skills.competition_grasp")
         fake_module.OfficialScriptedGraspDriver = GraspDriver
         fake_module.ScriptedGraspConfig = SimpleNamespace
+        fake_module.apply_object_grasp_profile = lambda config, _name: config
         package = types.ModuleType("robot_agent")
         skills_package = types.ModuleType("robot_agent.skills")
         modules = {
