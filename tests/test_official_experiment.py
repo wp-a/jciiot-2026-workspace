@@ -1,7 +1,10 @@
 import json
+import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 from scripts import run_official_experiment as experiment_module
@@ -98,6 +101,116 @@ class OfficialExperimentTests(unittest.TestCase):
             )
             self.assertFalse(path.with_name("result.json.tmp").exists())
 
+    def test_parser_defaults_to_flow_and_accepts_agent_mode(self):
+        required = [
+            "--candidate-root", "/tmp/candidate",
+            "--expected-official-commit", "a" * 40,
+            "--workspace-commit", "b" * 40,
+            "--trajectory", "/tmp/trajectory.json",
+            "--output", "/tmp/manifest.json",
+        ]
+
+        self.assertEqual(
+            experiment_module.build_parser().parse_args(required).execution_mode,
+            "flow",
+        )
+        self.assertEqual(
+            experiment_module.build_parser().parse_args(
+                required + ["--execution-mode", "agent"]
+            ).execution_mode,
+            "agent",
+        )
+
+    def test_execute_task_agent_mode_calls_official_robot_agent(self):
+        captured = {}
+
+        class FakeOutput:
+            def as_dict(self):
+                return {
+                    "skill_name": "competition_task",
+                    "success": True,
+                    "payload": {"workflow": {"success": True}},
+                }
+
+        class FakeRobotAgent:
+            def __init__(self, **kwargs):
+                captured["kwargs"] = kwargs
+
+            def run(self, prompt):
+                captured["prompt"] = prompt
+                return FakeOutput()
+
+        robot_agent = types.ModuleType("robot_agent")
+        core = types.ModuleType("robot_agent.core")
+        agent_module = types.ModuleType("robot_agent.core.agent")
+        agent_module.RobotAgent = FakeRobotAgent
+        modules = {
+            "robot_agent": robot_agent,
+            "robot_agent.core": core,
+            "robot_agent.core.agent": agent_module,
+        }
+        backend = object()
+        scene = SimpleNamespace(scene_name="factory", map_name="factory_map")
+        grid = object()
+        task = dict(self.task, scene_prefix="factory_sorting_1_example")
+
+        with mock.patch.dict(sys.modules, modules):
+            result = experiment_module.execute_task(
+                execution_mode="agent",
+                backend=backend,
+                scene_context=scene,
+                grid=grid,
+                task=task,
+                task_index=0,
+                max_attempts=1,
+            )
+
+        self.assertEqual(result["skill_name"], "competition_task")
+        self.assertTrue(captured["prompt"].strip())
+        self.assertIs(captured["kwargs"]["backend"], backend)
+        self.assertIs(captured["kwargs"]["scene_context"], scene)
+        self.assertIs(captured["kwargs"]["grid"], grid)
+        self.assertEqual(
+            captured["kwargs"]["scene_metadata"]["task_index"],
+            0,
+        )
+        self.assertEqual(
+            captured["kwargs"]["scene_metadata"]["input_object_map"],
+            {"input_5": "box_near"},
+        )
+
+    def test_execute_task_flow_mode_preserves_direct_workflow(self):
+        captured = {}
+
+        def run_official_task(**kwargs):
+            captured.update(kwargs)
+            return {"success": True, "states": {"box_near": "verified"}}
+
+        robot_agent = types.ModuleType("robot_agent")
+        workflows = types.ModuleType("robot_agent.workflows")
+        flow_module = types.ModuleType("robot_agent.workflows.competition_flow")
+        flow_module.run_official_task = run_official_task
+        modules = {
+            "robot_agent": robot_agent,
+            "robot_agent.workflows": workflows,
+            "robot_agent.workflows.competition_flow": flow_module,
+        }
+
+        with mock.patch.dict(sys.modules, modules):
+            result = experiment_module.execute_task(
+                execution_mode="flow",
+                backend="backend",
+                scene_context="scene",
+                grid="grid",
+                task=self.task,
+                task_index=0,
+                max_attempts=2,
+            )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(captured["max_attempts"], 2)
+        self.assertEqual(captured["task"], self.task)
+
     def test_main_captures_started_at_before_running_experiment(self):
         clock_calls = []
 
@@ -141,6 +254,7 @@ class OfficialExperimentTests(unittest.TestCase):
                 manifest["runner"]["started_at"],
                 "2026-07-27T12:00:00+00:00",
             )
+            self.assertEqual(manifest["runner"]["execution_mode"], "flow")
 
 
 if __name__ == "__main__":

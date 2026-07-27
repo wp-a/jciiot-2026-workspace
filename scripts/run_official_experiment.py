@@ -249,6 +249,71 @@ def _score_trajectory(task_index: int, trajectory_path: Path) -> dict[str, Any]:
     return _json_safe(app._score_steps(task_index))
 
 
+def _primary_object_name(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            if item:
+                return str(item)
+    return ""
+
+
+def execute_task(
+    *,
+    execution_mode: str,
+    backend,
+    scene_context,
+    grid,
+    task: dict[str, Any],
+    task_index: int,
+    max_attempts: int,
+) -> dict[str, Any]:
+    """Execute through either the historical flow or official RobotAgent."""
+    if execution_mode == "flow":
+        from robot_agent.workflows.competition_flow import run_official_task
+
+        return run_official_task(
+            backend=backend,
+            scene_context=scene_context,
+            grid=grid,
+            task=task,
+            max_attempts=max_attempts,
+        )
+    if execution_mode != "agent":
+        raise ValueError(f"unsupported execution mode: {execution_mode}")
+
+    from robot_agent.core.agent import RobotAgent
+
+    object_name = _primary_object_name(task.get("object", ""))
+    scene_metadata = {
+        "task_index": int(task_index),
+        "env_name": str(task.get("env_name", "")),
+        "scene_name": getattr(scene_context, "scene_name", ""),
+        "map_name": getattr(scene_context, "map_name", ""),
+        "map_prefix": str(task.get("scene_prefix", "")),
+        "input_object_map": (
+            {str(task["source"]): object_name} if object_name else {}
+        ),
+    }
+    agent = RobotAgent(
+        backend=backend,
+        scene_context=scene_context,
+        grid=grid,
+        scene_metadata=scene_metadata,
+        knowledge_enabled=False,
+    )
+    output = agent.run(
+        f"Execute official {task.get('level', '')} transport task "
+        f"from {task.get('source', '')} to {task.get('target', '')}."
+    )
+    if hasattr(output, "as_dict"):
+        return _json_safe(output.as_dict())
+    if isinstance(output, dict):
+        return _json_safe(output)
+    raise TypeError("RobotAgent.run returned an unsupported result")
+
+
 def run_experiment(args: argparse.Namespace) -> dict[str, Any]:
     candidate_root = args.candidate_root.resolve()
     app_dir = _configure_candidate(candidate_root)
@@ -269,13 +334,13 @@ def run_experiment(args: argparse.Namespace) -> dict[str, Any]:
         backend.start_recording()
         backend._record_trajectory_frame()
 
-        from robot_agent.workflows.competition_flow import run_official_task
-
-        execution_result = run_official_task(
+        execution_result = execute_task(
+            execution_mode=args.execution_mode,
             backend=backend,
             scene_context=scene_context,
             grid=grid,
             task=task,
+            task_index=args.task_index,
             max_attempts=args.max_attempts,
         )
         backend._record_trajectory_frame()
@@ -324,7 +389,7 @@ def run_experiment(args: argparse.Namespace) -> dict[str, Any]:
             backend.close()
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("--candidate-root", type=Path, required=True)
     parser.add_argument("--expected-official-commit", required=True)
@@ -335,7 +400,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--trajectory", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--required-score", type=int)
-    args = parser.parse_args(argv)
+    parser.add_argument(
+        "--execution-mode",
+        choices=("flow", "agent"),
+        default="flow",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
 
     started_at = _utc_now()
     report = run_experiment(args)
@@ -343,6 +417,7 @@ def main(argv: list[str] | None = None) -> int:
         "python": sys.version,
         "platform": platform.platform(),
         "started_at": started_at,
+        "execution_mode": args.execution_mode,
     }
     write_json_atomic(args.output, report)
     print(json.dumps(_json_safe(report), ensure_ascii=True, indent=2))
