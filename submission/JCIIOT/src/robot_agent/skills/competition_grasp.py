@@ -44,6 +44,7 @@ class ScriptedGraspConfig:
         wrist_adjustment_steps: int = 20,
         wrist_height_trigger: float = 0.04,
         hold_close_pose: bool = True,
+        face_insertion: float = 0.03,
         max_action: float = 0.65,
         lift_height: float = 0.05,
         lift_steps: int = 300,
@@ -75,6 +76,7 @@ class ScriptedGraspConfig:
         self.wrist_adjustment_steps = int(wrist_adjustment_steps)
         self.wrist_height_trigger = float(wrist_height_trigger)
         self.hold_close_pose = bool(hold_close_pose)
+        self.face_insertion = float(face_insertion)
         self.max_action = float(max_action)
         self.lift_height = float(lift_height)
         self.lift_steps = int(lift_steps)
@@ -194,6 +196,31 @@ def close_pose_targets(
         arm: np.asarray(source[arm], dtype=float).copy()
         for arm in ARMS
     }
+
+
+def inward_face_targets(
+    targets: Mapping[str, np.ndarray],
+    *,
+    object_xy: np.ndarray,
+    insertion: float,
+) -> dict[str, np.ndarray]:
+    """Insert grasp centers from the marked face toward the object interior."""
+    copied = {
+        arm: np.asarray(targets[arm], dtype=float).copy()
+        for arm in ARMS
+    }
+    grasp_center = np.mean(
+        np.stack([copied[arm][:2] for arm in ARMS]),
+        axis=0,
+    )
+    inward = np.asarray(object_xy, dtype=float).reshape(2) - grasp_center
+    norm = float(np.linalg.norm(inward))
+    if norm <= 1e-9 or float(insertion) == 0.0:
+        return copied
+    offset = inward / norm * float(insertion)
+    for arm in ARMS:
+        copied[arm][:2] += offset
+    return copied
 
 
 def targets_reached(
@@ -440,6 +467,13 @@ class OfficialScriptedGraspDriver:
             raw_targets,
             swap=config.swap_arm_targets,
         )
+        body_id = backend.env.obj_body_id[object_name]
+        object_xy = backend.env.sim.data.body_xpos[body_id][:2]
+        grasp_targets = inward_face_targets(
+            grasp_targets,
+            object_xy=object_xy,
+            insertion=config.face_insertion,
+        )
         offset = np.array([0.0, 0.0, float(height_offset)], dtype=float)
         return {
             arm: np.asarray(grasp_targets[arm], dtype=float) + offset
@@ -523,14 +557,11 @@ class OfficialScriptedGraspDriver:
         helpers = self._helpers()
         raw_env = backend.env
         robot = raw_env.robots[0]
-        raw_targets, _ = helpers["get_targets"](
-            raw_env,
+        targets = self._grasp_targets(
+            backend,
             object_name,
-            config.site_below_offset,
-        )
-        targets = assigned_grasp_targets(
-            raw_targets,
-            swap=config.swap_arm_targets,
+            config,
+            height_offset=0.0,
         )
         current = helpers["gripper_position"](raw_env, robot, "left")
         if not wrist_adjustment_required(
@@ -590,14 +621,11 @@ class OfficialScriptedGraspDriver:
         helpers = self._helpers()
         raw_env = backend.env
         robot = raw_env.robots[0]
-        raw_targets, _ = helpers["get_targets"](
-            raw_env,
+        grasp_targets = self._grasp_targets(
+            backend,
             object_name,
-            config.site_below_offset,
-        )
-        grasp_targets = assigned_grasp_targets(
-            raw_targets,
-            swap=config.swap_arm_targets,
+            config,
+            height_offset=0.0,
         )
         current_positions = {
             arm: helpers["gripper_position"](raw_env, robot, arm)

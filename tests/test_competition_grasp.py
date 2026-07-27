@@ -248,6 +248,21 @@ class CompetitionGraspTests(unittest.TestCase):
         np.testing.assert_allclose(held["right"], current["right"])
         np.testing.assert_allclose(held["left"], current["left"])
 
+    def test_grasp_targets_insert_from_face_toward_object_center(self):
+        targets = {
+            "right": np.array([12.03, 2.98, 1.38]),
+            "left": np.array([11.70, 2.98, 1.38]),
+        }
+
+        inserted = self.module.inward_face_targets(
+            targets,
+            object_xy=np.array([11.865, 3.195]),
+            insertion=0.03,
+        )
+
+        np.testing.assert_allclose(inserted["right"], [12.03, 3.01, 1.38])
+        np.testing.assert_allclose(inserted["left"], [11.70, 3.01, 1.38])
+
     def test_stage_requires_every_arm_within_tolerance(self):
         targets = {
             "right": np.array([1.0, 2.0, 3.0]),
