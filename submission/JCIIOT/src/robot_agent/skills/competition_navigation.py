@@ -121,6 +121,28 @@ def select_grasp_candidate(candidates, *, station_approach) -> str:
     return str(max(entries, key=score)["name"])
 
 
+def refine_base_position(
+    backend,
+    target_xy,
+    *,
+    waypoint_tolerance: float = 0.03,
+    max_steps: int = 120,
+) -> bool:
+    """Refine an A* endpoint with the official incremental direct driver."""
+    import numpy as np
+
+    target = np.asarray(target_xy, dtype=float).reshape(2)
+    return bool(
+        backend.follow_path(
+            [target],
+            max_steps=int(max_steps),
+            waypoint_tolerance=float(waypoint_tolerance),
+            stop_on_collision=True,
+            record_every=1,
+        )
+    )
+
+
 def orient_base(
     backend,
     target_yaw: float,
