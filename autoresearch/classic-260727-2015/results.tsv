@@ -1,0 +1,2 @@
+iteration	candidate	change	status	official_score	grasp_and_lift	collision_frames	target_distance_m	elapsed_s	artifact	notes
+0	official-recorded-reference	unmodified public reference trajectory	kept	10	1	0	0.12		vendor/JCIIOT2026/JCIIOT/recordings/FactorySorting1_3FO3ERFHISEM/trajectory_20260629_164216_OK.json	Scorer invocation verified on server; this is reference evidence, not our generated result.
