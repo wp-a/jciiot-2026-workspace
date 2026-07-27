@@ -44,7 +44,8 @@ class ScriptedGraspConfig:
         wrist_adjustment_steps: int = 20,
         wrist_height_trigger: float = 0.04,
         hold_close_pose: bool = True,
-        face_insertion: float = 0.03,
+        face_insertion: float = 0.0,
+        close_follow_max_distance: float = 0.05,
         max_action: float = 0.65,
         lift_height: float = 0.05,
         lift_steps: int = 300,
@@ -77,6 +78,7 @@ class ScriptedGraspConfig:
         self.wrist_height_trigger = float(wrist_height_trigger)
         self.hold_close_pose = bool(hold_close_pose)
         self.face_insertion = float(face_insertion)
+        self.close_follow_max_distance = float(close_follow_max_distance)
         self.max_action = float(max_action)
         self.lift_height = float(lift_height)
         self.lift_steps = int(lift_steps)
@@ -221,6 +223,16 @@ def inward_face_targets(
     for arm in ARMS:
         copied[arm][:2] += offset
     return copied
+
+
+def bounded_planar_follow_offset(delta: np.ndarray, *, max_distance: float) -> np.ndarray:
+    """Bound object-relative close tracking without changing its direction."""
+    delta = np.asarray(delta, dtype=float).reshape(2)
+    distance = float(np.linalg.norm(delta))
+    limit = max(0.0, float(max_distance))
+    if distance <= limit or distance <= 1e-12:
+        return delta.copy()
+    return delta / distance * limit
 
 
 def targets_reached(
@@ -636,14 +648,23 @@ class OfficialScriptedGraspDriver:
             grasp_targets,
             hold_current=config.hold_close_pose,
         )
+        body_id = raw_env.obj_body_id[object_name]
+        start_object_xy = raw_env.sim.data.body_xpos[body_id][:2].copy()
         hold_targets = helpers["capture_hold_targets"](robot)
 
         for _ in range(config.close_steps):
             robot.composite_controller.update_state()
+            object_xy = raw_env.sim.data.body_xpos[body_id][:2]
+            follow_offset = bounded_planar_follow_offset(
+                object_xy - start_object_xy,
+                max_distance=config.close_follow_max_distance,
+            )
             arm_actions = {}
             for arm in ARMS:
                 current = helpers["gripper_position"](raw_env, robot, arm)
-                world_delta = np.asarray(grasp_targets[arm], dtype=float) - current
+                active_target = np.asarray(grasp_targets[arm], dtype=float).copy()
+                active_target[:2] += follow_offset
+                world_delta = active_target - current
                 controller_delta = helpers["world_delta"](robot, arm, world_delta)
                 arm_actions[arm] = helpers["arm_action"](
                     robot,

@@ -263,6 +263,14 @@ class CompetitionGraspTests(unittest.TestCase):
         np.testing.assert_allclose(inserted["right"], [12.03, 3.01, 1.38])
         np.testing.assert_allclose(inserted["left"], [11.70, 3.01, 1.38])
 
+    def test_close_follow_offset_is_bounded_without_changing_direction(self):
+        offset = self.module.bounded_planar_follow_offset(
+            np.array([0.03, 0.04]),
+            max_distance=0.03,
+        )
+
+        np.testing.assert_allclose(offset, [0.018, 0.024])
+
     def test_stage_requires_every_arm_within_tolerance(self):
         targets = {
             "right": np.array([1.0, 2.0, 3.0]),
