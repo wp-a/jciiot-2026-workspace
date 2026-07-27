@@ -320,7 +320,7 @@ class CompetitionGraspTests(unittest.TestCase):
         config = self.module.ScriptedGraspConfig()
 
         self.assertEqual(config.site_below_offset, 0.015)
-        self.assertEqual(config.left_wrist_adjustment, 0.20)
+        self.assertEqual(config.left_wrist_adjustment, 0.10)
 
     def test_grasp_targets_can_be_swapped_after_base_rotation(self):
         raw_targets = {

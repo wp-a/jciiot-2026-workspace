@@ -40,7 +40,7 @@ class ScriptedGraspConfig:
         contact_polish_max_drop: float = 0.030,
         contact_confirmation_drop: float = 0.003,
         contact_settle_steps: int = 5,
-        left_wrist_adjustment: float = 0.20,
+        left_wrist_adjustment: float = 0.10,
         wrist_adjustment_steps: int = 20,
         wrist_height_trigger: float = 0.04,
         hold_close_pose: bool = True,
