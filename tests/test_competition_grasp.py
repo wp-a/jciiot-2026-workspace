@@ -97,6 +97,32 @@ class CompetitionGraspTests(unittest.TestCase):
         self.assertFalse(self.module.targets_reached(almost, targets, tolerance=0.01))
         self.assertTrue(self.module.targets_reached(reached, targets, tolerance=0.01))
 
+    def test_approach_tolerance_hands_small_residual_to_close_stage(self):
+        config = self.module.ScriptedGraspConfig()
+        targets = {
+            "right": np.array([12.03, 2.98, 1.365]),
+            "left": np.array([11.70, 2.98, 1.365]),
+        }
+        current = {
+            "right": np.array([12.032, 2.981, 1.365]),
+            "left": np.array([11.696, 2.982, 1.415]),
+        }
+
+        self.assertFalse(
+            self.module.targets_reached(
+                current,
+                targets,
+                tolerance=config.position_tolerance,
+            )
+        )
+        self.assertTrue(
+            self.module.targets_reached(
+                current,
+                targets,
+                tolerance=config.approach_tolerance,
+            )
+        )
+
     def test_vertical_clearance_targets_only_raise_grippers(self):
         current = {
             "right": np.array([12.48, 4.87, 1.16]),

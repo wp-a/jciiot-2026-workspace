@@ -28,6 +28,7 @@ class ScriptedGraspConfig:
         pregrasp_height: float = 0.10,
         site_below_offset: float = 0.035,
         position_tolerance: float = 0.012,
+        approach_tolerance: float = 0.055,
         pregrasp_steps: int = 180,
         approach_steps: int = 180,
         close_steps: int = 80,
@@ -45,6 +46,7 @@ class ScriptedGraspConfig:
         self.pregrasp_height = float(pregrasp_height)
         self.site_below_offset = float(site_below_offset)
         self.position_tolerance = float(position_tolerance)
+        self.approach_tolerance = float(approach_tolerance)
         self.pregrasp_steps = int(pregrasp_steps)
         self.approach_steps = int(approach_steps)
         self.close_steps = int(close_steps)
@@ -202,6 +204,7 @@ class OfficialScriptedGraspDriver:
         *,
         max_steps: int,
         gripper_value: float,
+        tolerance: float | None = None,
     ) -> bool:
         helpers = self._helpers()
         raw_env = backend.env
@@ -221,7 +224,11 @@ class OfficialScriptedGraspDriver:
             if targets_reached(
                 current,
                 fixed_targets,
-                tolerance=config.position_tolerance,
+                tolerance=(
+                    config.position_tolerance
+                    if tolerance is None
+                    else float(tolerance)
+                ),
             ):
                 return True
 
@@ -334,6 +341,7 @@ class OfficialScriptedGraspDriver:
             config,
             max_steps=config.approach_steps,
             gripper_value=-1.0,
+            tolerance=config.approach_tolerance,
         )
 
     def close_and_check_contacts(self, backend, object_name, config):
