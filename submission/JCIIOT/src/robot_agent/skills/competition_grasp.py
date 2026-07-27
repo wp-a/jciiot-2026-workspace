@@ -36,8 +36,8 @@ class ScriptedGraspConfig:
         pregrasp_steps: int = 180,
         approach_steps: int = 180,
         close_steps: int = 300,
-        contact_polish_steps: int = 80,
-        contact_polish_downward: float = 0.10,
+        contact_polish_step: float = 0.001,
+        contact_polish_max_drop: float = 0.030,
         max_action: float = 0.65,
         lift_height: float = 0.15,
         lift_steps: int = 300,
@@ -60,8 +60,8 @@ class ScriptedGraspConfig:
         self.pregrasp_steps = int(pregrasp_steps)
         self.approach_steps = int(approach_steps)
         self.close_steps = int(close_steps)
-        self.contact_polish_steps = int(contact_polish_steps)
-        self.contact_polish_downward = float(contact_polish_downward)
+        self.contact_polish_step = float(contact_polish_step)
+        self.contact_polish_max_drop = float(contact_polish_max_drop)
         self.max_action = float(max_action)
         self.lift_height = float(lift_height)
         self.lift_steps = int(lift_steps)
@@ -88,6 +88,32 @@ def lowered_torso_target(current, *, drop: float, minimum: float) -> np.ndarray:
     """Return a bounded absolute torso target for improved low reach."""
     current = np.asarray(current, dtype=float).copy()
     return np.maximum(current - float(drop), float(minimum))
+
+
+def contact_micro_adjustment_targets(
+    current: float,
+    *,
+    step: float,
+    max_drop: float,
+    minimum: float,
+) -> list[float]:
+    """Return bounded torso targets for a fine post-close contact search."""
+    current = float(current)
+    step = float(step)
+    max_drop = float(max_drop)
+    minimum = float(minimum)
+    if step <= 0.0 or max_drop <= 0.0 or current <= minimum:
+        return []
+
+    lower = max(current - max_drop, minimum)
+    targets = []
+    target = current
+    while target - step > lower:
+        target -= step
+        targets.append(target)
+    if not targets or not np.isclose(targets[-1], lower):
+        targets.append(lower)
+    return targets
 
 
 def targets_reached(
@@ -441,9 +467,34 @@ class OfficialScriptedGraspDriver:
         helpers = self._helpers()
         raw_env = backend.env
         robot = raw_env.robots[0]
-        hold_targets = helpers["capture_hold_targets"](robot)
+        torso_joint = next(
+            (
+                raw_env.sim.model.joint_id2name(index)
+                for index in range(raw_env.sim.model.njnt)
+                if (raw_env.sim.model.joint_id2name(index) or "").endswith(
+                    "torso_lift_joint"
+                )
+            ),
+            None,
+        )
+        if torso_joint is None:
+            return contacts
 
-        for _ in range(config.contact_polish_steps):
+        qpos_addr = raw_env.sim.model.get_joint_qpos_addr(torso_joint)
+        if isinstance(qpos_addr, tuple):
+            return contacts
+        start = float(raw_env.sim.data.qpos[qpos_addr])
+        targets = contact_micro_adjustment_targets(
+            start,
+            step=config.contact_polish_step,
+            max_drop=config.contact_polish_max_drop,
+            minimum=config.torso_minimum,
+        )
+
+        for target in targets:
+            raw_env.sim.data.qpos[qpos_addr] = target
+            raw_env.sim.forward()
+            self._record(backend, raw_env)
             current_contacts = helpers["grasp_status"](
                 raw_env,
                 robot,
@@ -451,38 +502,12 @@ class OfficialScriptedGraspDriver:
             )
             if all(bool(current_contacts.get(arm, False)) for arm in ARMS):
                 return current_contacts
-
-            arm_actions = {}
-            for arm in ARMS:
-                if bool(current_contacts.get(arm, False)):
-                    world_delta = np.zeros(3, dtype=float)
-                else:
-                    world_delta = np.array(
-                        [0.0, 0.0, -config.contact_polish_downward],
-                        dtype=float,
-                    )
-                controller_delta = helpers["world_delta"](
-                    robot,
-                    arm,
-                    world_delta,
-                )
-                arm_actions[arm] = helpers["arm_action"](
-                    robot,
-                    arm,
-                    controller_delta,
-                    config.max_action,
-                )
-            action = helpers["build_action"](
-                robot,
-                arm_actions=arm_actions,
-                gripper_value=1.0,
-                hold_targets=hold_targets,
-            )
-            _, _, _, info = raw_env.step(action)
-            self._record(backend, raw_env)
-            if bool((info or {}).get("has_judge_collision", False)):
+            if bool(getattr(raw_env, "has_judge_collision", False)):
                 break
 
+        raw_env.sim.data.qpos[qpos_addr] = start
+        raw_env.sim.forward()
+        self._record(backend, raw_env)
         return helpers["grasp_status"](raw_env, robot, object_name)
 
     def lift_and_verify(self, backend, object_name, config) -> bool:

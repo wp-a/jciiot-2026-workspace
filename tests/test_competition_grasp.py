@@ -101,6 +101,16 @@ class CompetitionGraspTests(unittest.TestCase):
 
         np.testing.assert_allclose(target, [0.31])
 
+    def test_contact_micro_adjustments_are_incremental_and_bounded(self):
+        targets = self.module.contact_micro_adjustment_targets(
+            0.115,
+            step=0.004,
+            max_drop=0.020,
+            minimum=0.100,
+        )
+
+        np.testing.assert_allclose(targets, [0.111, 0.107, 0.103, 0.100])
+
     def test_stage_requires_every_arm_within_tolerance(self):
         targets = {
             "right": np.array([1.0, 2.0, 3.0]),
