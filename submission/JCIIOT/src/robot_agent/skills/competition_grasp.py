@@ -194,10 +194,14 @@ def close_pose_targets(
     *,
     hold_current: bool,
 ) -> dict[str, np.ndarray]:
-    """Separate gripper closing from Cartesian repositioning when requested."""
-    source = current if hold_current else requested
+    """Hold the corrected left pose while the right arm finishes its approach."""
+    if hold_current:
+        return {
+            "right": np.asarray(requested["right"], dtype=float).copy(),
+            "left": np.asarray(current["left"], dtype=float).copy(),
+        }
     return {
-        arm: np.asarray(source[arm], dtype=float).copy()
+        arm: np.asarray(requested[arm], dtype=float).copy()
         for arm in ARMS
     }
 

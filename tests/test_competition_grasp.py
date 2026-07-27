@@ -245,7 +245,7 @@ class CompetitionGraspTests(unittest.TestCase):
             hold_current=True,
         )
 
-        np.testing.assert_allclose(held["right"], current["right"])
+        np.testing.assert_allclose(held["right"], requested["right"])
         np.testing.assert_allclose(held["left"], current["left"])
 
     def test_grasp_targets_insert_from_face_toward_object_center(self):
