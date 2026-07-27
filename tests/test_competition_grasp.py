@@ -131,7 +131,8 @@ class CompetitionGraspTests(unittest.TestCase):
 
         targets = self.module.mirrored_fingerpad_targets(
             right_fingerpads,
-            object_x=11.8675,
+            object_xy=np.array([11.8675, 3.0]),
+            mirror_normal_xy=np.array([1.0, 0.0]),
             height_offset=0.13,
         )
 
@@ -140,6 +141,29 @@ class CompetitionGraspTests(unittest.TestCase):
             [
                 [11.7044, 2.9367, 1.2696],
                 [11.6815, 3.0389, 1.3435],
+            ],
+        )
+
+    def test_mirrored_fingerpad_targets_follow_rotated_arm_axis(self):
+        right_fingerpads = np.array(
+            [
+                [0.6792, 8.5927, 1.5148],
+                [0.6290, 8.6871, 1.5856],
+            ]
+        )
+
+        targets = self.module.mirrored_fingerpad_targets(
+            right_fingerpads,
+            object_xy=np.array([0.4418, 8.4731]),
+            mirror_normal_xy=np.array([0.0, 1.0]),
+            height_offset=0.13,
+        )
+
+        np.testing.assert_allclose(
+            targets,
+            [
+                [0.6792, 8.3535, 1.3848],
+                [0.6290, 8.2591, 1.4556],
             ],
         )
 

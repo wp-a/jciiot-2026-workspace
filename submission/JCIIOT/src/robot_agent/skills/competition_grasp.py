@@ -244,14 +244,22 @@ def apply_object_grasp_profile(
 def mirrored_fingerpad_targets(
     right_fingerpads: np.ndarray,
     *,
-    object_x: float,
+    object_xy: np.ndarray,
+    mirror_normal_xy: np.ndarray,
     height_offset: float,
 ) -> np.ndarray:
-    """Mirror a successful right open-gripper pose for the left gripper."""
+    """Mirror a right open-gripper pose across the current inter-arm axis."""
     targets = np.asarray(right_fingerpads, dtype=float).copy()
     if targets.shape != (2, 3):
         raise ValueError("right_fingerpads must have shape (2, 3)")
-    targets[:, 0] = 2.0 * float(object_x) - targets[:, 0]
+    center = np.asarray(object_xy, dtype=float).reshape(2)
+    normal = np.asarray(mirror_normal_xy, dtype=float).reshape(2)
+    normal_norm = float(np.linalg.norm(normal))
+    if normal_norm <= 1e-9:
+        raise ValueError("mirror_normal_xy must be nonzero")
+    normal /= normal_norm
+    signed_distances = (targets[:, :2] - center) @ normal
+    targets[:, :2] -= 2.0 * signed_distances[:, None] * normal
     targets[:, 2] -= float(height_offset)
     return targets
 
@@ -779,10 +787,16 @@ class OfficialScriptedGraspDriver:
                 axis=0,
             )
 
+        right_fingerpads = fingerpad_positions("right")
+        left_fingerpads = fingerpad_positions("left")
         body_id = raw_env.obj_body_id[object_name]
         target_fingerpads = mirrored_fingerpad_targets(
-            fingerpad_positions("right"),
-            object_x=float(data.body_xpos[body_id][0]),
+            right_fingerpads,
+            object_xy=data.body_xpos[body_id][:2],
+            mirror_normal_xy=(
+                np.mean(right_fingerpads[:, :2], axis=0)
+                - np.mean(left_fingerpads[:, :2], axis=0)
+            ),
             height_offset=config.mirrored_ik_height_offset,
         )
         start = data.qpos[qpos_addrs].copy()
