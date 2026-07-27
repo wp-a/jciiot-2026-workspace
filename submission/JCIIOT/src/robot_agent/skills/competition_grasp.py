@@ -43,6 +43,7 @@ class ScriptedGraspConfig:
         left_wrist_adjustment: float = 0.20,
         wrist_adjustment_steps: int = 20,
         wrist_height_trigger: float = 0.04,
+        hold_close_pose: bool = True,
         max_action: float = 0.65,
         lift_height: float = 0.05,
         lift_steps: int = 300,
@@ -73,6 +74,7 @@ class ScriptedGraspConfig:
         self.left_wrist_adjustment = float(left_wrist_adjustment)
         self.wrist_adjustment_steps = int(wrist_adjustment_steps)
         self.wrist_height_trigger = float(wrist_height_trigger)
+        self.hold_close_pose = bool(hold_close_pose)
         self.max_action = float(max_action)
         self.lift_height = float(lift_height)
         self.lift_steps = int(lift_steps)
@@ -178,6 +180,20 @@ def wrist_adjustment_required(
 ) -> bool:
     """Detect when left-arm height reach needs the measured wrist correction."""
     return float(current_z) - float(target_z) > float(threshold)
+
+
+def close_pose_targets(
+    current: Mapping[str, np.ndarray],
+    requested: Mapping[str, np.ndarray],
+    *,
+    hold_current: bool,
+) -> dict[str, np.ndarray]:
+    """Separate gripper closing from Cartesian repositioning when requested."""
+    source = current if hold_current else requested
+    return {
+        arm: np.asarray(source[arm], dtype=float).copy()
+        for arm in ARMS
+    }
 
 
 def targets_reached(
@@ -582,6 +598,15 @@ class OfficialScriptedGraspDriver:
         grasp_targets = assigned_grasp_targets(
             raw_targets,
             swap=config.swap_arm_targets,
+        )
+        current_positions = {
+            arm: helpers["gripper_position"](raw_env, robot, arm)
+            for arm in ARMS
+        }
+        grasp_targets = close_pose_targets(
+            current_positions,
+            grasp_targets,
+            hold_current=config.hold_close_pose,
         )
         hold_targets = helpers["capture_hold_targets"](robot)
 

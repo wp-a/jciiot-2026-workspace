@@ -229,6 +229,25 @@ class CompetitionGraspTests(unittest.TestCase):
             )
         )
 
+    def test_close_pose_can_hold_post_adjustment_gripper_positions(self):
+        current = {
+            "right": np.array([12.03, 2.98, 1.38]),
+            "left": np.array([11.73, 2.99, 1.40]),
+        }
+        requested = {
+            "right": np.array([12.03, 2.98, 1.36]),
+            "left": np.array([11.70, 2.98, 1.36]),
+        }
+
+        held = self.module.close_pose_targets(
+            current,
+            requested,
+            hold_current=True,
+        )
+
+        np.testing.assert_allclose(held["right"], current["right"])
+        np.testing.assert_allclose(held["left"], current["left"])
+
     def test_stage_requires_every_arm_within_tolerance(self):
         targets = {
             "right": np.array([1.0, 2.0, 3.0]),
