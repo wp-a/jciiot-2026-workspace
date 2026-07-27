@@ -54,7 +54,8 @@
   "allowed_modification_roots": [
     "JCIIOT/src/robot_agent/skills/",
     "JCIIOT/src/robot_agent/workflows/",
-    "JCIIOT/knowledge/robot_params.json"
+    "JCIIOT/knowledge/robot_params.json",
+    "JCIIOT/knowledge/generated_sop_l[1-5].md"
   ],
   "prohibited_modification_roots": [
     "JCIIOT/src/robot_agent/core/",

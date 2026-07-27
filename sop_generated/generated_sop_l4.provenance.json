@@ -1,0 +1,85 @@
+{
+  "generator": "competition-sop-generator/1.0",
+  "level": "L4",
+  "case_number": 7,
+  "status": "ready",
+  "source": {
+    "file": "JCIIOT 2026 case 7 SOP.docx",
+    "sha256": "df637fcb1e558cbcacfc895d38b435008aa9eb15e1f85744631cea12b137e568",
+    "prompt_locator": "paragraph:1",
+    "paragraph_count": 189,
+    "image_count": 5
+  },
+  "task": {
+    "material": "blue, hollow plastic box",
+    "quantity": 1,
+    "raw_source_label": "Pick Station 5",
+    "effective_source_label": "Pick Station 5",
+    "source_resolution": "prompt",
+    "target_label": "Place Station 2",
+    "official_source": "input_2",
+    "official_target": "output_5",
+    "official_objects": [
+      "blue_container_h01_back_upper",
+      "blue_container_h01_back_lower"
+    ]
+  },
+  "validation": {
+    "prompt_match": true,
+    "task_config_match": true,
+    "semantic_ports_present": true
+  },
+  "conflicts": [],
+  "images": [
+    {
+      "name": "image1.png",
+      "sha256": "981b032136cddbdb439d69e2819d7672f11d64cff1ff5c6119efc000addd7d83",
+      "size_bytes": 415350,
+      "status": "analyzed",
+      "description": "{\"material_observations\": [\"metal\", \"plastic\", \"glass\", \"wood\"], \"route_or_arrow_observations\": [\"black conveyor belt\", \"teal platform\", \"white support structure\"], \"safety_observations\": [\"safety light\", \"green floor\", \"no visible hazards\"], \"uncertainties\": [\"no station labels\", \"no route arrows\", \"no safety instructions\"], \"visible_labels\": [\"machine\", \"workbench\", \"green boxes\", \"monitor\"]}",
+      "model": "Qwen/Qwen3-VL-2B-Instruct@master+sha256:7de1838c87a5349b016c26a1c3f7d2bc400a3d485f95ef39a7059ffd734977a0",
+      "attempts": 1,
+      "raw_response_sha256": "b94ed47cce9c8d69a6e9c0760d56d04c5c8fee35a2ebfef933d071875e629670"
+    },
+    {
+      "name": "image2.png",
+      "sha256": "ee57dd143186a4a73de327b1812d39b32a0f602e686bdd5aa88e54f9b6f527a9",
+      "size_bytes": 499725,
+      "status": "analyzed",
+      "description": "{\"material_observations\": [\"plastic crates\", \"metal support structure\", \"concrete floor\", \"white painted surfaces\"], \"route_or_arrow_observations\": [\"black conveyor belt\", \"white platform\", \"white support pillars\"], \"safety_observations\": [\"color-coded pole\", \"white platform\", \"white cylindrical tank\"], \"uncertainties\": [\"no explicit station labels\", \"no route arrows\", \"no safety signs\"], \"visible_labels\": [\"blue crates\", \"black conveyor belt\", \"white machinery\", \"green floor\"]}",
+      "model": "Qwen/Qwen3-VL-2B-Instruct@master+sha256:7de1838c87a5349b016c26a1c3f7d2bc400a3d485f95ef39a7059ffd734977a0",
+      "attempts": 1,
+      "raw_response_sha256": "f57304ad7ca617d910ee479e25b4a805eb149f91c1dcda20f0c7fcdb6e75c66a"
+    },
+    {
+      "name": "image3.png",
+      "sha256": "3374db9ea4d64eb73e51fd4437aaa625ff1aa58afb3e9191242d4677e148437d",
+      "size_bytes": 1302194,
+      "status": "analyzed",
+      "description": "{\"material_observations\": [], \"route_or_arrow_observations\": [], \"safety_observations\": [], \"uncertainties\": [], \"visible_labels\": []}",
+      "model": "Qwen/Qwen3-VL-2B-Instruct@master+sha256:7de1838c87a5349b016c26a1c3f7d2bc400a3d485f95ef39a7059ffd734977a0",
+      "attempts": 2,
+      "raw_response_sha256": "4d61749ee65172ef4ebe6e419af5e1625a776c26e01d849dc0cbe24cf7df794c"
+    },
+    {
+      "name": "image4.png",
+      "sha256": "dafbe08d11e2bfefe0eba1178b3936e726797982c5f3c74e4e8042e89eb78ab6",
+      "size_bytes": 430024,
+      "status": "analyzed",
+      "description": "{\"material_observations\": [\"plastic\", \"metal\", \"wood\", \"composite\"], \"route_or_arrow_observations\": [\"horizontal conveyor\", \"vertical lift\", \"no visible path\"], \"safety_observations\": [\"red and green safety lights\", \"no visible emergency stop\", \"no visible warning signs\"], \"uncertainties\": [\"no explicit SOP text\", \"no station labels\", \"no route arrows\", \"no material handling instructions\"], \"visible_labels\": [\"machine\", \"control panel\", \"safety light\", \"workbench\"]}",
+      "model": "Qwen/Qwen3-VL-2B-Instruct@master+sha256:7de1838c87a5349b016c26a1c3f7d2bc400a3d485f95ef39a7059ffd734977a0",
+      "attempts": 1,
+      "raw_response_sha256": "db74ac4675949871516631c23b8bd38eb19a6ab3395470898293f3ca7dba7bcd"
+    },
+    {
+      "name": "image5.png",
+      "sha256": "e3d52eb2c898dd489a34f44e6f9207649035029f027b4ae1c9eeb89b86e30733",
+      "size_bytes": 692596,
+      "status": "analyzed",
+      "description": "{\"material_observations\": [\"plastic\", \"blue\", \"lattice pattern\"], \"route_or_arrow_observations\": [\"no arrows\", \"no route indicators\"], \"safety_observations\": [\"no visible safety signs\", \"no warning labels\"], \"uncertainties\": [\"no station labels\", \"no route arrows\", \"no safety equipment\"], \"visible_labels\": [\"blue plastic crate\", \"white table\", \"green surface\", \"gray cabinet\"]}",
+      "model": "Qwen/Qwen3-VL-2B-Instruct@master+sha256:7de1838c87a5349b016c26a1c3f7d2bc400a3d485f95ef39a7059ffd734977a0",
+      "attempts": 1,
+      "raw_response_sha256": "b8daeedfd10835ae3ec4cb34ab23cc15aed57f30569cf8927b0f105e1d3b21df"
+    }
+  ]
+}

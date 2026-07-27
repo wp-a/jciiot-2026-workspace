@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-28T06:30:00+08:00",
+  "purpose": "offline image evidence for original SOP DOCX generation",
+  "model": {
+    "id": "Qwen/Qwen3-VL-2B-Instruct",
+    "revision": "master",
+    "license": "Apache-2.0",
+    "huggingface_url": "https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct",
+    "modelscope_url": "https://modelscope.cn/models/Qwen/Qwen3-VL-2B-Instruct",
+    "modelscope_last_updated_unix": 1761236209,
+    "weights_file": "model.safetensors",
+    "weights_size_bytes": 4255140312,
+    "weights_sha256": "7de1838c87a5349b016c26a1c3f7d2bc400a3d485f95ef39a7059ffd734977a0"
+  },
+  "runtime": {
+    "python": "3.11.15",
+    "torch": "2.13.0+cu130",
+    "torchvision": "0.28.0+cu130",
+    "transformers": "5.14.1",
+    "accelerate": "1.14.0",
+    "pillow": "12.3.0",
+    "safetensors": "0.8.0",
+    "modelscope": "1.38.1"
+  },
+  "execution_boundary": {
+    "used_for": "SOP image evidence generation only",
+    "used_during_scored_robot_execution": false,
+    "model_weights_in_submission": false,
+    "vlm_may_generate_robot_actions": false
+  }
+}

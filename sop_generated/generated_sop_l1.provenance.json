@@ -1,0 +1,85 @@
+{
+  "generator": "competition-sop-generator/1.0",
+  "level": "L1",
+  "case_number": 1,
+  "status": "ready",
+  "source": {
+    "file": "JCIIOT 2026 case 1 SOP.docx",
+    "sha256": "32a446a8395b03b46c9581d3e4978bd84bd90f31096e675da77366fd1cdc9c1c",
+    "prompt_locator": "paragraph:1",
+    "paragraph_count": 29,
+    "image_count": 5
+  },
+  "task": {
+    "material": "blue, hollow plastic box",
+    "quantity": 1,
+    "raw_source_label": "Pick Station 2",
+    "effective_source_label": "Pick Station 2",
+    "source_resolution": "prompt",
+    "target_label": "Place Station 3",
+    "official_source": "input_5",
+    "official_target": "output_4",
+    "official_objects": [
+      "line_5_container_h01_near",
+      "line_5_container_h01_far"
+    ]
+  },
+  "validation": {
+    "prompt_match": true,
+    "task_config_match": true,
+    "semantic_ports_present": true
+  },
+  "conflicts": [],
+  "images": [
+    {
+      "name": "image1.png",
+      "sha256": "a7e1a0093261dc5747cda82b635f2a36603a8417a331190f6755874ef5941108",
+      "size_bytes": 1023673,
+      "status": "analyzed",
+      "description": "{\"material_observations\": [\"plastic\", \"metal\", \"wood\", \"glass\"], \"route_or_arrow_observations\": [\"no arrows\", \"no route indicators\"], \"safety_observations\": [\"no visible safety signs\", \"no warning labels\", \"no protective equipment\"], \"uncertainties\": [\"no explicit SOP text\", \"no station labels\", \"no route arrows\", \"no safety equipment\"], \"visible_labels\": [\"workbench\", \"storage bins\", \"computer monitor\", \"pallet\"]}",
+      "model": "Qwen/Qwen3-VL-2B-Instruct@master+sha256:7de1838c87a5349b016c26a1c3f7d2bc400a3d485f95ef39a7059ffd734977a0",
+      "attempts": 1,
+      "raw_response_sha256": "41f66202eb256e633543b9134abeb139d31db9b18be9a15b51d4cbfba236ce35"
+    },
+    {
+      "name": "image2.png",
+      "sha256": "390d4e596cb91455ef2a1895c43a3ef13b612521cddc0b35ea0312d562638b22",
+      "size_bytes": 1110907,
+      "status": "analyzed",
+      "description": "{\"material_observations\": [\"plastic\", \"metal\", \"wood\", \"polypropylene\"], \"route_or_arrow_observations\": [\"no arrows\", \"no route indicators\"], \"safety_observations\": [\"no visible safety signage\", \"no warning labels\", \"no protective equipment\"], \"uncertainties\": [\"no explicit SOP text\", \"no station labels\", \"no route arrows\", \"no safety instructions\"], \"visible_labels\": [\"workbench\", \"storage bins\", \"workstation\", \"computer monitor\"]}",
+      "model": "Qwen/Qwen3-VL-2B-Instruct@master+sha256:7de1838c87a5349b016c26a1c3f7d2bc400a3d485f95ef39a7059ffd734977a0",
+      "attempts": 1,
+      "raw_response_sha256": "af0433790cb4c46969c31fedd791b8dfe2f2195b0a9071f1be39c24b7dd5882b"
+    },
+    {
+      "name": "image3.png",
+      "sha256": "73f7aee6a6cb7b47d4d517da7909eca4dc766b4056e83d8d71a53dbf34454231",
+      "size_bytes": 1303360,
+      "status": "analyzed",
+      "description": "{\"material_observations\": [], \"route_or_arrow_observations\": [], \"safety_observations\": [], \"uncertainties\": [], \"visible_labels\": []}",
+      "model": "Qwen/Qwen3-VL-2B-Instruct@master+sha256:7de1838c87a5349b016c26a1c3f7d2bc400a3d485f95ef39a7059ffd734977a0",
+      "attempts": 2,
+      "raw_response_sha256": "4d61749ee65172ef4ebe6e419af5e1625a776c26e01d849dc0cbe24cf7df794c"
+    },
+    {
+      "name": "image4.png",
+      "sha256": "4d8a640cc5fde0ba8066e82e482d39e212d06e35c27c77024d9bfa3435a2c0ea",
+      "size_bytes": 412305,
+      "status": "analyzed",
+      "description": "{\"material_observations\": [\"metal\", \"plastic\", \"wood\", \"teal surface\"], \"route_or_arrow_observations\": [\"no arrows\", \"no route indicators\"], \"safety_observations\": [\"no visible safety guards\", \"no warning signs\", \"no emergency stop\", \"no clear signage\"], \"uncertainties\": [\"no station labels\", \"no route arrows\", \"no safety equipment\", \"no material handling instructions\"], \"visible_labels\": [\"workbench\", \"power outlet\", \"workstation\", \"machine\"]}",
+      "model": "Qwen/Qwen3-VL-2B-Instruct@master+sha256:7de1838c87a5349b016c26a1c3f7d2bc400a3d485f95ef39a7059ffd734977a0",
+      "attempts": 1,
+      "raw_response_sha256": "2dfd2d8a4c182b9e88552f3cb2b56b49b45279492fb00c8c552338603582de83"
+    },
+    {
+      "name": "image5.png",
+      "sha256": "6d43722df3d1e7bea7586ad039b6a153735fd8c394d6e607e8bb116b6fa64884",
+      "size_bytes": 506904,
+      "status": "analyzed",
+      "description": "{\"material_observations\": [\"plastic\", \"metal\", \"wood\", \"concrete\"], \"route_or_arrow_observations\": [\"conveyor belt\", \"horizontal rail\", \"vertical rail\"], \"safety_observations\": [\"electrical outlet\", \"metal guard\", \"no visible warning signs\"], \"uncertainties\": [\"no station labels\", \"no route arrows\", \"no task materials\"], \"visible_labels\": [\"blue plastic crate\", \"white metal frame\", \"gray floor\", \"white table\"]}",
+      "model": "Qwen/Qwen3-VL-2B-Instruct@master+sha256:7de1838c87a5349b016c26a1c3f7d2bc400a3d485f95ef39a7059ffd734977a0",
+      "attempts": 1,
+      "raw_response_sha256": "5af8100e3104874274b44ec119c165fc03e9ba9750a8e7a1491eb2e23af09812"
+    }
+  ]
+}

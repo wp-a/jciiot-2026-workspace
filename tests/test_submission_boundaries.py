@@ -12,7 +12,11 @@ ALLOWED_PREFIXES = (
     "JCIIOT/src/robot_agent/skills/",
     "JCIIOT/src/robot_agent/workflows/",
 )
-ALLOWED_FILES = {"JCIIOT/knowledge/robot_params.json", "README.md"}
+ALLOWED_FILES = {
+    "JCIIOT/knowledge/robot_params.json",
+    "README.md",
+    *(f"JCIIOT/knowledge/generated_sop_l{level}.md" for level in range(1, 6)),
+}
 
 
 class SubmissionBoundaryTests(unittest.TestCase):
