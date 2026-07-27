@@ -118,8 +118,30 @@ class CompetitionGraspTests(unittest.TestCase):
     def test_lift_defaults_use_official_short_verification_motion(self):
         config = self.module.ScriptedGraspConfig()
 
-        self.assertEqual(config.lift_height, 0.05)
+        self.assertEqual(config.lift_height, 0.04)
         self.assertEqual(config.lift_hold_steps, 0)
+
+    def test_mirrored_fingerpad_targets_reflect_and_lower_right_template(self):
+        right_fingerpads = np.array(
+            [
+                [12.0306, 2.9367, 1.3996],
+                [12.0535, 3.0389, 1.4735],
+            ]
+        )
+
+        targets = self.module.mirrored_fingerpad_targets(
+            right_fingerpads,
+            object_x=11.8675,
+            height_offset=0.13,
+        )
+
+        np.testing.assert_allclose(
+            targets,
+            [
+                [11.7044, 2.9367, 1.2696],
+                [11.6815, 3.0389, 1.3435],
+            ],
+        )
 
     def test_contact_confirmation_requires_depth_beyond_first_touch(self):
         self.assertFalse(

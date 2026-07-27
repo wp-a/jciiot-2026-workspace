@@ -41,14 +41,18 @@ class ScriptedGraspConfig:
         contact_confirmation_drop: float = 0.003,
         contact_settle_steps: int = 5,
         left_wrist_adjustment: float = 0.10,
-        wrist_adjustment_steps: int = 20,
+        wrist_adjustment_steps: int = 80,
         wrist_height_trigger: float = 0.04,
+        mirrored_ik_height_offset: float = 0.13,
+        mirrored_ik_regularization: float = 0.05,
+        mirrored_ik_max_error: float = 0.08,
+        mirrored_ik_max_nfev: int = 300,
         hold_close_pose: bool = True,
         face_insertion: float = 0.0,
         close_follow_max_distance: float = 0.0,
         close_increment_interval: int = 20,
         max_action: float = 0.65,
-        lift_height: float = 0.05,
+        lift_height: float = 0.04,
         lift_steps: int = 300,
         lift_hold_steps: int = 0,
         lift_tolerance: float = 0.01,
@@ -77,6 +81,10 @@ class ScriptedGraspConfig:
         self.left_wrist_adjustment = float(left_wrist_adjustment)
         self.wrist_adjustment_steps = int(wrist_adjustment_steps)
         self.wrist_height_trigger = float(wrist_height_trigger)
+        self.mirrored_ik_height_offset = float(mirrored_ik_height_offset)
+        self.mirrored_ik_regularization = float(mirrored_ik_regularization)
+        self.mirrored_ik_max_error = float(mirrored_ik_max_error)
+        self.mirrored_ik_max_nfev = int(mirrored_ik_max_nfev)
         self.hold_close_pose = bool(hold_close_pose)
         self.face_insertion = float(face_insertion)
         self.close_follow_max_distance = float(close_follow_max_distance)
@@ -186,6 +194,21 @@ def wrist_adjustment_required(
 ) -> bool:
     """Detect when left-arm height reach needs the measured wrist correction."""
     return float(current_z) - float(target_z) > float(threshold)
+
+
+def mirrored_fingerpad_targets(
+    right_fingerpads: np.ndarray,
+    *,
+    object_x: float,
+    height_offset: float,
+) -> np.ndarray:
+    """Mirror a successful right open-gripper pose for the left gripper."""
+    targets = np.asarray(right_fingerpads, dtype=float).copy()
+    if targets.shape != (2, 3):
+        raise ValueError("right_fingerpads must have shape (2, 3)")
+    targets[:, 0] = 2.0 * float(object_x) - targets[:, 0]
+    targets[:, 2] -= float(height_offset)
+    return targets
 
 
 def close_pose_targets(
@@ -597,36 +620,86 @@ class OfficialScriptedGraspDriver:
         ):
             return True
 
-        joint_name = next(
-            (
-                raw_env.sim.model.joint_id2name(index)
-                for index in range(raw_env.sim.model.njnt)
-                if (raw_env.sim.model.joint_id2name(index) or "").endswith(
-                    "arm_left_5_joint"
-                )
-            ),
-            None,
-        )
-        if joint_name is None:
+        model = raw_env.sim.model
+        data = raw_env.sim.data
+        joint_names = [
+            f"robot0_arm_left_{index}_joint"
+            for index in range(1, 7)
+        ]
+        try:
+            joint_ids = [model.joint_name2id(name) for name in joint_names]
+            qpos_addrs = [model.get_joint_qpos_addr(name) for name in joint_names]
+        except Exception:
             return False
-        joint_id = raw_env.sim.model.joint_name2id(joint_name)
-        qpos_addr = raw_env.sim.model.get_joint_qpos_addr(joint_name)
-        if isinstance(qpos_addr, tuple):
+        if any(isinstance(addr, tuple) for addr in qpos_addrs):
             return False
 
-        start = float(raw_env.sim.data.qpos[qpos_addr])
-        target = start + config.left_wrist_adjustment
-        if bool(raw_env.sim.model.jnt_limited[joint_id]):
-            joint_range = raw_env.sim.model.jnt_range[joint_id]
-            target = float(np.clip(target, joint_range[0], joint_range[1]))
+        def fingerpad_positions(arm: str) -> np.ndarray:
+            gripper = robot.gripper[arm]
+            geom_names = [
+                gripper.important_geoms[key][0]
+                for key in ("left_fingerpad", "right_fingerpad")
+            ]
+            geom_ids = [model.geom_name2id(name) for name in geom_names]
+            return np.stack(
+                [data.geom_xpos[geom_id].copy() for geom_id in geom_ids],
+                axis=0,
+            )
+
+        body_id = raw_env.obj_body_id[object_name]
+        target_fingerpads = mirrored_fingerpad_targets(
+            fingerpad_positions("right"),
+            object_x=float(data.body_xpos[body_id][0]),
+            height_offset=config.mirrored_ik_height_offset,
+        )
+        start = data.qpos[qpos_addrs].copy()
+        lower = np.array(
+            [model.jnt_range[joint_id][0] for joint_id in joint_ids],
+            dtype=float,
+        )
+        upper = np.array(
+            [model.jnt_range[joint_id][1] for joint_id in joint_ids],
+            dtype=float,
+        )
+
+        from scipy.optimize import least_squares
+
+        def residual(joints: np.ndarray) -> np.ndarray:
+            data.qpos[qpos_addrs] = joints
+            raw_env.sim.forward()
+            position_error = (
+                fingerpad_positions("left") - target_fingerpads
+            ).reshape(-1)
+            regularization = (
+                config.mirrored_ik_regularization * (joints - start)
+            )
+            return np.concatenate([position_error, regularization])
+
+        solution = least_squares(
+            residual,
+            start,
+            bounds=(lower, upper),
+            max_nfev=config.mirrored_ik_max_nfev,
+        )
+        target = np.asarray(solution.x, dtype=float)
+        position_error = float(
+            np.linalg.norm(
+                fingerpad_positions("left") - target_fingerpads
+            )
+        )
+        data.qpos[qpos_addrs] = start
+        raw_env.sim.forward()
+        if not bool(solution.success) or position_error > config.mirrored_ik_max_error:
+            synchronize_controller_goals(robot)
+            return False
 
         from robot_agent.environments.robosuite_backend import (
             _navigation_collisions,
         )
 
         steps = max(1, config.wrist_adjustment_steps)
-        for value in np.linspace(start, target, steps + 1, dtype=float)[1:]:
-            raw_env.sim.data.qpos[qpos_addr] = value
+        for values in np.linspace(start, target, steps + 1, dtype=float)[1:]:
+            data.qpos[qpos_addrs] = values
             raw_env.sim.forward()
             collisions = _navigation_collisions(
                 raw_env,
@@ -634,7 +707,7 @@ class OfficialScriptedGraspDriver:
                 getattr(backend, "_ignore_collision_geom", ()),
             )
             if collisions:
-                raw_env.sim.data.qpos[qpos_addr] = start
+                data.qpos[qpos_addrs] = start
                 raw_env.sim.forward()
                 synchronize_controller_goals(robot)
                 self._record(backend, raw_env)
@@ -665,6 +738,7 @@ class OfficialScriptedGraspDriver:
         body_id = raw_env.obj_body_id[object_name]
         start_object_xy = raw_env.sim.data.body_xpos[body_id][:2].copy()
         hold_targets = helpers["capture_hold_targets"](robot)
+        stable_steps = 0
 
         for step in range(config.close_steps):
             robot.composite_controller.update_state()
@@ -698,7 +772,8 @@ class OfficialScriptedGraspDriver:
             raw_env.step(action)
             self._record(backend, raw_env)
             contacts = helpers["grasp_status"](raw_env, robot, object_name)
-            if all(bool(contacts.get(arm, False)) for arm in ARMS):
+            stable_steps = next_contact_stability(contacts, stable_steps)
+            if stable_steps >= config.contact_settle_steps:
                 return contacts
 
         return helpers["grasp_status"](raw_env, robot, object_name)
