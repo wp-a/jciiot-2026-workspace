@@ -18,3 +18,8 @@
 - `rejected`：因许可证、边界、依赖或性能证据不足而拒绝。
 
 禁止把论文作者结果、其他参赛者自报分数或单次本地成功写成 `competition-reproduced`。
+
+## 当前审计
+
+- [五份原始 SOP DOCX 来源、冲突与证据优先级](sop-docx-source-audit-2026-07-28.md)
+- [公开 GitHub 同类项目审计](github-project-audit-2026-07-22.md)
