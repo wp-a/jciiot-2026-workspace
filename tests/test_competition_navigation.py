@@ -122,6 +122,23 @@ class CompetitionNavigationTests(unittest.TestCase):
         self.assertAlmostEqual(orientation["yaw"], expected_yaw)
         self.assertFalse(orientation["swap_arm_targets"])
 
+    def test_wall_side_station_pose_uses_reachable_approach_axis(self):
+        pose = self.module.station_side_grasp_pose(
+            grasp_center_xy=[-14.674088, 4.199868],
+            right_site_xy=[-14.509088, 4.199868],
+            left_site_xy=[-14.839088, 4.199868],
+            station_center=[-14.544, 5.01],
+            station_approach=[-13.1, 5.01],
+            base_standoff=1.0,
+        )
+
+        self.assertAlmostEqual(pose["base_xy"][0], -13.674088)
+        self.assertAlmostEqual(pose["base_xy"][1], 4.199868)
+        self.assertAlmostEqual(pose["staging_xy"][0], -13.1)
+        self.assertAlmostEqual(pose["staging_xy"][1], 4.199868)
+        self.assertAlmostEqual(abs(pose["yaw"]), math.pi)
+        self.assertFalse(pose["swap_arm_targets"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -314,6 +314,49 @@ class CompetitionGraspTests(unittest.TestCase):
             )
         )
 
+    def test_wall_side_tote_grasp_is_limited_to_white_left_objects(self):
+        self.assertTrue(
+            self.module.uses_station_side_tote_grasp(
+                "white_tote_b01_left_front"
+            )
+        )
+        self.assertFalse(
+            self.module.uses_station_side_tote_grasp(
+                "green_tote_b01_lower"
+            )
+        )
+
+    def test_wall_side_tote_targets_reflect_near_site_across_heading(self):
+        targets = self.module.station_side_tote_grasp_targets(
+            {
+                "right": np.array([-14.509088, 4.199868, 1.473978]),
+                "left": np.array([-14.839088, 4.199868, 1.473978]),
+            },
+            object_xy=np.array([-14.674088, 4.414868]),
+            base_xy=np.array([-13.65, 4.20]),
+        )
+
+        np.testing.assert_allclose(
+            targets["right"],
+            [-14.509088, 4.629868, 1.473978],
+            atol=1e-4,
+        )
+        np.testing.assert_allclose(
+            targets["left"],
+            [-14.509088, 4.199868, 1.473978],
+            atol=1e-4,
+        )
+
+    def test_white_tote_profile_uses_measured_mirrored_ik_height(self):
+        config = self.module.ScriptedGraspConfig()
+
+        profiled = self.module.apply_object_grasp_profile(
+            config,
+            "white_tote_b01_left_front",
+        )
+
+        self.assertAlmostEqual(profiled.mirrored_ik_height_offset, 0.06)
+
     def test_container_profile_restores_scored_l1_grasp_parameters(self):
         config = self.module.ScriptedGraspConfig()
 

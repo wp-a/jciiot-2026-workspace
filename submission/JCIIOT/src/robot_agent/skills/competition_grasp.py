@@ -222,6 +222,11 @@ def uses_legacy_container_grasp(object_name: str) -> bool:
     return "container_h01" in str(object_name).lower()
 
 
+def uses_station_side_tote_grasp(object_name: str) -> bool:
+    """Select the wall-side geometry used by the three L5 white totes."""
+    return "white_tote_b01_left" in str(object_name).lower()
+
+
 def apply_object_grasp_profile(
     config: ScriptedGraspConfig,
     object_name: str,
@@ -238,7 +243,47 @@ def apply_object_grasp_profile(
         config.lift_height = 0.15
         config.lift_hold_steps = 20
         config.lift_tolerance = 0.02
+    elif uses_station_side_tote_grasp(object_name):
+        config.mirrored_ik_height_offset = 0.06
     return config
+
+
+def station_side_tote_grasp_targets(
+    raw_targets: Mapping[str, np.ndarray],
+    *,
+    object_xy: np.ndarray,
+    base_xy: np.ndarray,
+) -> dict[str, np.ndarray]:
+    """Reflect the reachable marked site across the robot heading axis."""
+    targets = {
+        arm: np.asarray(raw_targets[arm], dtype=float).copy()
+        for arm in ARMS
+    }
+    center = np.asarray(object_xy, dtype=float).reshape(2)
+    base = np.asarray(base_xy, dtype=float).reshape(2)
+    grasp_center = np.mean(
+        np.stack([targets[arm][:2] for arm in ARMS]),
+        axis=0,
+    )
+    forward = grasp_center - base
+    forward_norm = float(np.linalg.norm(forward))
+    if forward_norm <= 1e-9:
+        raise ValueError("base_xy must differ from the grasp center")
+    forward /= forward_norm
+    near = min(
+        targets.values(),
+        key=lambda target: float(np.linalg.norm(target[:2] - base)),
+    ).copy()
+    relative = near[:2] - center
+    reflected = near.copy()
+    reflected[:2] = center + 2.0 * np.dot(relative, forward) * forward - relative
+    expected_right_minus_left = np.array(
+        [forward[1], -forward[0]],
+        dtype=float,
+    )
+    if float(np.dot(reflected[:2] - near[:2], expected_right_minus_left)) >= 0.0:
+        return {"right": reflected, "left": near}
+    return {"right": near, "left": reflected}
 
 
 def mirrored_fingerpad_targets(
@@ -600,11 +645,18 @@ class OfficialScriptedGraspDriver:
             object_name,
             config.site_below_offset,
         )
+        body_id = backend.env.obj_body_id[object_name]
+        if uses_station_side_tote_grasp(object_name):
+            base_xy, _ = backend.get_base_pose()
+            raw_targets = station_side_tote_grasp_targets(
+                raw_targets,
+                object_xy=backend.env.sim.data.body_xpos[body_id][:2],
+                base_xy=base_xy,
+            )
         grasp_targets = assigned_grasp_targets(
             raw_targets,
             swap=config.swap_arm_targets,
         )
-        body_id = backend.env.obj_body_id[object_name]
         object_xy = backend.env.sim.data.body_xpos[body_id][:2]
         grasp_targets = inward_face_targets(
             grasp_targets,

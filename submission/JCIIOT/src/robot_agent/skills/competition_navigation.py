@@ -124,6 +124,56 @@ def grasp_aligned_base_pose(
     }
 
 
+def station_side_grasp_pose(
+    *,
+    grasp_center_xy,
+    right_site_xy,
+    left_site_xy,
+    station_center,
+    station_approach,
+    base_standoff: float = 1.0,
+) -> dict:
+    """Approach a wall-side object along the station's reachable axis."""
+    center = (float(grasp_center_xy[0]), float(grasp_center_xy[1]))
+    approach_axis = (
+        float(station_approach[0]) - float(station_center[0]),
+        float(station_approach[1]) - float(station_center[1]),
+    )
+    axis_norm = math.hypot(*approach_axis)
+    if axis_norm < 1e-6:
+        raise ValueError("station approach must differ from station center")
+    direction = (
+        approach_axis[0] / axis_norm,
+        approach_axis[1] / axis_norm,
+    )
+    base_xy = [
+        center[0] + float(base_standoff) * direction[0],
+        center[1] + float(base_standoff) * direction[1],
+    ]
+    staging_distance = (
+        (float(station_approach[0]) - base_xy[0]) * direction[0]
+        + (float(station_approach[1]) - base_xy[1]) * direction[1]
+    )
+    staging_xy = [
+        base_xy[0] + staging_distance * direction[0],
+        base_xy[1] + staging_distance * direction[1],
+    ]
+    orientation = grasp_orientation_from_base(
+        base_xy=base_xy,
+        right_site_xy=right_site_xy,
+        left_site_xy=left_site_xy,
+    )
+    return {
+        "base_xy": base_xy,
+        "staging_xy": staging_xy,
+        "grasp_center_xy": list(center),
+        "right_site_xy": [float(right_site_xy[0]), float(right_site_xy[1])],
+        "left_site_xy": [float(left_site_xy[0]), float(left_site_xy[1])],
+        "yaw": orientation["yaw"],
+        "swap_arm_targets": orientation["swap_arm_targets"],
+    }
+
+
 def select_grasp_candidate(candidates, *, station_approach) -> str:
     """Prefer an approach pose clear of other task objects, then the station path."""
     entries = list(candidates)
