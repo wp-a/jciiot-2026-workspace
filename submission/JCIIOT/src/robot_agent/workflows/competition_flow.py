@@ -6,8 +6,11 @@ from typing import Any, Iterable
 
 
 def auxiliary_source_detour(*, target: str, carrying: bool) -> list[float] | None:
-    """Use the verified upper corridor when approaching the auxiliary input."""
-    if str(target) == "aux_input_1" and not bool(carrying):
+    """Use the verified upper corridor when approaching upper-row inputs."""
+    if (
+        str(target) in {"input_1", "input_2", "aux_input_1"}
+        and not bool(carrying)
+    ):
         return [12.4, 7.2]
     return None
 

@@ -269,6 +269,20 @@ class CompetitionFlowTests(unittest.TestCase):
                 carrying=True,
             )
         )
+        self.assertEqual(
+            self.module.auxiliary_source_detour(
+                target="input_2",
+                carrying=False,
+            ),
+            [12.4, 7.2],
+        )
+        self.assertEqual(
+            self.module.auxiliary_source_detour(
+                target="input_1",
+                carrying=False,
+            ),
+            [12.4, 7.2],
+        )
 
     def test_delivery_inset_moves_unregistered_output_toward_center(self):
         target = self.module.delivery_inset_target(
