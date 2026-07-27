@@ -102,28 +102,16 @@ class CompetitionNavigationTests(unittest.TestCase):
 
         self.assertAlmostEqual(next_yaw, -math.pi + 0.025)
 
-    def test_refinement_uses_official_backend_with_tight_tolerance(self):
-        class Backend:
-            def __init__(self):
-                self.calls = []
-
-            def follow_path(self, path, **kwargs):
-                self.calls.append((path, kwargs))
-                return True
-
-        backend = Backend()
-
-        success = self.module.refine_base_position(
-            backend,
-            [11.867624, 2.329399],
+    def test_reached_base_orientation_faces_grasp_center(self):
+        orientation = self.module.grasp_orientation_from_base(
+            base_xy=[12.4061, 2.353],
+            right_site_xy=[12.032624, 2.9804],
+            left_site_xy=[11.702624, 2.9804],
         )
 
-        self.assertTrue(success)
-        path, kwargs = backend.calls[0]
-        self.assertAlmostEqual(path[0][0], 11.867624)
-        self.assertAlmostEqual(path[0][1], 2.329399)
-        self.assertEqual(kwargs["waypoint_tolerance"], 0.03)
-        self.assertTrue(kwargs["stop_on_collision"])
+        expected_yaw = math.atan2(2.9804 - 2.353, 11.867624 - 12.4061)
+        self.assertAlmostEqual(orientation["yaw"], expected_yaw)
+        self.assertFalse(orientation["swap_arm_targets"])
 
 
 if __name__ == "__main__":

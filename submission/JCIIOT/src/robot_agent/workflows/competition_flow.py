@@ -229,14 +229,14 @@ class OfficialCompetitionDriver:
     ) -> bool:
         resolved_target = target
         staging_target: str | None = None
-        refinement_xy = None
+        active_grasp_pose = None
         orient_for_grasp = False
         if not carrying and object_name:
             try:
                 grasp_pose = self._grasp_pose(target, object_name)
                 base_xy = grasp_pose["base_xy"]
                 staging_xy = grasp_pose["staging_xy"]
-                refinement_xy = base_xy
+                active_grasp_pose = grasp_pose
                 resolved_target = f"{base_xy[0]:.6f}, {base_xy[1]:.6f}"
                 staging_target = f"{staging_xy[0]:.6f}, {staging_xy[1]:.6f}"
                 self._grasp_yaw = float(grasp_pose["yaw"])
@@ -259,12 +259,21 @@ class OfficialCompetitionDriver:
                 return True
         if not self._move_to(resolved_target, carrying=carrying):
             return False
-        if refinement_xy is not None:
+        if active_grasp_pose is not None:
             from robot_agent.skills.competition_navigation import (
-                refine_base_position,
+                grasp_orientation_from_base,
+                orient_base,
             )
 
-            return bool(refine_base_position(self.backend, refinement_xy))
+            reached_xy, _ = self.backend.get_base_pose()
+            orientation = grasp_orientation_from_base(
+                base_xy=reached_xy,
+                right_site_xy=active_grasp_pose["right_site_xy"],
+                left_site_xy=active_grasp_pose["left_site_xy"],
+            )
+            self._grasp_yaw = float(orientation["yaw"])
+            self._swap_arm_targets = bool(orientation["swap_arm_targets"])
+            return bool(orient_base(self.backend, self._grasp_yaw))
         return True
 
     def grasp(self, source: str, object_name: str) -> dict[str, Any]:

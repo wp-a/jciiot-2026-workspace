@@ -22,6 +22,38 @@ def bounded_yaw_step(
     return (float(current_yaw) + delta + math.pi) % (2.0 * math.pi) - math.pi
 
 
+def grasp_orientation_from_base(
+    *,
+    base_xy,
+    right_site_xy,
+    left_site_xy,
+) -> dict:
+    """Face the grasp center and choose the closest arm-to-site assignment."""
+    grasp_center = (
+        (float(right_site_xy[0]) + float(left_site_xy[0])) / 2.0,
+        (float(right_site_xy[1]) + float(left_site_xy[1])) / 2.0,
+    )
+    yaw = math.atan2(
+        grasp_center[1] - float(base_xy[1]),
+        grasp_center[0] - float(base_xy[0]),
+    )
+    axis_x = float(right_site_xy[0]) - float(left_site_xy[0])
+    axis_y = float(right_site_xy[1]) - float(left_site_xy[1])
+    axis_norm = math.hypot(axis_x, axis_y)
+    if axis_norm < 1e-6:
+        raise ValueError("grasp sites must have distinct planar positions")
+    axis = (axis_x / axis_norm, axis_y / axis_norm)
+    expected_right_to_left_axis = (math.sin(yaw), -math.cos(yaw))
+    swap_arm_targets = (
+        expected_right_to_left_axis[0] * axis[0]
+        + expected_right_to_left_axis[1] * axis[1]
+    ) < 0.0
+    return {
+        "yaw": yaw,
+        "swap_arm_targets": swap_arm_targets,
+    }
+
+
 def grasp_aligned_base_pose(
     *,
     object_xy,
@@ -75,17 +107,19 @@ def grasp_aligned_base_pose(
         base_xy[0] + projection * axis[0],
         base_xy[1] + projection * axis[1],
     ]
-    yaw = math.atan2(-base_direction[1], -base_direction[0])
-    expected_right_to_left_axis = (math.sin(yaw), -math.cos(yaw))
-    swap_arm_targets = (
-        expected_right_to_left_axis[0] * axis[0]
-        + expected_right_to_left_axis[1] * axis[1]
-    ) < 0.0
+    orientation = grasp_orientation_from_base(
+        base_xy=base_xy,
+        right_site_xy=right_site_xy,
+        left_site_xy=left_site_xy,
+    )
     return {
         "base_xy": base_xy,
         "staging_xy": staging_xy,
-        "yaw": yaw,
-        "swap_arm_targets": swap_arm_targets,
+        "grasp_center_xy": list(grasp_center),
+        "right_site_xy": [float(right_site_xy[0]), float(right_site_xy[1])],
+        "left_site_xy": [float(left_site_xy[0]), float(left_site_xy[1])],
+        "yaw": orientation["yaw"],
+        "swap_arm_targets": orientation["swap_arm_targets"],
     }
 
 
@@ -119,28 +153,6 @@ def select_grasp_candidate(candidates, *, station_approach) -> str:
         return clearance, -approach_distance
 
     return str(max(entries, key=score)["name"])
-
-
-def refine_base_position(
-    backend,
-    target_xy,
-    *,
-    waypoint_tolerance: float = 0.03,
-    max_steps: int = 120,
-) -> bool:
-    """Refine an A* endpoint with the official incremental direct driver."""
-    import numpy as np
-
-    target = np.asarray(target_xy, dtype=float).reshape(2)
-    return bool(
-        backend.follow_path(
-            [target],
-            max_steps=int(max_steps),
-            waypoint_tolerance=float(waypoint_tolerance),
-            stop_on_collision=True,
-            record_every=1,
-        )
-    )
 
 
 def orient_base(
