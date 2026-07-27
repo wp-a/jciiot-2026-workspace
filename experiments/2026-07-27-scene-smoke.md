@@ -40,6 +40,7 @@
 |---|---|
 | `scene-smoke-all-0dcdddf.json` | `dd400a3e035de43dbd8971d736da9f40a0b939bdc59de79bc30af5180ae3f1b3` |
 | `environment-0dcdddf.txt` | `b2d3ac83b1ca4a7663fa7ddf1915dfdc03e977ccde6b542cdeb9e36498a69017` |
+| `pip-freeze-0dcdddf.txt` | `899a297ae716d7209a53656f1a14b0d9ef541033d034dffadea0f6c15bd30f04` |
 
 ## 结论边界
 
