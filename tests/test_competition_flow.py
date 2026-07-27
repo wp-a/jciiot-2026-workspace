@@ -6,6 +6,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import numpy as np
+
 
 MODULE_PATH = (
     Path(__file__).resolve().parents[1]
@@ -197,6 +199,55 @@ class CompetitionFlowTests(unittest.TestCase):
             driver.grasp("input_6", "green_tote_b01_lower")
 
         self.assertEqual(captured["config"].site_below_offset, 0.035)
+
+    def test_object_ranking_skips_candidates_without_grasp_sites(self):
+        driver = object.__new__(self.module.OfficialCompetitionDriver)
+        driver.scene_context = SimpleNamespace(
+            input_ports={
+                "input_5": SimpleNamespace(
+                    approach=np.array([1.0, 2.0]),
+                    center=np.array([1.0, 3.0]),
+                )
+            }
+        )
+        driver.backend = SimpleNamespace(
+            env=SimpleNamespace(
+                obj_body_id={"box_near": 0, "box_far": 1},
+                sim=SimpleNamespace(
+                    data=SimpleNamespace(
+                        body_xpos=np.array(
+                            [[1.0, 3.0, 1.2], [1.2, 3.0, 1.2]]
+                        )
+                    )
+                ),
+            )
+        )
+
+        def grasp_pose(_source, name):
+            if name == "box_far":
+                raise RuntimeError("missing grasp site")
+            return {"base_xy": np.array([1.0, 2.5])}
+
+        driver._grasp_pose = grasp_pose
+        navigation = types.ModuleType(
+            "robot_agent.skills.competition_navigation"
+        )
+        navigation.select_grasp_candidate = (
+            lambda entries, **_kwargs: entries[0]["name"]
+        )
+        modules = {
+            "robot_agent": types.ModuleType("robot_agent"),
+            "robot_agent.skills": types.ModuleType("robot_agent.skills"),
+            "robot_agent.skills.competition_navigation": navigation,
+        }
+
+        with patch.dict(sys.modules, modules):
+            ranked = driver.rank_objects(
+                "input_5",
+                ["box_far", "box_near"],
+            )
+
+        self.assertEqual(ranked, ["box_near"])
 
 
 if __name__ == "__main__":

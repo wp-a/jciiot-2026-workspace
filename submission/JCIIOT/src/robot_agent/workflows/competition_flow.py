@@ -199,7 +199,10 @@ class OfficialCompetitionDriver:
         )
         entries = []
         for name in names:
-            pose = self._grasp_pose(source, name)
+            try:
+                pose = self._grasp_pose(source, name)
+            except (AttributeError, KeyError, RuntimeError, TypeError, ValueError):
+                continue
             body_id = self.backend.env.obj_body_id[name]
             object_xy = self.backend.env.sim.data.body_xpos[body_id][:2]
             entries.append(
