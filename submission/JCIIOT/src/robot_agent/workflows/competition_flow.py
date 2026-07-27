@@ -220,6 +220,16 @@ class OfficialCompetitionDriver:
             remaining = [entry for entry in remaining if entry["name"] != selected]
         return ranked
 
+    def _prepare_grasp_clearance(self, object_name: str) -> bool:
+        from robot_agent.skills.competition_grasp import (
+            OfficialScriptedGraspDriver,
+            ScriptedGraspConfig,
+        )
+
+        config = self.grasp_config or ScriptedGraspConfig()
+        driver = OfficialScriptedGraspDriver()
+        return bool(driver.raise_to_clearance(self.backend, object_name, config))
+
     def move(
         self,
         target: str,
@@ -257,6 +267,8 @@ class OfficialCompetitionDriver:
                 return False
             if staging_target == resolved_target:
                 return True
+            if object_name is None or not self._prepare_grasp_clearance(object_name):
+                return False
         if not self._move_to(resolved_target, carrying=carrying):
             return False
         if active_grasp_pose is not None:
