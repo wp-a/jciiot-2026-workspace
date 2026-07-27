@@ -2,6 +2,8 @@
 
 本文件把外部项目经验映射到 JCIIOT 的实际模块、指标和实验顺序。状态以 [`STATUS.md`](../STATUS.md) 为准，实验结果写入 [`experiments/experiment-log.csv`](../experiments/experiment-log.csv)。
 
+2026-07-28 更新：固定种子五关已全部满分、零碰撞。抓取主线采用对象族几何 OSC/约束 IK；学习实验下调为多种子证据显示几何瓶颈后的后备。详细现状见 [`09-current-route-and-optimization-plan.md`](09-current-route-and-optimization-plan.md)。
+
 ## 模块总览
 
 | 模块 | 官方现状 | 主要风险 | 首选改进 | 参考项目 | 核心指标 |
@@ -59,6 +61,8 @@ pending -> approached -> grasped -> lifted -> transported -> placed -> verified
 失败只回退到最近可恢复状态，并设置每阶段最大重试。完成对象立即持久化，后续导航和放置必须把已放置对象视为不可碰撞区域。对象顺序先按路线成本和抓取可靠性排序，再用消融实验确认。
 
 退出标准：三件对象都有匹配的成功抓取事件，全部到达目标，整段轨迹无碰撞，官方 30/30。
+
+当前状态：固定种子已达到 30/30，三件最终距离为 0.60/0.00/0.60 m。后续重点是多种子稳定性和在满分约束下缩短释放等待。
 
 ## P1：原创 SOP 流水线
 

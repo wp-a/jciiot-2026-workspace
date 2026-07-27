@@ -20,3 +20,4 @@
 
 - [ADR-0001：采用可验证混合竞赛架构](0001-hybrid-competition-architecture.md)
 - [ADR-0002：隔离第三方与其他参赛者代码](0002-reference-code-policy.md)
+- [ADR-0003：几何控制器作为主策略，学习策略作为证据驱动后备](0003-geometric-primary-controller.md)

@@ -16,6 +16,8 @@ DOCX 文本/图片
 
 LLM/VLM 不直接输出底盘或关节动作。它只处理语义不确定性；物理执行使用可测试的技能和显式约束。
 
+截至 2026-07-28，方案 B 已在官方固定种子下完成五关满分和零碰撞。当前实际主抓取策略已从“优先复用 BC”收敛为“对象族几何 OSC/约束 IK 主策略，学习策略作为证据驱动后备”。结果和边界见 [`09-current-route-and-optimization-plan.md`](09-current-route-and-optimization-plan.md) 与 [`2026-07-28-five-level-performance-baseline.md`](../experiments/2026-07-28-five-level-performance-baseline.md)。
+
 ## 分阶段里程碑
 
 ### M0：规则锁定与环境准备
@@ -51,6 +53,8 @@ LLM/VLM 不直接输出底盘或关节动作。它只处理语义不确定性；
 - 单件失败只重试当前对象；已放置对象不可被后续路径碰撞或带走。
 
 退出条件：三件物体都有匹配成功抓取事件、全部到达 `aux_output_1`、零碰撞、30/30。
+
+当前状态：固定种子已达到退出条件；下一门槛是 20 种子稳定性和等待时间消融。
 
 ### M4：原创 SOP 解析器
 

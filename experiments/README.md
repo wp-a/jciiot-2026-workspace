@@ -21,3 +21,4 @@
 
 - [2026-07-27 五场景无权重冒烟](2026-07-27-scene-smoke.md)
 - [2026-07-27 L1 双臂几何 OSC 满分基线](2026-07-27-l1-scripted-grasp.md)
+- [2026-07-28 五关满分性能基线](2026-07-28-five-level-performance-baseline.md)
