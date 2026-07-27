@@ -24,3 +24,4 @@
 - [2026-07-28 五关满分性能基线](2026-07-28-five-level-performance-baseline.md)
 - [2026-07-28 L2-L5 多种子重复稳定性](2026-07-28-multiseed-stability.md)
 - [2026-07-28 官方 Agent 入口五关验收](2026-07-28-official-agent-entrypoint.md)
+- [2026-07-28 原创 SOP 知识生成](2026-07-28-sop-qwen3vl-generation.md)

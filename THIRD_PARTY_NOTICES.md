@@ -22,6 +22,20 @@
 | MobileManiBench | BSD-3-Clause | 移动操作数据与评测结构参考 | 研究用途；不引入 Isaac Sim 栈 |
 | RoboMonkey | MIT | test-time verifier 思路 | 研究用途；只考虑确定性轻量 verifier |
 
+## 当前采用的离线 SOP 生成组件
+
+| 组件 | 许可证 | 固定版本 | 用途与边界 |
+|---|---|---|---|
+| Qwen3-VL-2B-Instruct | Apache-2.0 | `master`，`model.safetensors` SHA-256 `7de1838c87a5349b016c26a1c3f7d2bc400a3d485f95ef39a7059ffd734977a0` | 仅对原始 DOCX 内嵌图片生成结构化证据；不生成机器人动作，不在评分执行时加载，权重不随提交分发 |
+| PyTorch / torchvision | BSD-style | `2.13.0+cu130` / `0.28.0+cu130` | 独立 VLM 生成环境，不进入 MuJoCo 评分环境 |
+| Transformers / Accelerate | Apache-2.0 | `5.14.1` / `1.14.0` | 本地 Qwen3-VL 推理 |
+| ModelScope | Apache-2.0 | `1.38.1` | 从公开官方镜像获取模型权重 |
+
+模型公开来源、权重大小、完整哈希和其余依赖版本固定在
+`config/sop-vlm-lock.json`。最终生成的 Markdown 和 provenance 记录每份
+DOCX、每张输入图片及每次原始 VLM 响应的 SHA-256。官方手写
+`knowledge/sop*.md` 不作为生成输入。
+
 ## 受限或待确认
 
 | 组件 | 风险 | 赛事策略 |
@@ -34,7 +48,7 @@
 
 ## 使用要求
 
-- 当前提交代码只直接使用 Python 标准库、NumPy 和官方基线已经提供的 robot-agent/MuJoCo/robosuite 接口；没有复制下列参考仓库的实现，也没有使用外部模型权重。
+- 评分执行代码只直接使用 Python 标准库、NumPy 和官方基线已经提供的 robot-agent/MuJoCo/robosuite 接口；离线 SOP 图片证据额外使用上表公开 VLM 组件。没有复制下列参考仓库的实现，也没有把外部模型权重纳入评分执行依赖。
 - “可采用候选”和“受限或待确认”均为研究台账，不代表已进入当前提交依赖。
 - 每个实际采用的第三方文件保留版权声明和许可证要求。
 - 报告中注明库、算法、模型、数据和外部服务，不把开源组件描述为自研贡献。

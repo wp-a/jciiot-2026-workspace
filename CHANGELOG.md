@@ -4,6 +4,8 @@
 
 ## 2026-07-28
 
+- 新增原创 SOP 知识生成器：不读取官方手写 SOP Markdown，解析五份原始 DOCX，用公开 Qwen3-VL-2B-Instruct 对 25 张图片生成带哈希的固定 schema 证据，并与 Prompt、Erratum、官方任务配置和语义地图交叉验证。
+- 五份 SOP 全部生成 Markdown 和 provenance；20 张图片首次通过、5 张经一次格式修复通过；L2 的错误工位和物体模板残留被显式记录和解析。模型权重、运行环境、产物和原始证据 ZIP 均固定 SHA-256。
 - L2-L5 各完成 20 次重复实验，共 80/80 官方满分、120/120 抓取事件、零碰撞、零 runner 错误；保存 80 份 manifest 和 80 条轨迹并完成独立校验。
 - 新增官方 `CompetitionTaskSkill` 入口适配和最小 skill factory 覆盖，不改 `app.py`、核心、环境、评分器或任务配置；干净物化候选经 `RobotAgent.run()` 五关 100/100。
 - 新增多种子稳定性报告、官方 Agent 入口报告和 80 行 autoresearch 台账；封存的证据 ZIP 在远端、本地及内部文件级哈希均通过。

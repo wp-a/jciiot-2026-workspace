@@ -26,9 +26,11 @@
 9. [五关性能基线](experiments/2026-07-28-five-level-performance-baseline.md)：固定种子 100/100、零碰撞和 L5 收敛证据。
 10. [多种子稳定性](experiments/2026-07-28-multiseed-stability.md)：L2-L5 各 20 次，80/80 满分和置信区间。
 11. [官方 Agent 入口验收](experiments/2026-07-28-official-agent-entrypoint.md)：干净候选通过 `RobotAgent.run()` 五关 100/100。
-12. [资料索引](docs/04-source-index.md)和[来源台账](research/source-ledger.csv)：网页、代码、论文、固定版本和采用状态。
-13. [架构决策](decisions/README.md)：路线选择和第三方代码隔离政策。
-14. [提交合规清单](docs/06-submission-compliance.md)：组队、依赖、复现、报告和发布要求。
+12. [原创 SOP 知识生成](experiments/2026-07-28-sop-qwen3vl-generation.md)：五份 DOCX、25 张图片、冲突处理和模型证据边界。
+13. [技术报告](TECHNICAL_REPORT.md)：最终方法、定量结果、新颖性、限制和复现说明。
+14. [资料索引](docs/04-source-index.md)和[来源台账](research/source-ledger.csv)：网页、代码、论文、固定版本和采用状态。
+15. [架构决策](decisions/README.md)：路线选择和第三方代码隔离政策。
+16. [提交合规清单](docs/06-submission-compliance.md)：组队、依赖、复现、报告和发布要求。
 
 ## 工作区结构
 
@@ -39,6 +41,7 @@ research/     检索记录和后续论文笔记
 decisions/    不覆盖历史的架构与合规决策记录
 references/   外部项目 manifest；实际 checkout 不入顶层 Git
 experiments/  实验协议与结果日志
+sop_generated/原创 SOP 生成结果、provenance 和校验清单
 src/          后续自研代码入口，当前不放占位实现
 data/         数据说明；大文件不入库
 artifacts/    轨迹、模型和评测产物说明；大文件不入库
@@ -73,4 +76,4 @@ bash tests/test_workspace_check.sh
 
 ## 下一阶段的最小成功标准
 
-固定种子五关满分、L2-L5 每关 20 次重复执行和干净官方 Agent 五关验收已经完成。下一阶段最小成功标准是：显式扰动物体位姿/底盘误差并统计鲁棒性；完善一键复现；完成原创 SOP 证据链、模块消融和技术报告。达到这些门槛前，不启动大规模 VLA 微调。
+固定种子五关满分、L2-L5 每关 20 次重复执行、干净官方 Agent 五关验收和原创 SOP 证据链已经完成。下一阶段最小成功标准是：显式扰动物体位姿/底盘误差并统计鲁棒性；完成模块消融、效率实验和视频。达到这些门槛前，不启动大规模 VLA 微调。
