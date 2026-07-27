@@ -80,6 +80,7 @@ Planner 让 LLM 输出严格结构化 JSON，但示例主路径被压成固定�
 ## 环境注意事项
 
 - 官方推荐 Python 3.11，并需安装项目自身、内嵌 robosuite 及 requirements。
+- 必须按根 `requirements.txt` 固定 `mujoco==3.9.0`。仅安装 robosuite 的宽松依赖会得到 3.10.0，其 `mj_fullM` Python 绑定签名已经变化，官方控制器会在环境构造阶段报 `TypeError`。
 - 官方 `.pth`、`.hdf5`、`.zip` 由 LFS 管理，轻量快照中的指针不能替代权重。
 - macOS 的 MuJoCo 可视 viewer 与普通 Python 子进程可能冲突；批量实验宜使用正确配置的 offscreen 渲染或 Linux GPU 环境。
 - 官方参考硬件是 Linux + RTX 4090 级别。正式复现应记录操作系统、CPU/GPU、驱动、MuJoCo 后端与随机种子。
@@ -102,3 +103,7 @@ Planner 让 LLM 输出严格结构化 JSON，但示例主路径被压成固定�
 2. **L5 改用辅助输出桌**：目标工位由 `output_6` 改为 `aux_output_1`，中心和接近点与 L3 辅助桌相同。L5 仍需搬运三个 white tote。
 3. **后端初始化顺序调整**：启用物理策略时，`_ensure_physics_policy()` 从导航环境 reset 之后提前到导航环境构造之前。该文件属于禁止修改目录，只记录并使用官方版本。
 4. 官方 `grasp_poses` 没有增加 `aux_input_1`；后端可以使用导航后传入或当前 base pose，但 L3 抓取策略是否适配新辅助桌必须通过实际闭环验证，不能仅凭任务配置判定可用。
+
+## 2026-07-27 远程场景冒烟
+
+在 Ubuntu 24.04.3、Python 3.11.15、MuJoCo 3.9.0 和官方 robosuite 1.5.2 环境中，固定 seed `20260727`，五个场景都成功完成构造、reset 和一个零动作 step，action shape 均为 20。该实验不加载 checkpoint，不启用 renderer，不执行任务 workflow，也不调用评分器；它只证明普通 Git 场景资产和基础动力学链可用。完整记录见 `experiments/2026-07-27-scene-smoke.md`。
