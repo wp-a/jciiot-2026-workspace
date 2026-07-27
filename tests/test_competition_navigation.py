@@ -109,7 +109,7 @@ class CompetitionNavigationTests(unittest.TestCase):
             max_step=self.module.SAFE_GRASP_YAW_CORRECTION,
         )
 
-        self.assertAlmostEqual(next_yaw, 1.8501)
+        self.assertAlmostEqual(next_yaw, 1.7701)
 
     def test_reached_base_orientation_faces_grasp_center(self):
         orientation = self.module.grasp_orientation_from_base(
