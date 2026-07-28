@@ -378,6 +378,22 @@ def next_orientation_alignment_state(
     }
 
 
+def eef_site_pose(raw_env, robot, arm: str) -> tuple[np.ndarray, np.ndarray]:
+    """Return the world pose of the grip site controlled by the arm OSC."""
+    try:
+        site_id = robot.eef_site_id[arm]
+    except (AttributeError, KeyError, TypeError) as exc:
+        raise ValueError(f"missing OSC grip site for {arm}") from exc
+    position = np.asarray(raw_env.sim.data.site_xpos[site_id], dtype=float)
+    if position.shape != (3,) or not np.all(np.isfinite(position)):
+        raise ValueError(f"invalid OSC grip-site position for {arm}")
+    orientation = _validated_rotation_matrix(
+        np.asarray(raw_env.sim.data.site_xmat[site_id], dtype=float).reshape(3, 3),
+        name=f"{arm} OSC grip-site orientation",
+    )
+    return position.copy(), orientation.copy()
+
+
 def has_bilateral_object_contact(
     contacts: Mapping[str, tuple[str, ...]],
 ) -> bool:
@@ -1064,12 +1080,9 @@ def _center_regrasp_probe(
             for arm in ("right", "left")
         }
 
-    def eef_orientations() -> dict[str, np.ndarray]:
+    def alignment_eef_poses() -> dict[str, tuple[np.ndarray, np.ndarray]]:
         return {
-            arm: np.asarray(
-                raw_env.sim.data.site_xmat[robot.eef_site_id[arm]],
-                dtype=float,
-            ).reshape(3, 3)
+            arm: eef_site_pose(raw_env, robot, arm)
             for arm in ("right", "left")
         }
 
@@ -1101,7 +1114,8 @@ def _center_regrasp_probe(
         nonlocal collision_steps
         if int(orientation_max_steps) < 1:
             raise ValueError("orientation_max_steps must be positive")
-        hold_positions = eef_positions()
+        hold_poses = alignment_eef_poses()
+        hold_positions = {arm: hold_poses[arm][0] for arm in ("right", "left")}
         state: dict[str, object] = {
             "stable_steps": 0,
             "max_position_drift_m": 0.0,
@@ -1109,8 +1123,13 @@ def _center_regrasp_probe(
         alignment_collision_frames = 0
         for local_step in range(int(orientation_max_steps)):
             robot.composite_controller.update_state()
-            current_positions = eef_positions()
-            current_orientations = eef_orientations()
+            current_poses = alignment_eef_poses()
+            current_positions = {
+                arm: current_poses[arm][0] for arm in ("right", "left")
+            }
+            current_orientations = {
+                arm: current_poses[arm][1] for arm in ("right", "left")
+            }
             arm_actions = {}
             orientation_actions = {}
             for arm in ("right", "left"):
@@ -1152,8 +1171,13 @@ def _center_regrasp_probe(
             if callable(recorder):
                 recorder(_env=raw_env)
 
-            measured_positions = eef_positions()
-            measured_orientations = eef_orientations()
+            measured_poses = alignment_eef_poses()
+            measured_positions = {
+                arm: measured_poses[arm][0] for arm in ("right", "left")
+            }
+            measured_orientations = {
+                arm: measured_poses[arm][1] for arm in ("right", "left")
+            }
             position_drift = max(
                 float(
                     np.linalg.norm(

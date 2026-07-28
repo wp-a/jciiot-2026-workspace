@@ -1,4 +1,5 @@
 import unittest
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -6,6 +7,7 @@ from scripts.run_l1_cradle_gate import (
     closure_axis_error_degrees,
     cradle_gate_accepted,
     cradle_gate_failures,
+    eef_site_pose,
     has_bilateral_object_contact,
     minimum_undirected_axis_rotation,
     next_orientation_alignment_state,
@@ -167,6 +169,25 @@ class OrientationCommandTests(unittest.TestCase):
         common["world_rotation_delta"] = np.full((3, 3), float("nan"))
         with self.assertRaises(ValueError):
             normalized_osc_orientation_command(**common)
+
+
+class EefSitePoseTests(unittest.TestCase):
+    def test_pose_uses_the_osc_grip_site_boundary(self):
+        rotation = OrientationCommandTests.rotation_z(np.pi / 4.0)
+        raw_env = SimpleNamespace(
+            sim=SimpleNamespace(
+                data=SimpleNamespace(
+                    site_xpos=np.array([[9.0, 8.0, 7.0], [1.0, 2.0, 3.0]]),
+                    site_xmat=np.array([np.eye(3).reshape(-1), rotation.reshape(-1)]),
+                )
+            )
+        )
+        robot = SimpleNamespace(eef_site_id={"right": 1})
+
+        position, orientation = eef_site_pose(raw_env, robot, "right")
+
+        np.testing.assert_allclose(position, [1.0, 2.0, 3.0])
+        np.testing.assert_allclose(orientation, rotation)
 
 
 class OrientationAlignmentGateTests(unittest.TestCase):
