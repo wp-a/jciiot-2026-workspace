@@ -1,0 +1,1151 @@
+{
+  "action_dim": 10,
+  "compatibility": {
+    "classification": "format-only",
+    "missing_observation_keys": [
+      "robot0_left_eef_pos",
+      "robot0_left_eef_quat",
+      "robot0_left_gripper_qpos",
+      "robot0_right_eef_pos",
+      "robot0_right_eef_quat",
+      "robot0_right_gripper_qpos",
+      "robot0_robotview_image"
+    ],
+    "reasons": [
+      "environment is not FactorySorting: SemanticOrganizeAndFetch",
+      "action dimension is 10, expected 20",
+      "missing JCIIOT observation keys: robot0_left_eef_pos, robot0_left_eef_quat, robot0_left_gripper_qpos, robot0_right_eef_pos, robot0_right_eef_quat, robot0_right_gripper_qpos, robot0_robotview_image"
+    ]
+  },
+  "data_attributes": {
+    "env_args": {
+      "env_kwargs": {
+        "ig_config": {
+          "action_high": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            0.05,
+            0.05
+          ],
+          "action_low": [
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            0.0,
+            0.0
+          ],
+          "additional_states_dim": 4,
+          "arm_velocity": 1.0,
+          "build_graph": true,
+          "collision_ignore_link_a_ids": [
+            0,
+            1,
+            2,
+            20,
+            21
+          ],
+          "collision_reward_weight": -0.1,
+          "control": [
+            "differential_drive",
+            "differential_drive",
+            "velocity",
+            "velocity",
+            "velocity",
+            "velocity",
+            "velocity",
+            "velocity",
+            "velocity",
+            "velocity",
+            "velocity",
+            "velocity",
+            "position",
+            "position"
+          ],
+          "controller": {
+            "eef_always_in_frame": true,
+            "eef_tracking_heuristic": "move_head_vertical_discrete",
+            "height_limits": [
+              0.2,
+              1.5
+            ],
+            "input_max": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "input_min": [
+              -1,
+              -1,
+              -1,
+              -1,
+              -1,
+              -1
+            ],
+            "kv_vel": -2.0,
+            "mode": "pose_delta_ori",
+            "neutral_xy": [
+              0.25,
+              0
+            ],
+            "output_max": [
+              0.2,
+              0.2,
+              0.2,
+              0.5,
+              0.5,
+              0.5
+            ],
+            "output_min": [
+              -0.2,
+              -0.2,
+              -0.2,
+              -0.5,
+              -0.5,
+              -0.5
+            ],
+            "radius_limit": 0.5,
+            "type": "ik"
+          },
+          "default_arm_pose": "diagonal30",
+          "depth_high": 3.0,
+          "depth_low": 0.35,
+          "depth_noise_rate": 0.0,
+          "discount_factor": 0.99,
+          "dist_tol": 0.5,
+          "enable_shadow": true,
+          "fisheye": false,
+          "goal": {
+            "location": "table_76",
+            "surface": "top"
+          },
+          "gripper_visualization": false,
+          "image_height": 480,
+          "image_width": 640,
+          "include_trash": false,
+          "initial_pos_z_offset": 0.1,
+          "is_discrete": false,
+          "laser_angular_range": 220.0,
+          "laser_linear_range": 25.0,
+          "laser_link_name": "laser_link",
+          "load_room_types": [
+            "kitchen"
+          ],
+          "load_texture": true,
+          "max_collisions_allowed": 500,
+          "max_step": 500,
+          "max_velocity": [
+            17.4,
+            17.4,
+            0.1,
+            1.57,
+            1.57,
+            1.256,
+            1.454,
+            1.571,
+            1.521,
+            1.571,
+            2.268,
+            2.268,
+            0.05,
+            0.05
+          ],
+          "min_laser_dist": 0.05,
+          "n_horizontal_rays": 100,
+          "n_vertical_beams": 1,
+          "objects": [
+            {
+              "class_id": 50,
+              "filename": "024_bowl",
+              "name": "bowl",
+              "obj_type": "ycb",
+              "ori_sampler": null,
+              "pos_range": null,
+              "pos_sampler": null,
+              "rot_axis": "z",
+              "rot_range": [
+                1.57,
+                1.57
+              ],
+              "sample_at": {
+                "bottom_cabinet_26": {
+                  "prob": 1e-08,
+                  "surfaces": [
+                    "drawer1"
+                  ]
+                },
+                "dishwasher_36": {
+                  "prob": 0.99999997,
+                  "surfaces": [
+                    "tray1"
+                  ]
+                },
+                "sink_37": {
+                  "prob": 1e-08,
+                  "surfaces": [
+                    "top"
+                  ]
+                },
+                "table_76": {
+                  "prob": 1e-08,
+                  "surfaces": [
+                    "top"
+                  ]
+                }
+              },
+              "scale": 1.0
+            }
+          ],
+          "obs_image_height": 90,
+          "obs_image_width": 120,
+          "output": [
+            "scan",
+            "task_obs",
+            "depth",
+            "rgb",
+            "proprio"
+          ],
+          "pos_range": [
+            [
+              0.2,
+              -2.0,
+              0.0
+            ],
+            [
+              0.4,
+              -1.8,
+              0.0
+            ]
+          ],
+          "potential_reward_weight": 1.0,
+          "randomize_scene_objects": {
+            "trash_can_77": {
+              "pos_range": [
+                [
+                  -0.2,
+                  -0.2,
+                  0.0
+                ],
+                [
+                  0.2,
+                  0.2,
+                  0.0
+                ]
+              ],
+              "rot_axis": "z",
+              "rot_range": [
+                0,
+                0
+              ]
+            }
+          },
+          "reward_type": "geodesic",
+          "robot": "FetchGripper",
+          "rot_range": [
+            2.94,
+            3.34
+          ],
+          "sampling": {
+            "only_top": false
+          },
+          "scan_noise_rate": 0.0,
+          "scene": "igibson",
+          "scene_id": "Pomaria_1_int",
+          "scene_instance": "Pomaria_1_int_custom_kitchen_cleanup_full",
+          "should_open_all_doors": false,
+          "skip_tuck_animation": true,
+          "slack_reward": -0.01,
+          "start_tucked": false,
+          "success_condition": "pick_place",
+          "success_reward": 10.0,
+          "target_dist_max": 10.0,
+          "target_dist_min": 1.0,
+          "target_visual_object_visible_to_agent": false,
+          "task_obs_format": "global",
+          "task_use_memory_obs": true,
+          "texture_scale": 1.0,
+          "torso_lift_velocity": 1.0,
+          "trash_bin": "trash_can_77",
+          "trav_map_erosion": 3,
+          "trav_map_resolution": 0.1,
+          "trunk_offset": 0.085,
+          "use_tuck_action": false,
+          "vertical_fov": 45,
+          "visual_object_at_initial_target_pos": true,
+          "wheel_velocity": 1.0
+        }
+      },
+      "env_name": "SemanticOrganizeAndFetch",
+      "type": 3
+    },
+    "total": 45941
+  },
+  "demo_count": 5,
+  "demos": [
+    {
+      "actions": {
+        "compression": null,
+        "dtype": "float64",
+        "shape": [
+          366,
+          10
+        ]
+      },
+      "attributes": {
+        "num_samples": 366
+      },
+      "name": "demo_0",
+      "observations": {
+        "depth": {
+          "compression": null,
+          "dtype": "float32",
+          "shape": [
+            366,
+            90,
+            120,
+            1
+          ]
+        },
+        "depth_wrist": {
+          "compression": null,
+          "dtype": "float32",
+          "shape": [
+            366,
+            90,
+            120,
+            1
+          ]
+        },
+        "gt_nav": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            366,
+            4
+          ]
+        },
+        "object": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            366,
+            3
+          ]
+        },
+        "proprio": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            366,
+            10
+          ]
+        },
+        "proprio_nav": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            366,
+            2
+          ]
+        },
+        "rgb": {
+          "compression": null,
+          "dtype": "uint8",
+          "shape": [
+            366,
+            90,
+            120,
+            3
+          ]
+        },
+        "rgb_wrist": {
+          "compression": null,
+          "dtype": "uint8",
+          "shape": [
+            366,
+            90,
+            120,
+            3
+          ]
+        },
+        "scan": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            366,
+            1,
+            100
+          ]
+        }
+      },
+      "samples": 366,
+      "states": {
+        "compression": null,
+        "dtype": "float64",
+        "shape": [
+          366,
+          506
+        ]
+      }
+    },
+    {
+      "actions": {
+        "compression": null,
+        "dtype": "float64",
+        "shape": [
+          388,
+          10
+        ]
+      },
+      "attributes": {
+        "num_samples": 388
+      },
+      "name": "demo_1",
+      "observations": {
+        "depth": {
+          "compression": null,
+          "dtype": "float32",
+          "shape": [
+            388,
+            90,
+            120,
+            1
+          ]
+        },
+        "depth_wrist": {
+          "compression": null,
+          "dtype": "float32",
+          "shape": [
+            388,
+            90,
+            120,
+            1
+          ]
+        },
+        "gt_nav": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            388,
+            4
+          ]
+        },
+        "object": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            388,
+            3
+          ]
+        },
+        "proprio": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            388,
+            10
+          ]
+        },
+        "proprio_nav": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            388,
+            2
+          ]
+        },
+        "rgb": {
+          "compression": null,
+          "dtype": "uint8",
+          "shape": [
+            388,
+            90,
+            120,
+            3
+          ]
+        },
+        "rgb_wrist": {
+          "compression": null,
+          "dtype": "uint8",
+          "shape": [
+            388,
+            90,
+            120,
+            3
+          ]
+        },
+        "scan": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            388,
+            1,
+            100
+          ]
+        }
+      },
+      "samples": 388,
+      "states": {
+        "compression": null,
+        "dtype": "float64",
+        "shape": [
+          388,
+          506
+        ]
+      }
+    },
+    {
+      "actions": {
+        "compression": null,
+        "dtype": "float64",
+        "shape": [
+          384,
+          10
+        ]
+      },
+      "attributes": {
+        "num_samples": 384
+      },
+      "name": "demo_10",
+      "observations": {
+        "depth": {
+          "compression": null,
+          "dtype": "float32",
+          "shape": [
+            384,
+            90,
+            120,
+            1
+          ]
+        },
+        "depth_wrist": {
+          "compression": null,
+          "dtype": "float32",
+          "shape": [
+            384,
+            90,
+            120,
+            1
+          ]
+        },
+        "gt_nav": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            384,
+            4
+          ]
+        },
+        "object": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            384,
+            3
+          ]
+        },
+        "proprio": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            384,
+            10
+          ]
+        },
+        "proprio_nav": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            384,
+            2
+          ]
+        },
+        "rgb": {
+          "compression": null,
+          "dtype": "uint8",
+          "shape": [
+            384,
+            90,
+            120,
+            3
+          ]
+        },
+        "rgb_wrist": {
+          "compression": null,
+          "dtype": "uint8",
+          "shape": [
+            384,
+            90,
+            120,
+            3
+          ]
+        },
+        "scan": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            384,
+            1,
+            100
+          ]
+        }
+      },
+      "samples": 384,
+      "states": {
+        "compression": null,
+        "dtype": "float64",
+        "shape": [
+          384,
+          506
+        ]
+      }
+    },
+    {
+      "actions": {
+        "compression": null,
+        "dtype": "float64",
+        "shape": [
+          394,
+          10
+        ]
+      },
+      "attributes": {
+        "num_samples": 394
+      },
+      "name": "demo_101",
+      "observations": {
+        "depth": {
+          "compression": null,
+          "dtype": "float32",
+          "shape": [
+            394,
+            90,
+            120,
+            1
+          ]
+        },
+        "depth_wrist": {
+          "compression": null,
+          "dtype": "float32",
+          "shape": [
+            394,
+            90,
+            120,
+            1
+          ]
+        },
+        "gt_nav": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            394,
+            4
+          ]
+        },
+        "object": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            394,
+            3
+          ]
+        },
+        "proprio": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            394,
+            10
+          ]
+        },
+        "proprio_nav": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            394,
+            2
+          ]
+        },
+        "rgb": {
+          "compression": null,
+          "dtype": "uint8",
+          "shape": [
+            394,
+            90,
+            120,
+            3
+          ]
+        },
+        "rgb_wrist": {
+          "compression": null,
+          "dtype": "uint8",
+          "shape": [
+            394,
+            90,
+            120,
+            3
+          ]
+        },
+        "scan": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            394,
+            1,
+            100
+          ]
+        }
+      },
+      "samples": 394,
+      "states": {
+        "compression": null,
+        "dtype": "float64",
+        "shape": [
+          394,
+          506
+        ]
+      }
+    },
+    {
+      "actions": {
+        "compression": null,
+        "dtype": "float64",
+        "shape": [
+          384,
+          10
+        ]
+      },
+      "attributes": {
+        "num_samples": 384
+      },
+      "name": "demo_102",
+      "observations": {
+        "depth": {
+          "compression": null,
+          "dtype": "float32",
+          "shape": [
+            384,
+            90,
+            120,
+            1
+          ]
+        },
+        "depth_wrist": {
+          "compression": null,
+          "dtype": "float32",
+          "shape": [
+            384,
+            90,
+            120,
+            1
+          ]
+        },
+        "gt_nav": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            384,
+            4
+          ]
+        },
+        "object": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            384,
+            3
+          ]
+        },
+        "proprio": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            384,
+            10
+          ]
+        },
+        "proprio_nav": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            384,
+            2
+          ]
+        },
+        "rgb": {
+          "compression": null,
+          "dtype": "uint8",
+          "shape": [
+            384,
+            90,
+            120,
+            3
+          ]
+        },
+        "rgb_wrist": {
+          "compression": null,
+          "dtype": "uint8",
+          "shape": [
+            384,
+            90,
+            120,
+            3
+          ]
+        },
+        "scan": {
+          "compression": null,
+          "dtype": "float64",
+          "shape": [
+            384,
+            1,
+            100
+          ]
+        }
+      },
+      "samples": 384,
+      "states": {
+        "compression": null,
+        "dtype": "float64",
+        "shape": [
+          384,
+          506
+        ]
+      }
+    }
+  ],
+  "env_args": {
+    "env_kwargs": {
+      "ig_config": {
+        "action_high": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          0.05,
+          0.05
+        ],
+        "action_low": [
+          -1.0,
+          -1.0,
+          -1.0,
+          -1.0,
+          -1.0,
+          -1.0,
+          -1.0,
+          -1.0,
+          -1.0,
+          -1.0,
+          -1.0,
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "additional_states_dim": 4,
+        "arm_velocity": 1.0,
+        "build_graph": true,
+        "collision_ignore_link_a_ids": [
+          0,
+          1,
+          2,
+          20,
+          21
+        ],
+        "collision_reward_weight": -0.1,
+        "control": [
+          "differential_drive",
+          "differential_drive",
+          "velocity",
+          "velocity",
+          "velocity",
+          "velocity",
+          "velocity",
+          "velocity",
+          "velocity",
+          "velocity",
+          "velocity",
+          "velocity",
+          "position",
+          "position"
+        ],
+        "controller": {
+          "eef_always_in_frame": true,
+          "eef_tracking_heuristic": "move_head_vertical_discrete",
+          "height_limits": [
+            0.2,
+            1.5
+          ],
+          "input_max": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "input_min": [
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1
+          ],
+          "kv_vel": -2.0,
+          "mode": "pose_delta_ori",
+          "neutral_xy": [
+            0.25,
+            0
+          ],
+          "output_max": [
+            0.2,
+            0.2,
+            0.2,
+            0.5,
+            0.5,
+            0.5
+          ],
+          "output_min": [
+            -0.2,
+            -0.2,
+            -0.2,
+            -0.5,
+            -0.5,
+            -0.5
+          ],
+          "radius_limit": 0.5,
+          "type": "ik"
+        },
+        "default_arm_pose": "diagonal30",
+        "depth_high": 3.0,
+        "depth_low": 0.35,
+        "depth_noise_rate": 0.0,
+        "discount_factor": 0.99,
+        "dist_tol": 0.5,
+        "enable_shadow": true,
+        "fisheye": false,
+        "goal": {
+          "location": "table_76",
+          "surface": "top"
+        },
+        "gripper_visualization": false,
+        "image_height": 480,
+        "image_width": 640,
+        "include_trash": false,
+        "initial_pos_z_offset": 0.1,
+        "is_discrete": false,
+        "laser_angular_range": 220.0,
+        "laser_linear_range": 25.0,
+        "laser_link_name": "laser_link",
+        "load_room_types": [
+          "kitchen"
+        ],
+        "load_texture": true,
+        "max_collisions_allowed": 500,
+        "max_step": 500,
+        "max_velocity": [
+          17.4,
+          17.4,
+          0.1,
+          1.57,
+          1.57,
+          1.256,
+          1.454,
+          1.571,
+          1.521,
+          1.571,
+          2.268,
+          2.268,
+          0.05,
+          0.05
+        ],
+        "min_laser_dist": 0.05,
+        "n_horizontal_rays": 100,
+        "n_vertical_beams": 1,
+        "objects": [
+          {
+            "class_id": 50,
+            "filename": "024_bowl",
+            "name": "bowl",
+            "obj_type": "ycb",
+            "ori_sampler": null,
+            "pos_range": null,
+            "pos_sampler": null,
+            "rot_axis": "z",
+            "rot_range": [
+              1.57,
+              1.57
+            ],
+            "sample_at": {
+              "bottom_cabinet_26": {
+                "prob": 1e-08,
+                "surfaces": [
+                  "drawer1"
+                ]
+              },
+              "dishwasher_36": {
+                "prob": 0.99999997,
+                "surfaces": [
+                  "tray1"
+                ]
+              },
+              "sink_37": {
+                "prob": 1e-08,
+                "surfaces": [
+                  "top"
+                ]
+              },
+              "table_76": {
+                "prob": 1e-08,
+                "surfaces": [
+                  "top"
+                ]
+              }
+            },
+            "scale": 1.0
+          }
+        ],
+        "obs_image_height": 90,
+        "obs_image_width": 120,
+        "output": [
+          "scan",
+          "task_obs",
+          "depth",
+          "rgb",
+          "proprio"
+        ],
+        "pos_range": [
+          [
+            0.2,
+            -2.0,
+            0.0
+          ],
+          [
+            0.4,
+            -1.8,
+            0.0
+          ]
+        ],
+        "potential_reward_weight": 1.0,
+        "randomize_scene_objects": {
+          "trash_can_77": {
+            "pos_range": [
+              [
+                -0.2,
+                -0.2,
+                0.0
+              ],
+              [
+                0.2,
+                0.2,
+                0.0
+              ]
+            ],
+            "rot_axis": "z",
+            "rot_range": [
+              0,
+              0
+            ]
+          }
+        },
+        "reward_type": "geodesic",
+        "robot": "FetchGripper",
+        "rot_range": [
+          2.94,
+          3.34
+        ],
+        "sampling": {
+          "only_top": false
+        },
+        "scan_noise_rate": 0.0,
+        "scene": "igibson",
+        "scene_id": "Pomaria_1_int",
+        "scene_instance": "Pomaria_1_int_custom_kitchen_cleanup_full",
+        "should_open_all_doors": false,
+        "skip_tuck_animation": true,
+        "slack_reward": -0.01,
+        "start_tucked": false,
+        "success_condition": "pick_place",
+        "success_reward": 10.0,
+        "target_dist_max": 10.0,
+        "target_dist_min": 1.0,
+        "target_visual_object_visible_to_agent": false,
+        "task_obs_format": "global",
+        "task_use_memory_obs": true,
+        "texture_scale": 1.0,
+        "torso_lift_velocity": 1.0,
+        "trash_bin": "trash_can_77",
+        "trav_map_erosion": 3,
+        "trav_map_resolution": 0.1,
+        "trunk_offset": 0.085,
+        "use_tuck_action": false,
+        "vertical_fov": 45,
+        "visual_object_at_initial_target_pos": true,
+        "wheel_velocity": 1.0
+      }
+    },
+    "env_name": "SemanticOrganizeAndFetch",
+    "type": 3
+  },
+  "env_info": null,
+  "file_size": 591069600,
+  "masks": {
+    "train": {
+      "compression": null,
+      "dtype": "|S8",
+      "shape": [
+        4
+      ]
+    },
+    "valid": {
+      "compression": null,
+      "dtype": "|S8",
+      "shape": [
+        1
+      ]
+    }
+  },
+  "materialized": true,
+  "observation_keys": [
+    "depth",
+    "depth_wrist",
+    "gt_nav",
+    "object",
+    "proprio",
+    "proprio_nav",
+    "rgb",
+    "rgb_wrist",
+    "scan"
+  ],
+  "path": "/home/user/jciiot-2026/assets/official-lfs-0dcdddf/table_setup_from_dishwasher_sample.hdf5",
+  "root_attributes": {},
+  "total_samples": 1916
+}
