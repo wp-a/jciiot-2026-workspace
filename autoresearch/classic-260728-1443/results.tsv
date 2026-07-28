@@ -1,0 +1,2 @@
+iteration	commit	physical_grasp	transport_stage	collision_frames	official_score	final_distance_m	elapsed_s	decision	notes
+1	98e7e6d	yes	object_drop	0	0	13.932889	46.188016	discard	Bilateral grasp and lift passed; box dropped 0.025 m after 83 wheel-action steps while base moved under 0.001 m.

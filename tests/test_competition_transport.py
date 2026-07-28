@@ -90,6 +90,39 @@ class PhysicalTransportGeometryTests(unittest.TestCase):
             0,
         )
 
+    def test_vertical_hold_delta_adds_feedforward_and_corrects_height_error(self):
+        module = load_module()
+
+        steady = module.vertical_hold_delta(
+            current_z=1.30,
+            target_z=1.30,
+            feedforward=0.0004,
+            gain=0.8,
+            max_delta=0.003,
+        )
+        correcting = module.vertical_hold_delta(
+            current_z=1.298,
+            target_z=1.30,
+            feedforward=0.0004,
+            gain=0.8,
+            max_delta=0.003,
+        )
+
+        self.assertAlmostEqual(steady, 0.0004)
+        self.assertAlmostEqual(correcting, 0.0020)
+
+    def test_direct_base_step_rotates_command_and_bounds_displacement(self):
+        module = load_module()
+
+        target = module.direct_base_step_target(
+            base_xy=np.array([1.0, 2.0]),
+            base_yaw=math.pi / 2.0,
+            base_command=np.array([0.4, 0.0, 0.0]),
+            control_dt=0.05,
+        )
+
+        np.testing.assert_allclose(target, [1.0, 2.02], atol=1e-9)
+
 
 class FakePhysicalTransportDriver:
     def __init__(
@@ -124,13 +157,26 @@ class FakePhysicalTransportDriver:
             "contacts": dict(self.contacts[index]),
         }
 
-    def step(self, _backend, *, object_name, base_command, hold_targets):
+    def step(
+        self,
+        _backend,
+        *,
+        object_name,
+        base_command,
+        hold_targets,
+        arm_world_deltas=None,
+        gripper_value=1.0,
+        base_control_dt=0.05,
+    ):
         command = np.asarray(base_command, dtype=float).copy()
         self.steps.append(
             {
                 "object_name": object_name,
                 "base_command": command,
                 "hold_targets": hold_targets,
+                "arm_world_deltas": arm_world_deltas,
+                "gripper_value": float(gripper_value),
+                "base_control_dt": float(base_control_dt),
             }
         )
         if self.advance:
@@ -178,6 +224,13 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
         self.assertIsNone(result["failure_stage"])
         self.assertGreaterEqual(len(driver.steps), 2)
         self.assertLess(float(result["final_distance"]), 0.02)
+        self.assertTrue(
+            all(
+                step["arm_world_deltas"]["right"][2] > 0.0
+                and step["arm_world_deltas"]["left"][2] > 0.0
+                for step in driver.steps
+            )
+        )
 
     def test_single_gripper_contact_loss_fails_immediately(self):
         driver = FakePhysicalTransportDriver(

@@ -4,7 +4,7 @@
 
 **Goal:** Replace attachment-driven object transport with controller-driven physical carrying and placement, then verify all five public scenes through the unmodified 8502 UI.
 
-**Architecture:** Preserve the verified two-arm OSC grasp and lift, but end grasp with a physical hold instead of an attachment. A new allowed skill will follow A* paths using Tiago's mobile-base action controller while keeping both OSC arms stationary relative to the base and both grippers closed; it will fail on contact loss, object drop, or collision. The same skill will physically descend, release, settle, and measure final distance at the destination.
+**Architecture:** Preserve the verified two-arm OSC grasp and lift, but end grasp with a physical hold instead of an attachment. A new allowed skill follows A* paths with bounded increments of the same direct-base mechanism used by the official UI, while the free object moves only through bilateral contact. Both OSC arms receive measured-height compensation and both grippers remain closed; contact loss, object drop, or collision fails immediately. The same skill physically descends, releases, settles, and measures final distance at the destination.
 
 **Tech Stack:** Python 3.11+, NumPy, MuJoCo, robosuite Tiago BASIC composite controller, unittest/pytest, Streamlit `app.py`, Git, remote NVIDIA L40S server.
 
@@ -288,6 +288,13 @@ Use the same public L1 scene, seed, official scorer, and remote pinned
 environment. Capture score, collision frames, grasp events, transport contact
 checks, minimum object height, final distance, and elapsed time.
 
+Iteration 1 established that the locked Tiago base action controller is not a
+viable cross-scene transport mechanism: the box hit the 25 mm drop guard after
+83 steps while the base moved less than 1 mm. A separate empty-base probe
+measured only about 5.6 mm of travel in 100 full-scale actions. Iteration 2
+therefore keeps the object fully physical but adopts the official UI's bounded
+direct-base stepping and adds bilateral OSC height compensation.
+
 **Step 3: Inspect the first-person replay**
 
 Render birdview and `robot0_robotview` from the unchanged scored trajectory.
@@ -343,4 +350,3 @@ Run: `git diff --check && python3.13 -m pytest -q`
 Expected: clean diff and all tests pass. Report exact public scores and any
 remaining limitations; do not call unmeasured or hidden performance full
 score.
-

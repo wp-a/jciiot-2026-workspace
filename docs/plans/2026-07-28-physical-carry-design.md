@@ -29,11 +29,18 @@ also changes attachment-relative translation and rotation before release.
 Consequently, the public scorer can award full points while the robot-view
 replay shows an object moving without physical support.
 
-The official UI constructs the backend with `drive_mode="direct"`, but the
-loaded Tiago robot still exposes a mobile-base velocity controller through its
-normal action vector. An allowed submission skill can therefore execute
-physical base, arm, torso, head, and gripper commands with `env.step(action)`
-without modifying the official backend.
+The official UI constructs the backend with `drive_mode="direct"`. A remote
+probe on the locked simulator showed why: 100 consecutive full-scale base
+actions moved the Tiago only about 5.6 mm, while a physically grasped L1 box
+slipped by 25 mm after 83 lower-amplitude steps. Controller-only travel across
+a factory scene would therefore require roughly one hundred thousand steps and
+cannot retain the official grasp.
+
+The carry path consequently uses the same incremental direct-base convention
+as the unmodified official UI, but never applies it to a task object. The base
+joint is advanced by a bounded world step, then normal arm and gripper actions
+advance MuJoCo exactly once. The box remains a free body and can move only
+through bilateral gripper contact and simulated forces.
 
 ## Selected Architecture
 
@@ -52,11 +59,14 @@ an A* path, the held object name, and a small explicit configuration.
 At every control step it will:
 
 1. Read the current base pose and next path waypoint.
-2. Convert the desired world-frame planar velocity into the base frame.
-3. Hold the grasp yaw with a bounded angular command.
-4. Send zero-delta OSC actions to both arms, closed-gripper actions, absolute
-   hold targets for torso and head, and the velocity command for the base.
-5. Advance physics exactly once with `env.step(action)`.
+2. Convert the desired world-frame planar velocity into the base frame and a
+   bounded direct-base step using the official 20 Hz convention.
+3. Hold the grasp yaw and apply a bounded upward OSC correction from measured
+   object-height error, resisting gravity-driven slip.
+4. Send the OSC corrections, closed-gripper actions, absolute hold targets for
+   torso and head, and a zero wheel command after the base step.
+5. Advance physics exactly once with `env.step(action)` so the free object is
+   carried only by contact.
 6. Record the trajectory and verify collision state, bilateral grasp contact,
    and minimum object lift.
 
@@ -65,9 +75,9 @@ or step-budget exhaustion fails transport immediately. There is no kinematic
 fallback.
 
 The base remains holonomic and preserves the grasp orientation. This avoids
-large rotations of the held object and reduces inertial load. Speed and
-acceleration limits are intentionally conservative for the first physical
-baseline and can be tuned only after L1 passes.
+large rotations of the held object and reduces inertial load. Step size,
+acceleration, and vertical compensation remain bounded and are tuned only from
+saved L1 trajectories.
 
 ### Placement
 
@@ -121,4 +131,3 @@ Remote acceptance is staged:
 
 Public-scene scores will be reported only as public fixed-scene results, not as
 hidden-test or BienData scores.
-

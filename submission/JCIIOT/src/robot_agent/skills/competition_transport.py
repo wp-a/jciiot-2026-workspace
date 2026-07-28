@@ -17,12 +17,16 @@ class PhysicalCarryConfig:
         max_steps: int = 6000,
         k_linear: float = 0.8,
         k_angular: float = 1.0,
-        max_linear: float = 0.12,
+        max_linear: float = 0.40,
         max_angular: float = 0.08,
-        max_linear_delta: float = 0.01,
+        max_linear_delta: float = 0.04,
         max_angular_delta: float = 0.01,
+        base_control_dt: float = 0.05,
         yaw_tolerance: float = 0.04,
         object_drop_tolerance: float = 0.025,
+        vertical_hold_feedforward: float = 0.0004,
+        vertical_hold_gain: float = 0.8,
+        max_vertical_hold_delta: float = 0.003,
         descent_step: float = 0.001,
         max_descent: float = 0.12,
         minimum_descent_before_support: float = 0.008,
@@ -40,8 +44,12 @@ class PhysicalCarryConfig:
         self.max_angular = float(max_angular)
         self.max_linear_delta = float(max_linear_delta)
         self.max_angular_delta = float(max_angular_delta)
+        self.base_control_dt = float(base_control_dt)
         self.yaw_tolerance = float(yaw_tolerance)
         self.object_drop_tolerance = float(object_drop_tolerance)
+        self.vertical_hold_feedforward = float(vertical_hold_feedforward)
+        self.vertical_hold_gain = float(vertical_hold_gain)
+        self.max_vertical_hold_delta = float(max_vertical_hold_delta)
         self.descent_step = float(descent_step)
         self.max_descent = float(max_descent)
         self.minimum_descent_before_support = float(
@@ -66,6 +74,45 @@ def world_velocity_to_base_frame(world_xy, yaw: float) -> np.ndarray:
         ],
         dtype=float,
     )
+
+
+def direct_base_step_target(
+    *,
+    base_xy,
+    base_yaw: float,
+    base_command,
+    control_dt: float,
+) -> np.ndarray:
+    """Convert a base-frame velocity command into one bounded world step."""
+    base_xy = np.asarray(base_xy, dtype=float).reshape(2)
+    command = np.asarray(base_command, dtype=float).reshape(-1)
+    if command.size < 2:
+        raise ValueError("base_command must contain forward and lateral values")
+    cosine = math.cos(float(base_yaw))
+    sine = math.sin(float(base_yaw))
+    world_velocity = np.array(
+        [
+            cosine * command[0] - sine * command[1],
+            sine * command[0] + cosine * command[1],
+        ],
+        dtype=float,
+    )
+    return base_xy + world_velocity * float(control_dt)
+
+
+def vertical_hold_delta(
+    *,
+    current_z: float,
+    target_z: float,
+    feedforward: float,
+    gain: float,
+    max_delta: float,
+) -> float:
+    """Return a small upward OSC delta that resists grasped-object slip."""
+    requested = float(feedforward) + float(gain) * (
+        float(target_z) - float(current_z)
+    )
+    return float(np.clip(requested, 0.0, float(max_delta)))
 
 
 def slew_limited_command(previous, requested, max_delta) -> np.ndarray:
@@ -211,6 +258,7 @@ def run_physical_transport(
 
     hold_targets = driver.capture_hold_targets(backend)
     observation = driver.observe(backend, object_name)
+    target_object_z = float(minimum_object_z) + config.object_drop_tolerance
     minimum_observed_z = float(observation["object_pos"][2])
     previous_command = np.zeros(3, dtype=float)
     waypoint_index = 0
@@ -292,11 +340,24 @@ def run_physical_transport(
                 dtype=float,
             ),
         )
+        hold_delta = vertical_hold_delta(
+            current_z=float(observation["object_pos"][2]),
+            target_z=target_object_z,
+            feedforward=config.vertical_hold_feedforward,
+            gain=config.vertical_hold_gain,
+            max_delta=config.max_vertical_hold_delta,
+        )
+        arm_world_deltas = {
+            arm: np.array([0.0, 0.0, hold_delta], dtype=float)
+            for arm in ("right", "left")
+        }
         step_info = driver.step(
             backend,
             object_name=object_name,
             base_command=command,
             hold_targets=hold_targets,
+            arm_world_deltas=arm_world_deltas,
+            base_control_dt=config.base_control_dt,
         )
         steps += 1
         previous_command = command
@@ -387,6 +448,7 @@ class OfficialPhysicalCarryDriver:
         hold_targets,
         arm_world_deltas=None,
         gripper_value: float = 1.0,
+        base_control_dt: float = 0.05,
     ) -> dict:
         del object_name
         from robosuite.environments.factory_sorting.lift_after_grasp import (
@@ -396,6 +458,28 @@ class OfficialPhysicalCarryDriver:
 
         raw_env = backend.env
         robot = raw_env.robots[0]
+        base_command = np.asarray(base_command, dtype=float).reshape(-1)
+        if np.any(np.abs(base_command) > 0.0):
+            from robot_agent.environments.robosuite_backend import (
+                _set_base_world_yaw_direct,
+                _set_base_xy_direct,
+            )
+
+            base_xy, base_yaw = backend.get_base_pose()
+            target_xy = direct_base_step_target(
+                base_xy=base_xy,
+                base_yaw=base_yaw,
+                base_command=base_command,
+                control_dt=base_control_dt,
+            )
+            angular = float(base_command[2]) if base_command.size >= 3 else 0.0
+            _set_base_world_yaw_direct(
+                raw_env,
+                robot,
+                float(base_yaw) + angular * float(base_control_dt),
+            )
+            _set_base_xy_direct(raw_env, robot, target_xy)
+
         arm_actions = {}
         if arm_world_deltas:
             robot.composite_controller.update_state()
@@ -417,7 +501,7 @@ class OfficialPhysicalCarryDriver:
                 )
         action_parts = physical_action_parts(
             robot,
-            base_command=base_command,
+            base_command=np.zeros(3, dtype=float),
             gripper_value=gripper_value,
             hold_targets=hold_targets,
             arm_actions=arm_actions,
