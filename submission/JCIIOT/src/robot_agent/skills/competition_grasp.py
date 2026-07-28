@@ -306,7 +306,7 @@ def apply_object_grasp_profile(
         config.close_increment_interval = 1
         config.contact_settle_steps = config.close_steps + 1
         config.hold_close_pose = False
-        config.face_insertion = 0.01
+        config.face_insertion = 0.0
         config.wrist_height_trigger = float("inf")
         config.lift_height = 0.15
         config.lift_hold_steps = 20

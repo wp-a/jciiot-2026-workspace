@@ -145,6 +145,7 @@ class FakePhysicalTransportDriver:
         object_heights=None,
         collision_step=None,
         advance=True,
+        recover_success=True,
     ):
         self.base_xy = np.zeros(2, dtype=float)
         self.yaw = 0.0
@@ -152,6 +153,9 @@ class FakePhysicalTransportDriver:
         self.object_heights = list(object_heights or [1.0])
         self.collision_step = collision_step
         self.advance = bool(advance)
+        self.recover_success = bool(recover_success)
+        self.recovered_height = None
+        self.recover_calls = []
         self.steps = []
 
     def capture_hold_targets(self, _backend):
@@ -160,11 +164,16 @@ class FakePhysicalTransportDriver:
     def observe(self, _backend, _object_name):
         index = min(len(self.steps), len(self.contacts) - 1)
         height_index = min(len(self.steps), len(self.object_heights) - 1)
+        object_z = (
+            self.recovered_height
+            if self.recovered_height is not None
+            else self.object_heights[height_index]
+        )
         return {
             "base_xy": self.base_xy.copy(),
             "base_yaw": self.yaw,
             "object_pos": np.array(
-                [self.base_xy[0] + 0.5, self.base_xy[1], self.object_heights[height_index]],
+                [self.base_xy[0] + 0.5, self.base_xy[1], object_z],
                 dtype=float,
             ),
             "contacts": dict(self.contacts[index]),
@@ -199,6 +208,27 @@ class FakePhysicalTransportDriver:
 
     def record_event(self, _backend, event, **payload):
         return (event, payload)
+
+    def recover_height(
+        self,
+        _backend,
+        *,
+        object_name,
+        lift_height,
+        max_steps,
+        max_action,
+    ):
+        self.recover_calls.append(
+            {
+                "object_name": object_name,
+                "lift_height": float(lift_height),
+                "max_steps": int(max_steps),
+                "max_action": float(max_action),
+            }
+        )
+        if self.recover_success:
+            self.recovered_height = 1.0
+        return self.recover_success
 
 
 class PhysicalTransportRunnerTests(unittest.TestCase):
@@ -239,8 +269,8 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
         self.assertLess(float(result["final_distance"]), 0.02)
         self.assertTrue(
             all(
-                step["arm_world_deltas"]["right"][2] > 0.0
-                and step["arm_world_deltas"]["left"][2] > 0.0
+                step["arm_world_deltas"]["right"][2] == 0.0
+                and step["arm_world_deltas"]["left"][2] == 0.0
                 for step in driver.steps
             )
         )
@@ -318,6 +348,46 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
             driver.steps[0]["arm_world_deltas"]["right"][0],
             -driver.steps[1]["arm_world_deltas"]["right"][0],
         )
+
+    def test_object_slip_triggers_a_physical_height_recovery(self):
+        driver = FakePhysicalTransportDriver(
+            object_heights=[1.0, 0.985, 0.985, 0.985]
+        )
+        config = self.module.PhysicalCarryConfig(
+            waypoint_tolerance=0.02,
+            max_steps=20,
+            k_linear=1.0,
+            max_linear=0.10,
+            max_linear_delta=0.10,
+            height_recovery_trigger=0.01,
+            height_recovery_steps=40,
+        )
+
+        result = self.run_transport(driver, config=config)
+
+        self.assertTrue(result["success"])
+        self.assertEqual(len(driver.recover_calls), 1)
+        self.assertGreater(driver.recover_calls[0]["lift_height"], 0.0)
+
+    def test_failed_height_recovery_stops_transport_without_fallback(self):
+        driver = FakePhysicalTransportDriver(
+            object_heights=[1.0, 0.985, 0.985, 0.985],
+            recover_success=False,
+        )
+        config = self.module.PhysicalCarryConfig(
+            waypoint_tolerance=0.02,
+            max_steps=20,
+            k_linear=1.0,
+            max_linear=0.10,
+            max_linear_delta=0.10,
+            height_recovery_trigger=0.01,
+        )
+
+        result = self.run_transport(driver, config=config)
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["failure_stage"], "height_recovery")
+        self.assertEqual(len(driver.recover_calls), 1)
 
     def test_physical_action_contains_every_controlled_part(self):
         self.assertTrue(hasattr(self.module, "physical_action_parts"))

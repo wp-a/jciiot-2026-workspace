@@ -24,9 +24,12 @@ class PhysicalCarryConfig:
         base_control_dt: float = 0.05,
         yaw_tolerance: float = 0.04,
         object_drop_tolerance: float = 0.025,
-        vertical_hold_feedforward: float = 0.0004,
-        vertical_hold_gain: float = 0.8,
-        max_vertical_hold_delta: float = 0.003,
+        vertical_hold_feedforward: float = 0.0,
+        vertical_hold_gain: float = 0.0,
+        max_vertical_hold_delta: float = 0.0,
+        height_recovery_trigger: float = 0.01,
+        height_recovery_steps: int = 80,
+        height_recovery_max_action: float = 0.65,
         descent_step: float = 0.001,
         max_descent: float = 0.12,
         minimum_descent_before_support: float = 0.008,
@@ -50,6 +53,9 @@ class PhysicalCarryConfig:
         self.vertical_hold_feedforward = float(vertical_hold_feedforward)
         self.vertical_hold_gain = float(vertical_hold_gain)
         self.max_vertical_hold_delta = float(max_vertical_hold_delta)
+        self.height_recovery_trigger = float(height_recovery_trigger)
+        self.height_recovery_steps = int(height_recovery_steps)
+        self.height_recovery_max_action = float(height_recovery_max_action)
         self.descent_step = float(descent_step)
         self.max_descent = float(max_descent)
         self.minimum_descent_before_support = float(
@@ -295,6 +301,44 @@ def run_physical_transport(
         if float(observation["object_pos"][2]) < float(minimum_object_z):
             failure_stage = "object_drop"
             break
+        height_error = target_object_z - float(observation["object_pos"][2])
+        if height_error >= config.height_recovery_trigger:
+            driver.record_event(
+                backend,
+                "physical_height_recovery_start",
+                object_name=object_name,
+                lift_height=height_error,
+            )
+            recovered = driver.recover_height(
+                backend,
+                object_name=object_name,
+                lift_height=height_error,
+                max_steps=config.height_recovery_steps,
+                max_action=config.height_recovery_max_action,
+            )
+            observation = driver.observe(backend, object_name)
+            minimum_observed_z = min(
+                minimum_observed_z,
+                float(observation["object_pos"][2]),
+            )
+            recovered_height_error = (
+                target_object_z - float(observation["object_pos"][2])
+            )
+            recovered = bool(
+                recovered
+                and next_contact_stability(observation["contacts"], 0) > 0
+                and recovered_height_error < config.height_recovery_trigger
+            )
+            driver.record_event(
+                backend,
+                "physical_height_recovery_end",
+                object_name=object_name,
+                success=recovered,
+                remaining_height_error=recovered_height_error,
+            )
+            if not recovered:
+                failure_stage = "height_recovery"
+                break
 
         while waypoint_index < len(waypoints):
             delta = waypoints[waypoint_index] - np.asarray(
@@ -539,6 +583,33 @@ class OfficialPhysicalCarryDriver:
         return {
             "collision": bool((info or {}).get("has_judge_collision", False)),
         }
+
+    @staticmethod
+    def recover_height(
+        backend,
+        *,
+        object_name: str,
+        lift_height: float,
+        max_steps: int,
+        max_action: float,
+    ) -> bool:
+        from robosuite.environments.factory_sorting.lift_after_grasp import (
+            lift_grasped_object,
+        )
+
+        recorder = getattr(backend, "_record_trajectory_frame", None)
+        result = lift_grasped_object(
+            env=backend.env,
+            object_name=object_name,
+            lift_height=float(lift_height),
+            max_steps=int(max_steps),
+            hold_steps=0,
+            tolerance=min(0.003, max(0.001, float(lift_height) * 0.25)),
+            max_action=float(max_action),
+            render=False,
+            render_callback=recorder if callable(recorder) else None,
+        )
+        return bool(result.get("success", False))
 
     @staticmethod
     def record_event(backend, event: str, **payload) -> None:

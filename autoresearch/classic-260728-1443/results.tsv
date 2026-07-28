@@ -5,3 +5,4 @@ iteration	commit	physical_grasp	transport_stage	collision_frames	official_score	
 4	d42effe	yes	contact	0	0	13.795181	52.016136	discard	Two settle steps per base increment did not recover horizontal lag and increased vertical slip; contact failed after 160 physics steps.
 5	9dc4182	yes	contact	0	0	13.783210	50.675121	discard	Arm-led cycles did not prevent slip; replay reconstruction showed the left gripper lost one fingerpad after its vertical offset from the box grew to about 0.125 m.
 6	50f7394	no	grasp	0	0	13.927869	44.524643	discard	A 20 mm inward insertion exceeded the feasible grasp envelope and prevented bilateral grasp formation.
+7	a75379f	yes	contact	0	0	13.752922	50.013084	discard	A 10 mm insertion restored grasp formation but did not materially improve carry lifetime, so insertion tuning was abandoned.
