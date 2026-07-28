@@ -22,7 +22,6 @@ class PhysicalCarryConfig:
         max_linear_delta: float = 0.04,
         max_angular_delta: float = 0.01,
         base_control_dt: float = 0.05,
-        transport_settle_steps: int = 2,
         yaw_tolerance: float = 0.04,
         object_drop_tolerance: float = 0.025,
         vertical_hold_feedforward: float = 0.0004,
@@ -46,7 +45,6 @@ class PhysicalCarryConfig:
         self.max_linear_delta = float(max_linear_delta)
         self.max_angular_delta = float(max_angular_delta)
         self.base_control_dt = float(base_control_dt)
-        self.transport_settle_steps = int(transport_settle_steps)
         self.yaw_tolerance = float(yaw_tolerance)
         self.object_drop_tolerance = float(object_drop_tolerance)
         self.vertical_hold_feedforward = float(vertical_hold_feedforward)
@@ -342,8 +340,19 @@ def run_physical_transport(
                 dtype=float,
             ),
         )
+        base_xy = np.asarray(observation["base_xy"], dtype=float)
+        world_step = direct_base_step_target(
+            base_xy=base_xy,
+            base_yaw=float(observation["base_yaw"]),
+            base_command=command,
+            control_dt=config.base_control_dt,
+        ) - base_xy
+        phases = (
+            (np.zeros(3, dtype=float), world_step),
+            (command, -world_step),
+        )
         abort = False
-        for substep in range(1 + max(0, config.transport_settle_steps)):
+        for phase_base_command, phase_arm_xy in phases:
             if steps >= config.max_steps:
                 break
             observation = driver.observe(backend, object_name)
@@ -355,15 +364,16 @@ def run_physical_transport(
                 max_delta=config.max_vertical_hold_delta,
             )
             arm_world_deltas = {
-                arm: np.array([0.0, 0.0, hold_delta], dtype=float)
+                arm: np.array(
+                    [phase_arm_xy[0], phase_arm_xy[1], hold_delta],
+                    dtype=float,
+                )
                 for arm in ("right", "left")
             }
             step_info = driver.step(
                 backend,
                 object_name=object_name,
-                base_command=(
-                    command if substep == 0 else np.zeros(3, dtype=float)
-                ),
+                base_command=phase_base_command,
                 hold_targets=hold_targets,
                 arm_world_deltas=arm_world_deltas,
                 base_control_dt=config.base_control_dt,

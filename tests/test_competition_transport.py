@@ -292,7 +292,7 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
         self.assertEqual(result["failure_stage"], "timeout")
         self.assertEqual(len(driver.steps), 3)
 
-    def test_each_base_increment_is_followed_by_physics_settle_steps(self):
+    def test_arms_lead_object_before_base_catches_up(self):
         driver = FakePhysicalTransportDriver()
         config = self.module.PhysicalCarryConfig(
             waypoint_tolerance=0.02,
@@ -300,7 +300,6 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
             k_linear=1.0,
             max_linear=0.08,
             max_linear_delta=0.08,
-            transport_settle_steps=2,
         )
 
         result = self.run_transport(
@@ -310,10 +309,15 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
         )
 
         self.assertTrue(result["success"])
-        self.assertEqual(len(driver.steps), 3)
-        self.assertGreater(driver.steps[0]["base_command"][0], 0.0)
-        np.testing.assert_allclose(driver.steps[1]["base_command"], np.zeros(3))
-        np.testing.assert_allclose(driver.steps[2]["base_command"], np.zeros(3))
+        self.assertEqual(len(driver.steps), 2)
+        np.testing.assert_allclose(driver.steps[0]["base_command"], np.zeros(3))
+        self.assertGreater(driver.steps[0]["arm_world_deltas"]["right"][0], 0.0)
+        self.assertGreater(driver.steps[1]["base_command"][0], 0.0)
+        self.assertLess(driver.steps[1]["arm_world_deltas"]["right"][0], 0.0)
+        self.assertAlmostEqual(
+            driver.steps[0]["arm_world_deltas"]["right"][0],
+            -driver.steps[1]["arm_world_deltas"]["right"][0],
+        )
 
     def test_physical_action_contains_every_controlled_part(self):
         self.assertTrue(hasattr(self.module, "physical_action_parts"))
