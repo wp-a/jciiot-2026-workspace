@@ -78,13 +78,14 @@ experiments:
   baseline_value: null
   best_value: null
   total_runs: 0
-  next_experiment: "experiments/h1-explicit-pose-perturbation/protocol.md"
+  active_protocol: "experiments/h1-explicit-pose-perturbation/protocol.md"
+  next_experiment: "Run nominal L1/L5 sanity, then five pre-registered L1 small-pose runs."
   trajectory: []
 
 outer_loop:
   cycle: 0
   last_direction: null
-  last_reflection: "Bootstrap complete; measure H1 before modifying the incumbent."
+  last_reflection: "H1 protocol locked; do not modify the incumbent until all seven registered runs are retained and aggregated."
 
 workspace:
   findings: "findings.md"
