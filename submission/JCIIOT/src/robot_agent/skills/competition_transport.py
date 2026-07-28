@@ -309,7 +309,7 @@ def run_physical_transport(
                 object_name=object_name,
                 lift_height=height_error,
             )
-            recovered = driver.recover_height(
+            controller_success = driver.recover_height(
                 backend,
                 object_name=object_name,
                 lift_height=height_error,
@@ -325,8 +325,7 @@ def run_physical_transport(
                 target_object_z - float(observation["object_pos"][2])
             )
             recovered = bool(
-                recovered
-                and next_contact_stability(observation["contacts"], 0) > 0
+                next_contact_stability(observation["contacts"], 0) > 0
                 and recovered_height_error < config.height_recovery_trigger
             )
             driver.record_event(
@@ -334,6 +333,7 @@ def run_physical_transport(
                 "physical_height_recovery_end",
                 object_name=object_name,
                 success=recovered,
+                controller_success=bool(controller_success),
                 remaining_height_error=recovered_height_error,
             )
             if not recovered:

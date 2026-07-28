@@ -146,6 +146,7 @@ class FakePhysicalTransportDriver:
         collision_step=None,
         advance=True,
         recover_success=True,
+        recovered_height_result=None,
     ):
         self.base_xy = np.zeros(2, dtype=float)
         self.yaw = 0.0
@@ -154,6 +155,7 @@ class FakePhysicalTransportDriver:
         self.collision_step = collision_step
         self.advance = bool(advance)
         self.recover_success = bool(recover_success)
+        self.recovered_height_result = recovered_height_result
         self.recovered_height = None
         self.recover_calls = []
         self.steps = []
@@ -226,7 +228,9 @@ class FakePhysicalTransportDriver:
                 "max_action": float(max_action),
             }
         )
-        if self.recover_success:
+        if self.recovered_height_result is not None:
+            self.recovered_height = float(self.recovered_height_result)
+        elif self.recover_success:
             self.recovered_height = 1.0
         return self.recover_success
 
@@ -387,6 +391,26 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
 
         self.assertFalse(result["success"])
         self.assertEqual(result["failure_stage"], "height_recovery")
+        self.assertEqual(len(driver.recover_calls), 1)
+
+    def test_measured_recovery_accepts_height_even_if_helper_target_was_stricter(self):
+        driver = FakePhysicalTransportDriver(
+            object_heights=[1.0, 0.985, 0.985, 0.985],
+            recover_success=False,
+            recovered_height_result=0.995,
+        )
+        config = self.module.PhysicalCarryConfig(
+            waypoint_tolerance=0.02,
+            max_steps=20,
+            k_linear=1.0,
+            max_linear=0.10,
+            max_linear_delta=0.10,
+            height_recovery_trigger=0.01,
+        )
+
+        result = self.run_transport(driver, config=config)
+
+        self.assertTrue(result["success"])
         self.assertEqual(len(driver.recover_calls), 1)
 
     def test_physical_action_contains_every_controlled_part(self):
