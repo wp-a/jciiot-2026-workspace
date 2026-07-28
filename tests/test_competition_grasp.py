@@ -80,8 +80,13 @@ class ScriptedDriver:
         self.calls.append("lift")
         return self.lift_success
 
-    def attach_for_transport(self, backend, object_name):
-        self.calls.append("attach")
+    def physical_hold_metadata(self, backend, object_name):
+        self.calls.append("hold_metadata")
+        return {
+            "base_yaw": 0.25,
+            "object_pos": [1.0, 2.0, 1.15],
+            "object_z": 1.15,
+        }
 
 
 class CompetitionGraspTests(unittest.TestCase):
@@ -410,21 +415,12 @@ class CompetitionGraspTests(unittest.TestCase):
             0.0,
         )
 
-    def test_l5_transport_starts_at_backend_center_attachment(self):
-        np.testing.assert_allclose(
-            self.module.transport_attachment_relative_xy(
-                "white_tote_b01_left_front",
-                np.array([1.03, -0.21]),
-            ),
-            [0.0, 0.0],
-        )
-        np.testing.assert_allclose(
-            self.module.transport_attachment_relative_xy(
-                "green_tote_b01_lower",
-                np.array([1.03, -0.21]),
-            ),
-            [1.03, -0.21],
-        )
+    def test_grasp_skill_has_no_kinematic_transport_path(self):
+        source = MODULE_PATH.read_text(encoding="utf-8")
+
+        self.assertNotIn("transport_attachment", source)
+        self.assertNotIn("attach_for_transport", source)
+        self.assertNotIn("_transport_stow", source)
 
     def test_container_profile_restores_scored_l1_grasp_parameters(self):
         config = self.module.ScriptedGraspConfig()
@@ -646,8 +642,16 @@ class CompetitionGraspTests(unittest.TestCase):
                 "wrist_adjust",
                 "close",
                 "lift",
-                "attach",
+                "hold_metadata",
             ],
+        )
+        self.assertEqual(
+            result["hold"],
+            {
+                "base_yaw": 0.25,
+                "object_pos": [1.0, 2.0, 1.15],
+                "object_z": 1.15,
+            },
         )
         self.assertEqual(backend.events[0]["name"], "grasp_start")
         self.assertEqual(backend.events[-1]["name"], "grasp_end")
@@ -730,7 +734,7 @@ class CompetitionGraspTests(unittest.TestCase):
                 "close",
                 "polish",
                 "lift",
-                "attach",
+                "hold_metadata",
             ],
         )
 
@@ -772,7 +776,7 @@ class CompetitionGraspTests(unittest.TestCase):
                 "wrist_adjust",
                 "close",
                 "lift",
-                "attach",
+                "hold_metadata",
             ],
         )
 

@@ -81,7 +81,6 @@ class ScriptedGraspConfig:
         lift_hold_steps: int = 0,
         lift_tolerance: float = 0.01,
         lift_follower_lead: float = 0.003,
-        transport_stow_steps: int = 120,
         swap_arm_targets: bool = False,
         clearance_prepared: bool = False,
     ) -> None:
@@ -123,7 +122,6 @@ class ScriptedGraspConfig:
         self.lift_hold_steps = int(lift_hold_steps)
         self.lift_tolerance = float(lift_tolerance)
         self.lift_follower_lead = float(lift_follower_lead)
-        self.transport_stow_steps = int(transport_stow_steps)
         self.swap_arm_targets = bool(swap_arm_targets)
         self.clearance_prepared = bool(clearance_prepared)
 
@@ -317,17 +315,6 @@ def apply_object_grasp_profile(
         config.station_side_reach_offset = 0.04
         config.clearance_translate_steps = 360
     return config
-
-
-def transport_attachment_relative_xy(
-    object_name: str,
-    captured_relative_xy: np.ndarray,
-) -> np.ndarray:
-    """Avoid sweeping remaining L5 objects with a stale grasp offset."""
-    relative_xy = np.asarray(captured_relative_xy, dtype=float).reshape(2)
-    if uses_station_side_tote_grasp(object_name):
-        return np.zeros(2, dtype=float)
-    return relative_xy.copy()
 
 
 def station_side_tote_grasp_targets(
@@ -594,10 +581,6 @@ class OfficialScriptedGraspDriver:
             grasp_status,
             gripper_end_center_pos,
         )
-        from robosuite.environments.factory_sorting.transport_attachment import (
-            capture_transport_attachment,
-        )
-
         return {
             "arm_action": arm_delta_to_normalized_action,
             "build_action": build_action,
@@ -609,7 +592,6 @@ class OfficialScriptedGraspDriver:
             "get_targets": get_target_positions,
             "grasp_status": grasp_status,
             "gripper_position": gripper_end_center_pos,
-            "attach": capture_transport_attachment,
         }
 
     @staticmethod
@@ -617,23 +599,6 @@ class OfficialScriptedGraspDriver:
         recorder = getattr(backend, "_record_trajectory_frame", None)
         if callable(recorder):
             recorder(_env=raw_env)
-
-    def _remember_transport_stow(self, raw_env, config) -> None:
-        if hasattr(self, "_transport_stow"):
-            return
-        model = raw_env.sim.model
-        data = raw_env.sim.data
-        joint_names = [
-            f"robot0_arm_{arm}_{index}_joint"
-            for arm in ARMS
-            for index in range(1, 7)
-        ]
-        qpos_addrs = [model.get_joint_qpos_addr(name) for name in joint_names]
-        self._transport_stow = (
-            joint_names,
-            data.qpos[qpos_addrs].copy(),
-        )
-        self._transport_stow_steps = config.transport_stow_steps
 
     def _seed_station_side_clearance(self, backend, object_name, config) -> bool:
         target = station_side_clearance_joint_seed(object_name)
@@ -843,7 +808,6 @@ class OfficialScriptedGraspDriver:
         helpers = self._helpers()
         raw_env = backend.env
         robot = raw_env.robots[0]
-        self._remember_transport_stow(raw_env, config)
         current = {
             arm: helpers["gripper_position"](raw_env, robot, arm)
             for arm in ARMS
@@ -868,7 +832,6 @@ class OfficialScriptedGraspDriver:
         )
 
     def move_above_grasp_sites(self, backend, object_name, config) -> bool:
-        self._remember_transport_stow(backend.env, config)
         if not self._seed_station_side_clearance(
             backend,
             object_name,
@@ -1355,56 +1318,20 @@ class OfficialScriptedGraspDriver:
             and all(bool(contacts.get(arm, False)) for arm in ARMS)
         )
 
-    def attach_for_transport(self, backend, object_name) -> None:
+    def physical_hold_metadata(self, backend, object_name) -> dict[str, Any]:
+        """Return read-only state needed by the physical transport controller."""
         helpers = self._helpers()
-        attachment = helpers["attach"](backend.env, object_name)
-        if isinstance(attachment, dict) and "relative_xy" in attachment:
-            attachment["relative_xy"] = transport_attachment_relative_xy(
-                object_name,
-                attachment["relative_xy"],
-            )
-        backend._held_crate_name = object_name
-        backend._held_crate_body_id = backend.env.obj_body_id.get(object_name)
-        self._record(backend, backend.env)
-
-        stow = getattr(self, "_transport_stow", None)
-        if stow is None:
-            return
-        raw_env = backend.env
-        robot = raw_env.robots[0]
-        model = raw_env.sim.model
-        data = raw_env.sim.data
-        joint_names, target = stow
-        qpos_addrs = [model.get_joint_qpos_addr(name) for name in joint_names]
-        start = data.qpos[qpos_addrs].copy()
-
-        from robot_agent.environments.robosuite_backend import (
-            _navigation_collisions,
-        )
-
-        path = joint_interpolation_path(
-            start,
-            target,
-            steps=getattr(self, "_transport_stow_steps", 120),
-        )
-        for values in path:
-            data.qpos[qpos_addrs] = values
-            raw_env.sim.forward()
-            collisions = _navigation_collisions(
-                raw_env,
-                robot,
-                getattr(backend, "_ignore_collision_geom", ()),
-            )
-            if collisions:
-                data.qpos[qpos_addrs] = start
-                raw_env.sim.forward()
-                synchronize_controller_goals(robot)
-                self._record(backend, raw_env)
-                raise RuntimeError(
-                    f"transport stow path collided: {collisions[0]}"
-                )
-            self._record(backend, raw_env)
-        synchronize_controller_goals(robot)
+        base_xy, base_yaw = backend.get_base_pose()
+        object_pos = np.asarray(
+            helpers["object_center"](backend.env, object_name),
+            dtype=float,
+        ).copy()
+        return {
+            "base_xy": np.asarray(base_xy, dtype=float).tolist(),
+            "base_yaw": float(base_yaw),
+            "object_pos": object_pos.tolist(),
+            "object_z": float(object_pos[2]),
+        }
 
 
 def run_scripted_grasp(
@@ -1476,12 +1403,13 @@ def run_scripted_grasp(
         contacts=contacts,
         lift_success=lift_success,
     )
+    hold = None
     if success:
         try:
-            driver.attach_for_transport(backend, object_name)
+            hold = dict(driver.physical_hold_metadata(backend, object_name))
         except Exception as exc:
             success = False
-            failure_stage = "transport_attachment"
+            failure_stage = "hold_observation"
             error = f"{type(exc).__name__}: {exc}"
 
     return {
@@ -1490,6 +1418,7 @@ def run_scripted_grasp(
         "object_name": object_name,
         "contacts": {arm: bool(contacts.get(arm, False)) for arm in ARMS},
         "lift_success": bool(lift_success),
+        "hold": hold,
         "failure_stage": failure_stage,
         "error": error,
     }
