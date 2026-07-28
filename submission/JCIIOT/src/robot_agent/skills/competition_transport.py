@@ -17,7 +17,7 @@ class PhysicalCarryConfig:
         max_steps: int = 6000,
         k_linear: float = 0.8,
         k_angular: float = 1.0,
-        max_linear: float = 0.40,
+        max_linear: float = 0.12,
         max_angular: float = 0.08,
         max_linear_delta: float = 0.04,
         max_angular_delta: float = 0.01,

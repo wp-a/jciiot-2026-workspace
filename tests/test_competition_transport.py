@@ -123,6 +123,19 @@ class PhysicalTransportGeometryTests(unittest.TestCase):
 
         np.testing.assert_allclose(target, [1.0, 2.02], atol=1e-9)
 
+    def test_default_direct_base_step_is_no_more_than_six_millimetres(self):
+        module = load_module()
+        config = module.PhysicalCarryConfig()
+
+        target = module.direct_base_step_target(
+            base_xy=np.zeros(2),
+            base_yaw=0.0,
+            base_command=np.array([config.max_linear, 0.0, 0.0]),
+            control_dt=config.base_control_dt,
+        )
+
+        self.assertLessEqual(float(np.linalg.norm(target)), 0.006 + 1e-12)
+
 
 class FakePhysicalTransportDriver:
     def __init__(
