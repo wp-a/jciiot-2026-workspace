@@ -437,7 +437,7 @@ class CompetitionGraspTests(unittest.TestCase):
         self.assertEqual(config.close_increment_interval, 1)
         self.assertEqual(config.contact_settle_steps, 81)
         self.assertFalse(config.hold_close_pose)
-        self.assertEqual(config.face_insertion, 0.02)
+        self.assertEqual(config.face_insertion, 0.01)
         self.assertEqual(config.lift_height, 0.15)
         self.assertEqual(config.lift_hold_steps, 20)
         self.assertEqual(config.lift_tolerance, 0.02)
