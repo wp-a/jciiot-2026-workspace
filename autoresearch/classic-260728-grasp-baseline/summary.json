@@ -1,0 +1,49 @@
+{
+  "version": "official_physical_grasp_baseline_summary_v1",
+  "official_commit": "0dcdddf18a9e694569aa1433cdfc04eb097fed78",
+  "checkpoint": {
+    "path": "/home/user/jciiot-2026/assets/official-lfs-0dcdddf/model_epoch_150.pth",
+    "sha256": "ef5910f6a9f6309b5ced617762dffeb1169a8b0cfcea892d158e6b483252169f",
+    "size_bytes": 139543773
+  },
+  "seed": 0,
+  "planned_runs": 11,
+  "recorded_runs": 11,
+  "successful_runs": 0,
+  "success_rate": 0,
+  "collision_runs": 2,
+  "infrastructure_errors": 0,
+  "unsupported_official_targets": 1,
+  "per_level": {
+    "L1": {
+      "runs": 2,
+      "successes": 0,
+      "collisions": 0,
+      "unsupported": 1
+    },
+    "L2": {
+      "runs": 2,
+      "successes": 0,
+      "collisions": 0,
+      "unsupported": 0
+    },
+    "L3": {
+      "runs": 2,
+      "successes": 0,
+      "collisions": 2,
+      "unsupported": 0
+    },
+    "L4": {
+      "runs": 2,
+      "successes": 0,
+      "collisions": 0,
+      "unsupported": 0
+    },
+    "L5": {
+      "runs": 3,
+      "successes": 0,
+      "collisions": 0,
+      "unsupported": 0
+    }
+  }
+}

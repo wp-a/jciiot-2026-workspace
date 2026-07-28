@@ -1,0 +1,12 @@
+level	object_name	seed	policy_target_supported	derived_yaw	physical_success	failure_stage	collision	lifted_m	infrastructure_error	elapsed_s
+L1	line_5_container_h01_near	0	true	3.141592653589793	false	grasp	false	-0.000004845592123547959		21.688339
+L1	line_5_container_h01_far	0	false	-2.17504268656236	false	unsupported_official_target	false	0.0		2.270997
+L2	green_tote_b01_upper	0	true	2.5924979041123346	false	grasp	false	-0.000006481261822122164		20.28708
+L2	green_tote_b01_lower	0	true	-2.5648725895883238	false	grasp	false	-0.000006481261822122164		20.294246
+L3	blue_tote_b01_far_right	0	true	1.9094972034432074	false	collision	true	-0.000004845592048940972		22.255252
+L3	blue_tote_b01_near_right	0	true	1.2257409214073713	false	collision	true	-0.000004845592048940972		22.400031
+L4	blue_container_h01_back_upper	0	true	2.92950357839848	false	grasp	false	-0.000004845592123547959		25.522741
+L4	blue_container_h01_back_lower	0	true	-2.84807309808906	false	grasp	false	-0.000004845592123547959		24.378523
+L5	white_tote_b01_left_center	0	true	-3.1064788148307487	false	grasp	false	-0.000006481261822122164		24.252723
+L5	white_tote_b01_left_front	0	true	-2.7801239977803807	false	grasp	false	-0.000006481261822122164		24.561516
+L5	white_tote_b01_left_back	0	true	2.8277127927137813	false	grasp	false	-0.000006481261822122164		24.438462

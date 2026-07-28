@@ -1,0 +1,427 @@
+{
+  "checkpoint": {
+    "path": "/home/user/jciiot-2026/assets/official-lfs-0dcdddf/model_epoch_150.pth",
+    "sha256": "ef5910f6a9f6309b5ced617762dffeb1169a8b0cfcea892d158e6b483252169f",
+    "size_bytes": 139543773
+  },
+  "jobs": [
+    {
+      "env_name": "FactorySorting7_3FO3ERFKY9RN",
+      "level": "L4",
+      "object_name": "blue_container_h01_back_upper",
+      "scene_prefix": "factory_sorting_7_3fo3erfky9rn",
+      "seed": 0,
+      "source": "input_2",
+      "task_index": 3
+    },
+    {
+      "env_name": "FactorySorting7_3FO3ERFKY9RN",
+      "level": "L4",
+      "object_name": "blue_container_h01_back_lower",
+      "scene_prefix": "factory_sorting_7_3fo3erfky9rn",
+      "seed": 0,
+      "source": "input_2",
+      "task_index": 3
+    },
+    {
+      "env_name": "FactorySorting9_3FO3ERT2C5FP",
+      "level": "L5",
+      "object_name": "white_tote_b01_left_center",
+      "scene_prefix": "factory_sorting_9_3fo3ert2c5fp",
+      "seed": 0,
+      "source": "input_1",
+      "task_index": 4
+    },
+    {
+      "env_name": "FactorySorting9_3FO3ERT2C5FP",
+      "level": "L5",
+      "object_name": "white_tote_b01_left_front",
+      "scene_prefix": "factory_sorting_9_3fo3ert2c5fp",
+      "seed": 0,
+      "source": "input_1",
+      "task_index": 4
+    },
+    {
+      "env_name": "FactorySorting9_3FO3ERT2C5FP",
+      "level": "L5",
+      "object_name": "white_tote_b01_left_back",
+      "scene_prefix": "factory_sorting_9_3fo3ert2c5fp",
+      "seed": 0,
+      "source": "input_1",
+      "task_index": 4
+    }
+  ],
+  "official_commit": "0dcdddf18a9e694569aa1433cdfc04eb097fed78",
+  "records": [
+    {
+      "collision": false,
+      "derived_yaw": 2.92950357839848,
+      "elapsed_s": 25.522741,
+      "env_name": "FactorySorting7_3FO3ERFKY9RN",
+      "failure_stage": "grasp",
+      "final_object_center_xyz": [
+        -9.848312,
+        5.343394,
+        1.3493606521965824
+      ],
+      "fingerpad_contacts": {
+        "left": {
+          "left_fingerpad": false,
+          "right_fingerpad": false
+        },
+        "right": {
+          "left_fingerpad": false,
+          "right_fingerpad": false
+        }
+      },
+      "finished_at": "2026-07-28T08:37:40.696337+00:00",
+      "grasp_status": {
+        "left": false,
+        "right": false
+      },
+      "infrastructure_error": null,
+      "level": "L4",
+      "lift_result": {
+        "failure_reason": "object is not grasped by both grippers: {'right': False, 'left': False}",
+        "success": false
+      },
+      "lifted_m": -4.845592123547959e-06,
+      "object_name": "blue_container_h01_back_upper",
+      "physical_success": false,
+      "policy_grasp_success": false,
+      "policy_target_supported": true,
+      "pre_lift_fingerpad_contacts": {
+        "left": {
+          "left_fingerpad": false,
+          "right_fingerpad": false
+        },
+        "right": {
+          "left_fingerpad": false,
+          "right_fingerpad": false
+        }
+      },
+      "pre_lift_grasp_status": {
+        "left": false,
+        "right": false
+      },
+      "probe_object_center_xyz": [
+        -9.848312,
+        5.343394,
+        1.349365497788706
+      ],
+      "probe_replay_position_error_m": 0.0,
+      "scene_prefix": "factory_sorting_7_3fo3erfky9rn",
+      "seed": 0,
+      "semantic_approach_xy": [
+        -8.3,
+        5.01
+      ],
+      "source": "input_2",
+      "start_object_center_xyz": [
+        -9.848312,
+        5.343394,
+        1.349365497788706
+      ],
+      "started_at": "2026-07-28T08:37:15.173621+00:00",
+      "task_index": 3
+    },
+    {
+      "collision": false,
+      "derived_yaw": -2.84807309808906,
+      "elapsed_s": 24.378523,
+      "env_name": "FactorySorting7_3FO3ERFKY9RN",
+      "failure_stage": "grasp",
+      "final_object_center_xyz": [
+        -9.848312,
+        4.542023,
+        1.3389786521965825
+      ],
+      "fingerpad_contacts": {
+        "left": {
+          "left_fingerpad": false,
+          "right_fingerpad": false
+        },
+        "right": {
+          "left_fingerpad": false,
+          "right_fingerpad": false
+        }
+      },
+      "finished_at": "2026-07-28T08:38:05.075714+00:00",
+      "grasp_status": {
+        "left": false,
+        "right": false
+      },
+      "infrastructure_error": null,
+      "level": "L4",
+      "lift_result": {
+        "failure_reason": "object is not grasped by both grippers: {'right': False, 'left': False}",
+        "success": false
+      },
+      "lifted_m": -4.845592123547959e-06,
+      "object_name": "blue_container_h01_back_lower",
+      "physical_success": false,
+      "policy_grasp_success": false,
+      "policy_target_supported": true,
+      "pre_lift_fingerpad_contacts": {
+        "left": {
+          "left_fingerpad": false,
+          "right_fingerpad": false
+        },
+        "right": {
+          "left_fingerpad": false,
+          "right_fingerpad": false
+        }
+      },
+      "pre_lift_grasp_status": {
+        "left": false,
+        "right": false
+      },
+      "probe_object_center_xyz": [
+        -9.848312,
+        4.542023,
+        1.338983497788706
+      ],
+      "probe_replay_position_error_m": 0.0,
+      "scene_prefix": "factory_sorting_7_3fo3erfky9rn",
+      "seed": 0,
+      "semantic_approach_xy": [
+        -8.3,
+        5.01
+      ],
+      "source": "input_2",
+      "start_object_center_xyz": [
+        -9.848312,
+        4.542023,
+        1.338983497788706
+      ],
+      "started_at": "2026-07-28T08:37:40.697194+00:00",
+      "task_index": 3
+    },
+    {
+      "collision": false,
+      "derived_yaw": -3.1064788148307487,
+      "elapsed_s": 24.252723,
+      "env_name": "FactorySorting9_3FO3ERT2C5FP",
+      "failure_stage": "grasp",
+      "final_object_center_xyz": [
+        -14.674088,
+        4.954705,
+        1.4889781521965826
+      ],
+      "fingerpad_contacts": {
+        "left": {
+          "left_fingerpad": false,
+          "right_fingerpad": false
+        },
+        "right": {
+          "left_fingerpad": false,
+          "right_fingerpad": false
+        }
+      },
+      "finished_at": "2026-07-28T08:38:29.329396+00:00",
+      "grasp_status": {
+        "left": false,
+        "right": false
+      },
+      "infrastructure_error": null,
+      "level": "L5",
+      "lift_result": {
+        "failure_reason": "object is not grasped by both grippers: {'right': False, 'left': False}",
+        "success": false
+      },
+      "lifted_m": -6.481261822122164e-06,
+      "object_name": "white_tote_b01_left_center",
+      "physical_success": false,
+      "policy_grasp_success": false,
+      "policy_target_supported": true,
+      "pre_lift_fingerpad_contacts": {
+        "left": {
+          "left_fingerpad": false,
+          "right_fingerpad": false
+        },
+        "right": {
+          "left_fingerpad": false,
+          "right_fingerpad": false
+        }
+      },
+      "pre_lift_grasp_status": {
+        "left": false,
+        "right": false
+      },
+      "probe_object_center_xyz": [
+        -14.674088,
+        4.954705,
+        1.4889846334584047
+      ],
+      "probe_replay_position_error_m": 0.0,
+      "scene_prefix": "factory_sorting_9_3fo3ert2c5fp",
+      "seed": 0,
+      "semantic_approach_xy": [
+        -13.1,
+        5.01
+      ],
+      "source": "input_1",
+      "start_object_center_xyz": [
+        -14.674088,
+        4.954705,
+        1.4889846334584047
+      ],
+      "started_at": "2026-07-28T08:38:05.076669+00:00",
+      "task_index": 4
+    },
+    {
+      "collision": false,
+      "derived_yaw": -2.7801239977803807,
+      "elapsed_s": 24.561516,
+      "env_name": "FactorySorting9_3FO3ERT2C5FP",
+      "failure_stage": "grasp",
+      "final_object_center_xyz": [
+        -14.674088,
+        4.414868,
+        1.4889781521965826
+      ],
+      "fingerpad_contacts": {
+        "left": {
+          "left_fingerpad": false,
+          "right_fingerpad": false
+        },
+        "right": {
+          "left_fingerpad": false,
+          "right_fingerpad": false
+        }
+      },
+      "finished_at": "2026-07-28T08:38:53.892544+00:00",
+      "grasp_status": {
+        "left": false,
+        "right": false
+      },
+      "infrastructure_error": null,
+      "level": "L5",
+      "lift_result": {
+        "failure_reason": "object is not grasped by both grippers: {'right': False, 'left': False}",
+        "success": false
+      },
+      "lifted_m": -6.481261822122164e-06,
+      "object_name": "white_tote_b01_left_front",
+      "physical_success": false,
+      "policy_grasp_success": false,
+      "policy_target_supported": true,
+      "pre_lift_fingerpad_contacts": {
+        "left": {
+          "left_fingerpad": false,
+          "right_fingerpad": false
+        },
+        "right": {
+          "left_fingerpad": false,
+          "right_fingerpad": false
+        }
+      },
+      "pre_lift_grasp_status": {
+        "left": false,
+        "right": false
+      },
+      "probe_object_center_xyz": [
+        -14.674088,
+        4.414868,
+        1.4889846334584047
+      ],
+      "probe_replay_position_error_m": 0.0,
+      "scene_prefix": "factory_sorting_9_3fo3ert2c5fp",
+      "seed": 0,
+      "semantic_approach_xy": [
+        -13.1,
+        5.01
+      ],
+      "source": "input_1",
+      "start_object_center_xyz": [
+        -14.674088,
+        4.414868,
+        1.4889846334584047
+      ],
+      "started_at": "2026-07-28T08:38:29.331029+00:00",
+      "task_index": 4
+    },
+    {
+      "collision": false,
+      "derived_yaw": 2.8277127927137813,
+      "elapsed_s": 24.438462,
+      "env_name": "FactorySorting9_3FO3ERT2C5FP",
+      "failure_stage": "grasp",
+      "final_object_center_xyz": [
+        -14.674088,
+        5.520966,
+        1.4889781521965826
+      ],
+      "fingerpad_contacts": {
+        "left": {
+          "left_fingerpad": false,
+          "right_fingerpad": false
+        },
+        "right": {
+          "left_fingerpad": false,
+          "right_fingerpad": false
+        }
+      },
+      "finished_at": "2026-07-28T08:39:18.332388+00:00",
+      "grasp_status": {
+        "left": false,
+        "right": false
+      },
+      "infrastructure_error": null,
+      "level": "L5",
+      "lift_result": {
+        "failure_reason": "object is not grasped by both grippers: {'right': False, 'left': False}",
+        "success": false
+      },
+      "lifted_m": -6.481261822122164e-06,
+      "object_name": "white_tote_b01_left_back",
+      "physical_success": false,
+      "policy_grasp_success": false,
+      "policy_target_supported": true,
+      "pre_lift_fingerpad_contacts": {
+        "left": {
+          "left_fingerpad": false,
+          "right_fingerpad": false
+        },
+        "right": {
+          "left_fingerpad": false,
+          "right_fingerpad": false
+        }
+      },
+      "pre_lift_grasp_status": {
+        "left": false,
+        "right": false
+      },
+      "probe_object_center_xyz": [
+        -14.674088,
+        5.520966,
+        1.4889846334584047
+      ],
+      "probe_replay_position_error_m": 0.0,
+      "scene_prefix": "factory_sorting_9_3fo3ert2c5fp",
+      "seed": 0,
+      "semantic_approach_xy": [
+        -13.1,
+        5.01
+      ],
+      "source": "input_1",
+      "start_object_center_xyz": [
+        -14.674088,
+        5.520966,
+        1.4889846334584047
+      ],
+      "started_at": "2026-07-28T08:38:53.893932+00:00",
+      "task_index": 4
+    }
+  ],
+  "summary": {
+    "collision_runs": 0,
+    "infrastructure_errors": 0,
+    "missing_runs": 0,
+    "planned_runs": 5,
+    "recorded_runs": 5,
+    "success_rate": 0.0,
+    "successful_runs": 0
+  },
+  "version": "official_physical_grasp_baseline_v1"
+}

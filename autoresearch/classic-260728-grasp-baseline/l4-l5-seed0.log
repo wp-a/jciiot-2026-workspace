@@ -1,0 +1,150 @@
+[robosuite WARNING] No private macro file found! (macros.py:57)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:58)
+[robosuite WARNING] To setup, run: python /home/user/jciiot-2026/candidates/competition-entry-260839a/JCIIOT/robosuite/robosuite/scripts/setup_macros.py (macros.py:59)
+[robosuite WARNING] Could not import robosuite_models. Some robots may not be available. If you want to use these robots, please install robosuite_models from source (https://github.com/ARISE-Initiative/robosuite_models) or through pip install. (__init__.py:31)
+[robosuite WARNING] Could not load the mink-based whole-body IK. Make sure you install related import properly (e.g. pip install mink==0.0.5), otherwise you will not be able to use the default IK controller setting for GR1 robot. (__init__.py:41)
+[robosuite INFO] Loading controller configuration from: /home/user/jciiot-2026/candidates/competition-entry-260839a/JCIIOT/robosuite/robosuite/controllers/config/robots/default_tiago.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: /home/user/jciiot-2026/candidates/competition-entry-260839a/JCIIOT/robosuite/robosuite/controllers/config/robots/default_tiago.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: /home/user/jciiot-2026/candidates/competition-entry-260839a/JCIIOT/robosuite/robosuite/controllers/config/robots/default_tiago.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: /home/user/jciiot-2026/candidates/competition-entry-260839a/JCIIOT/robosuite/robosuite/controllers/config/robots/default_tiago.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: /home/user/jciiot-2026/candidates/competition-entry-260839a/JCIIOT/robosuite/robosuite/controllers/config/robots/default_tiago.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: /home/user/jciiot-2026/candidates/competition-entry-260839a/JCIIOT/robosuite/robosuite/controllers/config/robots/default_tiago.json (composite_controller_factory.py:121)
+
+============= Initialized Observation Utils with Obs Spec =============
+
+using obs modality: low_dim with keys: ['robot0_left_gripper_qpos', 'robot0_right_eef_quat', 'robot0_left_eef_quat', 'robot0_left_eef_pos', 'robot0_right_eef_pos', 'robot0_right_gripper_qpos']
+using obs modality: rgb with keys: ['robot0_robotview_image']
+using obs modality: depth with keys: []
+using obs modality: scan with keys: []
+Created GPT_Backbone model with number of parameters: 396032
+Loaded robomimic checkpoint: /home/user/jciiot-2026/assets/official-lfs-0dcdddf/model_epoch_150.pth
+Evaluation device: cuda:0
+Evaluation factory scene: FactorySorting7_3FO3ERFKY9RN
+Evaluation factory scene: FactorySorting7_3FO3ERFKY9RN
+Target object: blue_container_h01_back_upper
+Robot base xy at reset: (-8.299999, 5.010000)
+Tracking sites: {'right': 'blue_container_h01_back_upper_right_grasp_site', 'left': 'blue_container_h01_back_upper_left_grasp_site'}
+Below-site grasp targets: {'right': array([-9.630312  ,  5.509394  ,  1.31436166]), 'left': array([-9.630312  ,  5.177394  ,  1.31436166])}
+wrapped_env_grasp_start_pose: x=-8.299999, y=5.010000, yaw=2.929503
+Executing grasp policy on the current robomimic-wrapped environment without reset_to
+ObservationKeyToModalityDict: object not found, adding object to mapping with assumed low_dim modality!
+ObservationKeyToModalityDict: robot0_joint_pos not found, adding robot0_joint_pos to mapping with assumed low_dim modality!
+ObservationKeyToModalityDict: robot0_joint_pos_cos not found, adding robot0_joint_pos_cos to mapping with assumed low_dim modality!
+ObservationKeyToModalityDict: robot0_joint_pos_sin not found, adding robot0_joint_pos_sin to mapping with assumed low_dim modality!
+ObservationKeyToModalityDict: robot0_joint_vel not found, adding robot0_joint_vel to mapping with assumed low_dim modality!
+ObservationKeyToModalityDict: robot0_joint_acc not found, adding robot0_joint_acc to mapping with assumed low_dim modality!
+ObservationKeyToModalityDict: robot0_right_eef_quat_site not found, adding robot0_right_eef_quat_site to mapping with assumed low_dim modality!
+ObservationKeyToModalityDict: robot0_right_gripper_qvel not found, adding robot0_right_gripper_qvel to mapping with assumed low_dim modality!
+ObservationKeyToModalityDict: robot0_left_eef_quat_site not found, adding robot0_left_eef_quat_site to mapping with assumed low_dim modality!
+ObservationKeyToModalityDict: robot0_left_gripper_qvel not found, adding robot0_left_gripper_qvel to mapping with assumed low_dim modality!
+ObservationKeyToModalityDict: robot0_base_pos not found, adding robot0_base_pos to mapping with assumed low_dim modality!
+ObservationKeyToModalityDict: robot0_base_quat not found, adding robot0_base_quat to mapping with assumed low_dim modality!
+ObservationKeyToModalityDict: robot0_base_to_right_eef_pos not found, adding robot0_base_to_right_eef_pos to mapping with assumed low_dim modality!
+ObservationKeyToModalityDict: robot0_base_to_right_eef_quat not found, adding robot0_base_to_right_eef_quat to mapping with assumed low_dim modality!
+ObservationKeyToModalityDict: robot0_base_to_right_eef_quat_site not found, adding robot0_base_to_right_eef_quat_site to mapping with assumed low_dim modality!
+ObservationKeyToModalityDict: robot0_base_to_left_eef_pos not found, adding robot0_base_to_left_eef_pos to mapping with assumed low_dim modality!
+ObservationKeyToModalityDict: robot0_base_to_left_eef_quat not found, adding robot0_base_to_left_eef_quat to mapping with assumed low_dim modality!
+ObservationKeyToModalityDict: robot0_base_to_left_eef_quat_site not found, adding robot0_base_to_left_eef_quat_site to mapping with assumed low_dim modality!
+ObservationKeyToModalityDict: timesteps not found, adding timesteps to mapping with assumed low_dim modality!
+ObservationKeyToModalityDict: actions not found, adding actions to mapping with assumed low_dim modality!
+Holding final grasp action for 5 steps
+After same-env wrapped policy execution object collision geoms: ['blue_container_h01_back_upper_container_h01_col_bottom', 'blue_container_h01_back_upper_container_h01_col_front', 'blue_container_h01_back_upper_container_h01_col_back', 'blue_container_h01_back_upper_container_h01_col_left', 'blue_container_h01_back_upper_container_h01_col_right']
+After same-env wrapped policy execution gripper end targets: {'right': [-9.6303, 5.5094, 1.3144], 'left': [-9.6303, 5.1774, 1.3144]}
+After same-env wrapped policy execution gripper end positions: {'right': [-8.8813, 5.3096, 0.4968], 'left': [-8.9228, 4.7964, 0.4974]}
+After same-env wrapped policy execution gripper end deltas current-minus-target: {'right': [0.749, -0.1998, -0.8176], 'left': [0.7075, -0.381, -0.8169]}
+After same-env wrapped policy execution gripper end distances: {'right': 1.126653164537051, 'left': 1.1458870394193499}
+After same-env wrapped policy execution fingerpad contact status: {'right': {'left_fingerpad': False, 'right_fingerpad': False}, 'left': {'left_fingerpad': False, 'right_fingerpad': False}}
+After same-env wrapped policy execution fingerpad contact pairs: {'right': {'left_fingerpad': [], 'right_fingerpad': []}, 'left': {'left_fingerpad': [], 'right_fingerpad': []}}
+After same-env wrapped policy execution grasp status: {'right': False, 'left': False}
+Same-env wrapped grasp return: 0.000000
+Same-env wrapped grasp success: False
+lift_initial_grasp_status: {'right': False, 'left': False}
+L4 blue_container_h01_back_upper seed=0: physical_success=False stage=grasp
+Evaluation factory scene: FactorySorting7_3FO3ERFKY9RN
+Evaluation factory scene: FactorySorting7_3FO3ERFKY9RN
+Target object: blue_container_h01_back_lower
+Robot base xy at reset: (-8.299999, 5.010000)
+Tracking sites: {'right': 'blue_container_h01_back_lower_right_grasp_site', 'left': 'blue_container_h01_back_lower_left_grasp_site'}
+Below-site grasp targets: {'right': array([-9.630312  ,  4.708023  ,  1.30397966]), 'left': array([-9.630312  ,  4.376023  ,  1.30397966])}
+wrapped_env_grasp_start_pose: x=-8.299999, y=5.010000, yaw=-2.848074
+Executing grasp policy on the current robomimic-wrapped environment without reset_to
+Holding final grasp action for 5 steps
+After same-env wrapped policy execution object collision geoms: ['blue_container_h01_back_lower_container_h01_col_bottom', 'blue_container_h01_back_lower_container_h01_col_front', 'blue_container_h01_back_lower_container_h01_col_back', 'blue_container_h01_back_lower_container_h01_col_left', 'blue_container_h01_back_lower_container_h01_col_right']
+After same-env wrapped policy execution gripper end targets: {'right': [-9.6303, 4.708, 1.304], 'left': [-9.6303, 4.376, 1.304]}
+After same-env wrapped policy execution gripper end positions: {'right': [-8.9526, 4.9998, 0.4969], 'left': [-8.7463, 4.528, 0.4976]}
+After same-env wrapped policy execution gripper end deltas current-minus-target: {'right': [0.6777, 0.2918, -0.8071], 'left': [0.884, 0.152, -0.8064]}
+After same-env wrapped policy execution gripper end distances: {'right': 1.093524790153843, 'left': 1.206191802095146}
+After same-env wrapped policy execution fingerpad contact status: {'right': {'left_fingerpad': False, 'right_fingerpad': False}, 'left': {'left_fingerpad': False, 'right_fingerpad': False}}
+After same-env wrapped policy execution fingerpad contact pairs: {'right': {'left_fingerpad': [], 'right_fingerpad': []}, 'left': {'left_fingerpad': [], 'right_fingerpad': []}}
+After same-env wrapped policy execution grasp status: {'right': False, 'left': False}
+Same-env wrapped grasp return: 0.000000
+Same-env wrapped grasp success: False
+lift_initial_grasp_status: {'right': False, 'left': False}
+L4 blue_container_h01_back_lower seed=0: physical_success=False stage=grasp
+Evaluation factory scene: FactorySorting9_3FO3ERT2C5FP
+Evaluation factory scene: FactorySorting9_3FO3ERT2C5FP
+Target object: white_tote_b01_left_center
+Robot base xy at reset: (-13.099999, 5.010000)
+Tracking sites: {'right': 'white_tote_b01_left_center_right_grasp_site', 'left': 'white_tote_b01_left_center_left_grasp_site'}
+Below-site grasp targets: {'right': array([-14.509088  ,   4.739705  ,   1.45397952]), 'left': array([-14.839088  ,   4.739705  ,   1.45397952])}
+wrapped_env_grasp_start_pose: x=-13.099999, y=5.010000, yaw=-3.106479[robosuite INFO] Loading controller configuration from: /home/user/jciiot-2026/candidates/competition-entry-260839a/JCIIOT/robosuite/robosuite/controllers/config/robots/default_tiago.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: /home/user/jciiot-2026/candidates/competition-entry-260839a/JCIIOT/robosuite/robosuite/controllers/config/robots/default_tiago.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: /home/user/jciiot-2026/candidates/competition-entry-260839a/JCIIOT/robosuite/robosuite/controllers/config/robots/default_tiago.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: /home/user/jciiot-2026/candidates/competition-entry-260839a/JCIIOT/robosuite/robosuite/controllers/config/robots/default_tiago.json (composite_controller_factory.py:121)
+
+Executing grasp policy on the current robomimic-wrapped environment without reset_to
+Holding final grasp action for 5 steps
+After same-env wrapped policy execution object collision geoms: ['white_tote_b01_left_center_tote_b01_col_bottom', 'white_tote_b01_left_center_tote_b01_col_front', 'white_tote_b01_left_center_tote_b01_col_back', 'white_tote_b01_left_center_tote_b01_col_left', 'white_tote_b01_left_center_tote_b01_col_right']
+After same-env wrapped policy execution gripper end targets: {'right': [-14.5091, 4.7397, 1.454], 'left': [-14.8391, 4.7397, 1.454]}
+After same-env wrapped policy execution gripper end positions: {'right': [-13.7401, 5.141, 0.4967], 'left': [-13.3872, 4.9522, 0.635]}
+After same-env wrapped policy execution gripper end deltas current-minus-target: {'right': [0.769, 0.4013, -0.9572], 'left': [1.4519, 0.2125, -0.8189]}
+After same-env wrapped policy execution gripper end distances: {'right': 1.2917495578029778, 'left': 1.6804310837036192}
+After same-env wrapped policy execution fingerpad contact status: {'right': {'left_fingerpad': False, 'right_fingerpad': False}, 'left': {'left_fingerpad': False, 'right_fingerpad': False}}
+After same-env wrapped policy execution fingerpad contact pairs: {'right': {'left_fingerpad': [], 'right_fingerpad': []}, 'left': {'left_fingerpad': [], 'right_fingerpad': []}}
+After same-env wrapped policy execution grasp status: {'right': False, 'left': False}
+Same-env wrapped grasp return: 0.000000
+Same-env wrapped grasp success: False
+lift_initial_grasp_status: {'right': False, 'left': False}
+L5 white_tote_b01_left_center seed=0: physical_success=False stage=grasp
+Evaluation factory scene: FactorySorting9_3FO3ERT2C5FP
+Evaluation factory scene: FactorySorting9_3FO3ERT2C5FP
+Target object: white_tote_b01_left_front
+Robot base xy at reset: (-13.099999, 5.010000)
+Tracking sites: {'right': 'white_tote_b01_left_front_right_grasp_site', 'left': 'white_tote_b01_left_front_left_grasp_site'}
+Below-site grasp targets: {'right': array([-14.509088  ,   4.199868  ,   1.45397952]), 'left': array([-14.839088  ,   4.199868  ,   1.45397952])}
+wrapped_env_grasp_start_pose: x=-13.099999, y=5.010000, yaw=-2.780125
+Executing grasp policy on the current robomimic-wrapped environment without reset_to
+Holding final grasp action for 5 steps
+After same-env wrapped policy execution object collision geoms: ['white_tote_b01_left_front_tote_b01_col_bottom', 'white_tote_b01_left_front_tote_b01_col_front', 'white_tote_b01_left_front_tote_b01_col_back', 'white_tote_b01_left_front_tote_b01_col_left', 'white_tote_b01_left_front_tote_b01_col_right']
+After same-env wrapped policy execution gripper end targets: {'right': [-14.5091, 4.1999, 1.454], 'left': [-14.8391, 4.1999, 1.454]}
+After same-env wrapped policy execution gripper end positions: {'right': [-13.7483, 4.9276, 0.4968], 'left': [-13.4922, 4.4808, 0.4976]}
+After same-env wrapped policy execution gripper end deltas current-minus-target: {'right': [0.7608, 0.7277, -0.9572], 'left': [1.3469, 0.2809, -0.9563]}
+After same-env wrapped policy execution gripper end distances: {'right': 1.422859615836717, 'left': 1.6755682774479443}
+After same-env wrapped policy execution fingerpad contact status: {'right': {'left_fingerpad': False, 'right_fingerpad': False}, 'left': {'left_fingerpad': False, 'right_fingerpad': False}}
+After same-env wrapped policy execution fingerpad contact pairs: {'right': {'left_fingerpad': [], 'right_fingerpad': []}, 'left': {'left_fingerpad': [], 'right_fingerpad': []}}
+After same-env wrapped policy execution grasp status: {'right': False, 'left': False}
+Same-env wrapped grasp return: 0.000000
+Same-env wrapped grasp success: False
+lift_initial_grasp_status: {'right': False, 'left': False}
+L5 white_tote_b01_left_front seed=0: physical_success=False stage=grasp
+Evaluation factory scene: FactorySorting9_3FO3ERT2C5FP
+Evaluation factory scene: FactorySorting9_3FO3ERT2C5FP
+Target object: white_tote_b01_left_back
+Robot base xy at reset: (-13.099999, 5.009999)
+Tracking sites: {'right': 'white_tote_b01_left_back_right_grasp_site', 'left': 'white_tote_b01_left_back_left_grasp_site'}
+Below-site grasp targets: {'right': array([-14.509088  ,   5.305966  ,   1.45397952]), 'left': array([-14.839088  ,   5.305966  ,   1.45397952])}
+wrapped_env_grasp_start_pose: x=-13.099999, y=5.009999, yaw=2.827712
+Executing grasp policy on the current robomimic-wrapped environment without reset_to
+Holding final grasp action for 5 steps
+After same-env wrapped policy execution object collision geoms: ['white_tote_b01_left_back_tote_b01_col_bottom', 'white_tote_b01_left_back_tote_b01_col_front', 'white_tote_b01_left_back_tote_b01_col_back', 'white_tote_b01_left_back_tote_b01_col_left', 'white_tote_b01_left_back_tote_b01_col_right']
+After same-env wrapped policy execution gripper end targets: {'right': [-14.5091, 5.306, 1.454], 'left': [-14.8391, 5.306, 1.454]}
+After same-env wrapped policy execution gripper end positions: {'right': [-13.6517, 5.3612, 0.4968], 'left': [-13.7401, 4.8539, 0.4975]}
+After same-env wrapped policy execution gripper end deltas current-minus-target: {'right': [0.8574, 0.0552, -0.9572], 'left': [1.099, -0.4521, -0.9564]}
+After same-env wrapped policy execution gripper end distances: {'right': 1.286234120439578, 'left': 1.5254359220867255}
+After same-env wrapped policy execution fingerpad contact status: {'right': {'left_fingerpad': False, 'right_fingerpad': False}, 'left': {'left_fingerpad': False, 'right_fingerpad': False}}
+After same-env wrapped policy execution fingerpad contact pairs: {'right': {'left_fingerpad': [], 'right_fingerpad': []}, 'left': {'left_fingerpad': [], 'right_fingerpad': []}}
+After same-env wrapped policy execution grasp status: {'right': False, 'left': False}
+Same-env wrapped grasp return: 0.000000
+Same-env wrapped grasp success: False
+lift_initial_grasp_status: {'right': False, 'left': False}
+L5 white_tote_b01_left_back seed=0: physical_success=False stage=grasp
