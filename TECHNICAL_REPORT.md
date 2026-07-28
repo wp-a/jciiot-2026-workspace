@@ -9,14 +9,16 @@ object-family geometric grasp control, physically verified transport and
 stable multi-object placement. A language model is not allowed to issue base
 or joint commands on the scored path.
 
-On official baseline commit
-`0dcdddf18a9e694569aa1433cdfc04eb097fed78`, the final candidate scores
+On the published baseline commit
+`0dcdddf18a9e694569aa1433cdfc04eb097fed78`, the current fixed-scene candidate
+scores with the unmodified public scorer
 `10/10`, `15/15`, `20/20`, `25/25` and `30/30`, for `100/100` total, with
 seven required successful grasp events and zero collision frames. An additional
 80-process repeatability batch on L2-L5 produced 80/80 full-score runs,
 120/120 required grasp events and zero collision frames. These repetitions do
 not perturb scene geometry, so they establish execution repeatability rather
-than pose-distribution robustness.
+than pose-distribution robustness. No result in this report is a BienData score
+or an organizer-reproduced result.
 
 ## 2. Task and scoring constraints
 
@@ -28,8 +30,8 @@ distance to the target-table center is below 0.8 m. L5 scores three white totes
 individually. Any collision recorded in the trajectory causes a five-point
 deduction; time is used only to rank equal scores.
 
-Our acceptance gate is stricter than the point total alone. It requires full
-official score, every required successful `grasp_end` event, zero collision
+Our local acceptance gate is stricter than the point total alone. It requires
+full public-scorer score, every required successful `grasp_end` event, zero collision
 frames, final target distance below 0.8 m and a successful workflow result.
 
 ## 3. System architecture
@@ -45,7 +47,7 @@ Official task metadata and semantic map
   -> stowed transport with official attachment semantics
   -> target-table release and multi-object slot assignment
   -> final state, collision and event verification
-  -> official trajectory recorder and unmodified scorer
+  -> published trajectory recorder and unmodified public scorer
 ```
 
 The official application executes
@@ -67,8 +69,8 @@ pending -> approached -> grasped -> lifted -> transported -> placed -> verified
 ```
 
 The history is recorded per object. An object reaches `verified` only after the
-complete physical chain succeeds. The current final candidate uses one attempt
-per object because all official-scene runs succeeded without retry; the state
+complete physical chain succeeds. The current fixed-scene candidate uses one
+attempt per object because all published-scene runs succeeded without retry; the state
 machine keeps failure stage and object identity explicit for future bounded
 recovery policies.
 
@@ -166,7 +168,7 @@ conflict resolution.
 | Task-config and semantic-map checks | 5/5 |
 | Official hand-written SOP files used as input | 0 |
 
-### Official Agent entry validation
+### Published Agent entry, local fixed-scene validation
 
 | Level | Score | Grasps | Collision frames | Maximum target distance | Wall time |
 |---|---:|---:|---:|---:|---:|
@@ -176,8 +178,10 @@ conflict resolution.
 | L4 | 25/25 | 1/1 | 0 | 0.328942 m | 101.424 s* |
 | L5 | 30/30 | 3/3 | 0 | 0.600000 m | 286.648 s* |
 
-Total: `100/100`, `7/7` grasps, zero collision frames. Asterisks mark tasks
-run concurrently; those wall times are not used for ranking claims.
+Total: `100/100`, `7/7` grasps, zero collision frames under the local public
+scorer. Asterisks mark tasks run concurrently; those wall times are not used
+for ranking claims. These results were not uploaded to BienData and do not
+establish performance under hidden perturbations.
 
 Every manifest reports `runner.execution_mode=agent`, selected skill
 `competition_task`, no planner output and every task object in `verified`
@@ -193,7 +197,7 @@ state. The protected `app.py`, `task_subprocess_runner.py` and
 | L4 | 20/20 | 83.8875%-100% | 20/20 | 0/20 | 0 |
 | L5 | 20/20 | 83.8875%-100% | 60/60 | 0/20 | 0 |
 
-The batch totals `1800/1800` official points and `120/120` required grasp
+The batch totals `1800/1800` local public-scorer points and `120/120` required grasp
 events. Seeds did not change frame counts or final geometry, so no geometric
 perturbation claim is made.
 
@@ -262,9 +266,10 @@ stores the official/workspace commits, seed, runtime, trajectory path, score,
 grasp count, collision count, target distances, workflow payload and timestamps
 in a machine-readable manifest.
 
-The final server validation used Ubuntu 24.04.3, Python 3.11.15, MuJoCo 3.9.0
-and robosuite 1.5.2. The five validation JSON files in the separate prediction
-ZIP are the exact trajectories from the clean official Agent entry validation.
+The current server validation used Ubuntu 24.04.3, Python 3.11.15, MuJoCo 3.9.0
+and robosuite 1.5.2. The five JSON files in the separate baseline prediction ZIP
+are the exact trajectories from the clean published Agent entry validation;
+the ZIP is not labeled as a final or organizer-verified result.
 The SOP generator has a separate locked environment because its model stack is
 not part of the simulator. Reproduction commands, 25 image records and output
 checksums are included under `sop_generated/`.
@@ -276,6 +281,19 @@ checksums are included under `sop_generated/`.
   semantic map.
 - The 80-run batch tests process-level repeatability, not perturbations of
   object pose, base localization or dynamics.
+- The public L1 BC-Transformer checkpoint records epoch 500 but a best rollout
+  success rate of 0.0; direct public-evaluator replay failed 0/3 repeated
+  resets in a requirements-pinned inference environment. The supplied 591 MB
+  HDF5 is a 10-action Fetch/iGibson format example, not JCIIOT Tiago training
+  data.
+- The current L5 implementation changes private transport-attachment relative
+  state for final reach. Although it does not directly write object qpos, this
+  is a compliance and reviewer-perception risk and must be replaced with
+  physical base/arm action before the candidate is called final.
+- Disabling the planner and first-matching every task with one aggregate skill
+  diverges from the training deck's standard atomic-skill story. The final
+  package needs either organizer clarification or a validated atomic-skill
+  execution trace.
 - The official visible Streamlit Execute button was not exercised on the
   headless server because no accessible X display or Xvfb was available. The
   same unmodified `RobotAgent.run()` path was tested headlessly.

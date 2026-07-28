@@ -16,7 +16,7 @@ DOCX 文本/图片
 
 LLM/VLM 不直接输出底盘或关节动作。它只处理语义不确定性；物理执行使用可测试的技能和显式约束。
 
-截至 2026-07-28，方案 B 已在官方固定种子下完成五关满分和零碰撞。当前实际主抓取策略已从“优先复用 BC”收敛为“对象族几何 OSC/约束 IK 主策略，学习策略作为证据驱动后备”。结果和边界见 [`09-current-route-and-optimization-plan.md`](09-current-route-and-optimization-plan.md) 与 [`2026-07-28-five-level-performance-baseline.md`](../experiments/2026-07-28-five-level-performance-baseline.md)。
+截至 2026-07-28，方案 B 已在五个公开固定场景和未修改公开评分器下完成本地 100/100、零碰撞；这不是 BienData 或组委会结果。现有对象族几何 OSC/约束 IK 降级为固定场景基线和离线 teacher，最终主线改为真实原子技能、比赛专用 Tiago 数据、对象族 robomimic 抓取和显式物理验证。结果和边界见 [`09-current-route-and-optimization-plan.md`](09-current-route-and-optimization-plan.md)、[`official-assets-and-score-reality-audit-2026-07-28.md`](../research/notes/official-assets-and-score-reality-audit-2026-07-28.md) 与 [`2026-07-28-five-level-performance-baseline.md`](../experiments/2026-07-28-five-level-performance-baseline.md)。
 
 ## 分阶段里程碑
 

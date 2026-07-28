@@ -1,5 +1,7 @@
 # 2026-07-28 官方 Agent 入口五关验收
 
+> 口径更正（2026-07-28）：这里的 Agent 和 scorer 来自锁定公开源码；100/100 是本地固定公开场景结果，不是 BienData 成绩或组委会复现。当前聚合 skill/planner gate 与私有 attachment 使用仍需提交前合规处理。
+
 ## 目的
 
 此前满分轨迹由工作区 runner 直接调用 `run_official_task()` 生成，尚不能证明评委运行官方 `app.py` 时会进入同一方案。本实验验证干净物化候选通过未修改的 `RobotAgent.run()` 和官方 skill registry 执行方案 B。

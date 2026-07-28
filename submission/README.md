@@ -4,6 +4,12 @@ This directory is the minimal code overlay for the official JCIIOT 2026
 baseline. It contains only files under the modification roots allowed by the
 official contestant manual.
 
+> Status: fixed-public-scene baseline, not final. Its local trajectories score
+> 100/100 with the unmodified public scorer, but no BienData or organizer result
+> exists, no geometry-perturbation gate has passed, and the current private
+> transport-attachment reach must be replaced or explicitly cleared before
+> submission.
+
 ## Locked baseline
 
 - Repository: `https://github.com/JCIIOT2026/JCIIOT2026.git`
@@ -88,8 +94,9 @@ app.py -> task_subprocess_runner.py -> RobotAgent.run()
        -> CompetitionTaskSkill -> CompetitionFlow
 ```
 
-The submitted validation archive is separate from this overlay. Its root must
-contain exactly the five official scene-named JSON trajectory files.
+The current baseline validation archive is separate from this overlay. Its root
+contains exactly the five published scene-named JSON trajectory files. Do not
+represent it as a final, hidden-set or organizer-verified prediction archive.
 
 ## Regenerate SOP knowledge offline
 

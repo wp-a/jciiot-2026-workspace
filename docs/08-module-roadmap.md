@@ -2,7 +2,7 @@
 
 本文件把外部项目经验映射到 JCIIOT 的实际模块、指标和实验顺序。状态以 [`STATUS.md`](../STATUS.md) 为准，实验结果写入 [`experiments/experiment-log.csv`](../experiments/experiment-log.csv)。
 
-2026-07-28 更新：固定种子五关已全部满分、零碰撞。抓取主线采用对象族几何 OSC/约束 IK；学习实验下调为多种子证据显示几何瓶颈后的后备。详细现状见 [`09-current-route-and-optimization-plan.md`](09-current-route-and-optimization-plan.md)。
+2026-07-28 更新：五个公开固定场景经本地未修改公开评分器达到 100/100、零碰撞，但没有 BienData/组委会结果或几何扰动证据。对象族几何 OSC/约束 IK 改为离线 teacher；最终抓取主线转为比赛专用 Tiago 数据上的 BC-RNN/BC-Transformer，并要求真实原子技能和 `EnvBackend` 边界。详细现状见 [`09-current-route-and-optimization-plan.md`](09-current-route-and-optimization-plan.md)。
 
 ## 模块总览
 

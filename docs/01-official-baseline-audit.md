@@ -93,7 +93,10 @@ Planner 让 LLM 输出严格结构化 JSON，但示例主路径被压成固定�
 2. **L3 目标物体更换**：`orange_tote_b01_upper` → `blue_tote_b01_far_right` / `blue_tote_b01_near_right`（源/目标工位不变）。旧物体名的固定计划、抓取位姿和 SOP 笔记必须迁移。
 3. **技能侧取主物体**：`pick_up.py` 与 `task_subprocess_runner.py` 用 `_primary_object_name` 取数组第一项，意味着官方管线默认仍抓第一个候选；把候选选择做成决策点（按可达性/抓取可靠性挑选）是合规的差异化空间。
 4. 注释乱码修复无行为影响。
-5. **LFS 配额超限（运维风险）**：上游 GitHub 仓库当前返回 "exceeded its LFS budget"，`model_epoch_150.pth`、示例 `.hdf5`、USD `.zip` 拉取失败。经核对：桌面网格 zip 仅是建模源档案，MJCF 未引用，解压后 `.obj/.stl`（3996 个）均为普通 git 对象且完整；USD 仅用于 Isaac 可视化。**仿真运行不被阻塞**，但 BC 权重必须自训或向组委会索取。建议在官方群反馈配额问题并留存记录。
+5. **LFS 状态已恢复**：2026-07-28 重新访问时，用户列出的 11 个 LFS 对象均可完整下载，字节数和 SHA-256 与 Git LFS pointer 一致。旧的“配额仍超限”结论不再成立，但本地仍按提交 `0dcdddf` 和对象哈希缓存，避免上游再次不可用。
+6. **公开 checkpoint 不是可靠现成策略**：安全解析显示 `model_epoch_150.pth` 实际保存 epoch 500 的 L1 Tiago 20 维 BC-Transformer，训练记录 `best_success_rate=0.0`。服务器用未修改官方 evaluator 在其 L1 固定 reset 重复三次，结果 0/3，夹爪无接触。
+7. **示例 HDF5 不是赛题数据**：`table_setup_from_dishwasher_sample.hdf5` 只有 5 条 Fetch/iGibson 厨房整理演示，动作维度 10；JCIIOT Tiago 为 20 维动作。该文件只能参考 robomimic 格式，不可直接训练赛题策略。
+8. **USD/mesh 的用途**：五个 USD 包是 `world.usda` 加视觉资产，不含动作演示；四个 mesh 包是桌面修订历史，当前源码中 44 个相关 OBJ 已与 v5 包逐字节一致，不应再覆盖解压。完整证据见 `research/notes/official-assets-and-score-reality-audit-2026-07-28.md`。
 
 ## 2026-07-27 增量再审计（f948609 -> 0dcdddf）
 
