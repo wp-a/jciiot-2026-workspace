@@ -3,9 +3,11 @@ import unittest
 import numpy as np
 
 from scripts.run_l1_cradle_gate import (
+    closure_axis_error_degrees,
     cradle_gate_accepted,
     cradle_gate_failures,
     has_bilateral_object_contact,
+    minimum_undirected_axis_rotation,
     opposed_wall_clearance_targets,
     opposed_wall_squeeze_targets,
     push_gate_accepted,
@@ -108,6 +110,49 @@ class L1PhysicalPushGateTests(unittest.TestCase):
 
 
 class OpposedWallRegraspTests(unittest.TestCase):
+    def test_axis_rotation_maps_tilted_closure_axis_to_wall_normal(self):
+        source = np.array([0.0, 0.6, 0.8])
+        target = np.array([0.0, 1.0, 0.0])
+
+        rotation = minimum_undirected_axis_rotation(source, target)
+
+        np.testing.assert_allclose(rotation @ source, target, atol=1e-8)
+        np.testing.assert_allclose(rotation.T @ rotation, np.eye(3), atol=1e-8)
+        self.assertAlmostEqual(float(np.linalg.det(rotation)), 1.0)
+
+    def test_axis_rotation_uses_the_nearest_sign_of_an_undirected_axis(self):
+        source = np.array([0.0, -0.8, 0.6])
+        target = np.array([0.0, 1.0, 0.0])
+
+        rotation = minimum_undirected_axis_rotation(source, target)
+
+        np.testing.assert_allclose(rotation @ source, -target, atol=1e-8)
+        self.assertAlmostEqual(closure_axis_error_degrees(rotation @ source, target), 0.0)
+
+    def test_closure_axis_error_treats_parallel_and_antiparallel_as_aligned(self):
+        self.assertAlmostEqual(
+            closure_axis_error_degrees([0.0, 1.0, 0.0], [0.0, 2.0, 0.0]),
+            0.0,
+        )
+        self.assertAlmostEqual(
+            closure_axis_error_degrees([0.0, -1.0, 0.0], [0.0, 2.0, 0.0]),
+            0.0,
+        )
+
+    def test_axis_rotation_rejects_invalid_vectors(self):
+        invalid_axes = (
+            np.zeros(3),
+            np.array([1.0, 2.0]),
+            np.array([1.0, float("nan"), 0.0]),
+            np.array([1.0, float("inf"), 0.0]),
+        )
+        for axis in invalid_axes:
+            with self.subTest(axis=axis):
+                with self.assertRaises(ValueError):
+                    minimum_undirected_axis_rotation(axis, [0.0, 1.0, 0.0])
+                with self.assertRaises(ValueError):
+                    closure_axis_error_degrees(axis, [0.0, 1.0, 0.0])
+
     def test_bilateral_contact_accepts_any_real_contact_from_each_arm(self):
         self.assertTrue(
             has_bilateral_object_contact(

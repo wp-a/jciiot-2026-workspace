@@ -138,6 +138,50 @@ def push_gate_accepted(record: Mapping[str, object]) -> bool:
     return not push_gate_failures(record)
 
 
+def _normalized_axis(value: object, *, name: str) -> np.ndarray:
+    axis = np.asarray(value, dtype=float)
+    if axis.shape != (3,) or not np.all(np.isfinite(axis)):
+        raise ValueError(f"{name} must be a finite three-vector")
+    norm = float(np.linalg.norm(axis))
+    if norm <= 1e-12:
+        raise ValueError(f"{name} must be non-zero")
+    return axis / norm
+
+
+def minimum_undirected_axis_rotation(
+    source_axis: object,
+    target_axis: object,
+) -> np.ndarray:
+    """Return the minimum rotation aligning an undirected source and target."""
+    source = _normalized_axis(source_axis, name="source_axis")
+    target = _normalized_axis(target_axis, name="target_axis")
+    if float(np.dot(source, target)) < 0.0:
+        target = -target
+    cross = np.cross(source, target)
+    sine = float(np.linalg.norm(cross))
+    cosine = float(np.clip(np.dot(source, target), -1.0, 1.0))
+    if sine <= 1e-12:
+        return np.eye(3)
+    axis = cross / sine
+    skew = np.array(
+        [
+            [0.0, -axis[2], axis[1]],
+            [axis[2], 0.0, -axis[0]],
+            [-axis[1], axis[0], 0.0],
+        ],
+        dtype=float,
+    )
+    return np.eye(3) + skew * sine + (skew @ skew) * (1.0 - cosine)
+
+
+def closure_axis_error_degrees(source_axis: object, target_axis: object) -> float:
+    """Return the unsigned angular error between two closure axes."""
+    source = _normalized_axis(source_axis, name="source_axis")
+    target = _normalized_axis(target_axis, name="target_axis")
+    cosine = float(np.clip(abs(np.dot(source, target)), 0.0, 1.0))
+    return float(np.degrees(np.arccos(cosine)))
+
+
 def has_bilateral_object_contact(
     contacts: Mapping[str, tuple[str, ...]],
 ) -> bool:
