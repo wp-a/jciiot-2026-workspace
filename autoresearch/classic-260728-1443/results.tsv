@@ -8,3 +8,4 @@ iteration	commit	physical_grasp	transport_stage	collision_frames	official_score	
 7	a75379f	yes	contact	0	0	13.752922	50.013084	discard	A 10 mm insertion restored grasp formation but did not materially improve carry lifetime, so insertion tuning was abandoned.
 8	6011920	yes	height_recovery	0	0	13.885632	53.115934	discard	Recovery lifted the box 4.8 mm with bilateral contact and returned it inside the 10 mm safety band, but the stricter helper boolean rejected it.
 9	4e52a99	yes	height_recovery	0	0	13.833571	62.170536	discard	Measured acceptance allowed two recoveries; the third lowered the box because accumulated gripper-to-object Z offset was not reset before lifting.
+10	d0bd963	yes	height_recenter	0	0	13.879424	47.209593	discard	Five recenter steps preserved bilateral contact but the box descended faster than the grippers, increasing rather than closing the relative Z error.

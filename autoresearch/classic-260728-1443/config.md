@@ -33,3 +33,8 @@ higher-priority metric. No attachment fallback is permitted.
   support; no transformed trajectory may be used for this validity decision.
 - The unmodified scorer result must be reproducible from the saved trajectory.
 
+## Final Status
+
+The ten-iteration budget was exhausted without passing L1. See `results.tsv`
+and `conclusion.md`. No candidate from this loop may replace the current 8502
+service or be reported as a valid score.
