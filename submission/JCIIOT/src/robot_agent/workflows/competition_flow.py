@@ -42,29 +42,6 @@ def delivery_inset_target(
     return approach + direction / distance * min(float(inset), distance)
 
 
-def bounded_delivery_extension(
-    current,
-    target,
-    *,
-    goal_distance: float = 0.25,
-    max_extension: float = 0.70,
-):
-    """Move an attached object toward a target by the minimum bounded amount."""
-    import numpy as np
-
-    current = np.asarray(current, dtype=float).reshape(2)
-    target = np.asarray(target, dtype=float).reshape(2)
-    delta = target - current
-    distance = float(np.linalg.norm(delta))
-    extension = min(
-        max(0.0, float(max_extension)),
-        max(0.0, distance - max(0.0, float(goal_distance))),
-    )
-    if distance <= 1e-9 or extension <= 1e-9:
-        return current.copy()
-    return current + delta / distance * extension
-
-
 def delivery_slot_target(center, object_name: str | None):
     """Assign the three L5 totes distinct scored positions on one output."""
     import numpy as np
@@ -78,48 +55,6 @@ def delivery_slot_target(center, object_name: str | None):
     elif name.endswith("_back"):
         target[0] += 0.60
     return target
-
-
-def delivery_extension_parameters(object_name: str | None) -> dict[str, float]:
-    """Use measured grasp reach to place L5 totes at exact packing slots."""
-    if "white_tote_b01_left" in str(object_name or "").lower():
-        return {"goal_distance": 0.0, "max_extension": 1.2}
-    return {}
-
-
-def delivery_object_world_yaw(object_name: str | None) -> float | None:
-    """Align L5 tote footprints to one shared output-table orientation."""
-    import math
-
-    if "white_tote_b01_left" in str(object_name or "").lower():
-        return math.pi / 2.0
-    return None
-
-
-def delivery_extension_waypoints(current, target, object_name: str | None):
-    """Enter occupied L5 output slots without crossing a prior slot."""
-    import numpy as np
-
-    current = np.asarray(current, dtype=float).reshape(2)
-    target = np.asarray(target, dtype=float).reshape(2)
-    if "white_tote_b01_left" not in str(object_name or "").lower():
-        return [target.copy()]
-    return [
-        np.array([target[0], current[1]], dtype=float),
-        target.copy(),
-    ]
-
-
-def delivery_release_steps(
-    object_name: str | None,
-    *,
-    configured: int,
-) -> int:
-    """Let table-edge-sensitive L5 placements settle before continuing."""
-    configured = max(1, int(configured))
-    if "white_tote_b01_left" in str(object_name or "").lower():
-        return max(configured, 200)
-    return configured
 
 
 class CompetitionFlow:
@@ -238,23 +173,20 @@ class OfficialCompetitionDriver:
         grasp_config=None,
     ) -> None:
         from robot_agent.skills.move import MoveSkill
-        from robot_agent.skills.place_down import PlaceDownSkill
-
         self.backend = backend
         self.scene_context = scene_context
         self.grasp_config = grasp_config
         self._grasp_yaw: float | None = None
         self._swap_arm_targets = False
         self._clearance_prepared = False
+        self._physical_hold: dict[str, Any] | None = None
+        self._last_transport: dict[str, Any] | None = None
+        self._last_place: dict[str, Any] | None = None
         self.move_skill = MoveSkill(
             backend=backend,
             scene_context=scene_context,
             grid=grid,
             path_spacing=path_spacing,
-        )
-        self.place_skill = PlaceDownSkill(
-            backend=backend,
-            scene_context=scene_context,
         )
 
     @staticmethod
@@ -377,26 +309,14 @@ class OfficialCompetitionDriver:
         carrying: bool,
         object_name: str | None = None,
     ) -> bool:
+        if carrying:
+            return self._move_physically_while_holding(target, object_name)
+
         resolved_target = target
         staging_target: str | None = None
         active_grasp_pose = None
         orient_for_grasp = False
-        if carrying and not self._physical_output_available(target):
-            station = self.scene_context.output_ports.get(target)
-            if station is not None:
-                approach = (
-                    station.approach
-                    if station.approach is not None
-                    else self.scene_context.approach_xy(target)
-                )
-                delivery_xy = delivery_inset_target(
-                    center=station.center[:2],
-                    approach=approach,
-                )
-                resolved_target = (
-                    f"{delivery_xy[0]:.6f}, {delivery_xy[1]:.6f}"
-                )
-        if not carrying and object_name:
+        if object_name:
             self._clearance_prepared = False
             try:
                 grasp_pose = self._grasp_pose(target, object_name)
@@ -460,6 +380,61 @@ class OfficialCompetitionDriver:
             return bool(orient_base(self.backend, self._grasp_yaw))
         return True
 
+    def _move_physically_while_holding(
+        self,
+        target: str,
+        object_name: str | None,
+    ) -> bool:
+        import numpy as np
+
+        from robot_agent.skills.competition_transport import (
+            PhysicalCarryConfig,
+            run_physical_transport,
+            transport_base_goal,
+        )
+
+        if not object_name or not self._physical_hold:
+            return False
+        station = self.scene_context.output_ports.get(target)
+        if station is None:
+            return False
+
+        config = PhysicalCarryConfig()
+        base_xy, _ = self.backend.get_base_pose()
+        hold = self._physical_hold
+        object_pos = np.asarray(hold["object_pos"], dtype=float)
+        object_target_xy = delivery_slot_target(
+            station.center[:2],
+            object_name,
+        )
+        goal_xy = transport_base_goal(
+            object_target_xy=object_target_xy,
+            base_xy=base_xy,
+            base_yaw=float(hold["base_yaw"]),
+            object_xy=object_pos[:2],
+        )
+        path = self.move_skill._plan(
+            np.asarray(base_xy, dtype=float),
+            np.asarray(goal_xy, dtype=float),
+        )
+        if not path:
+            self._last_transport = {
+                "success": False,
+                "failure_stage": "path",
+            }
+            return False
+        self._last_transport = run_physical_transport(
+            self.backend,
+            path=path,
+            object_name=object_name,
+            hold_yaw=float(hold["base_yaw"]),
+            minimum_object_z=(
+                float(hold["object_z"]) - config.object_drop_tolerance
+            ),
+            config=config,
+        )
+        return bool(self._last_transport.get("success", False))
+
     def grasp(self, source: str, object_name: str) -> dict[str, Any]:
         from robot_agent.skills.competition_grasp import (
             ScriptedGraspConfig,
@@ -470,186 +445,32 @@ class OfficialCompetitionDriver:
         config.swap_arm_targets = self._swap_arm_targets
         config.clearance_prepared = self._clearance_prepared
 
-        return run_scripted_grasp(
+        result = run_scripted_grasp(
             self.backend,
             source=source,
             object_name=object_name,
             config=config,
         )
-
-    def _extend_held_object_toward_target(
-        self,
-        target: str,
-        object_name: str,
-    ) -> bool:
-        """Use the official attachment for a bounded final placement reach."""
-        import numpy as np
-
-        scene = getattr(self, "scene_context", None)
-        station = None if scene is None else scene.output_ports.get(target)
-        if station is None:
-            return False
-
-        raw_env = self.backend.env
-        from robosuite.environments.factory_sorting.load_factory_sorting_evalization import (
-            get_base_world_pose,
-        )
-        from robosuite.environments.factory_sorting.transport_attachment import (
-            TRANSPORT_ATTACHMENT_ATTR,
-            quat_conjugate_wxyz,
-            quat_multiply_wxyz,
-            rotate_xy,
-            sync_transport_attachment,
-            yaw_quat_wxyz,
-        )
-
-        attachment = getattr(raw_env, TRANSPORT_ATTACHMENT_ATTR, None)
-        if not attachment or not attachment.get("active", False):
-            return False
-        body_id = raw_env.obj_body_id[object_name]
-        current_xy = raw_env.sim.data.body_xpos[body_id][:2].copy()
-        slot_xy = delivery_slot_target(
-            station.center[:2],
-            object_name,
-        )
-        desired_xy = bounded_delivery_extension(
-            current_xy,
-            slot_xy,
-            **delivery_extension_parameters(object_name),
-        )
-        if np.allclose(current_xy, desired_xy):
-            return False
-
-        base_xy, base_yaw = get_base_world_pose(raw_env)
-        start_relative = rotate_xy(current_xy - base_xy, -base_yaw)
-        recorder = getattr(self.backend, "_record_trajectory_frame", None)
-
-        from robot_agent.environments.robosuite_backend import (
-            _navigation_collisions,
-        )
-
-        collision = False
-        world_yaw = delivery_object_world_yaw(object_name)
-        if world_yaw is not None:
-            start_quat = np.asarray(
-                attachment["relative_quat"],
-                dtype=float,
-            )
-            base_quat = yaw_quat_wxyz(base_yaw)
-            end_quat = quat_multiply_wxyz(
-                quat_conjugate_wxyz(base_quat),
-                yaw_quat_wxyz(world_yaw),
-            )
-            if float(np.dot(start_quat, end_quat)) < 0.0:
-                end_quat = -end_quat
-            for alpha in np.linspace(0.0, 1.0, 81, dtype=float)[1:]:
-                relative_quat = (1.0 - alpha) * start_quat + alpha * end_quat
-                relative_quat /= float(np.linalg.norm(relative_quat))
-                attachment["relative_quat"] = relative_quat
-                sync_transport_attachment(raw_env)
-                if callable(recorder):
-                    recorder(_env=raw_env)
-                collision = collision or bool(
-                    _navigation_collisions(
-                        raw_env,
-                        raw_env.robots[0],
-                        getattr(self.backend, "_ignore_collision_geom", ()),
-                    )
-                )
-
-        for waypoint_xy in delivery_extension_waypoints(
-            current_xy,
-            desired_xy,
-            object_name,
-        ):
-            end_relative = rotate_xy(waypoint_xy - base_xy, -base_yaw)
-            for relative_xy in np.linspace(
-                start_relative,
-                end_relative,
-                81,
-                dtype=float,
-            )[1:]:
-                attachment["relative_xy"] = relative_xy
-                sync_transport_attachment(raw_env)
-                if callable(recorder):
-                    recorder(_env=raw_env)
-                collision = collision or bool(
-                    _navigation_collisions(
-                        raw_env,
-                        raw_env.robots[0],
-                        getattr(self.backend, "_ignore_collision_geom", ()),
-                    )
-                )
-            start_relative = end_relative
-        return collision
-
-    def _release_at_current_pose(self, target: str, object_name: str) -> bool:
-        """Physically release at an output missing from the backend registry."""
-        raw_env = self.backend.env
-        if getattr(self.backend, "_held_crate_name", None) != object_name:
-            return False
-
-        try:
-            collision = self._extend_held_object_toward_target(
-                target,
-                object_name,
-            )
-            from robosuite.environments.factory_sorting.place_on_table import (
-                gripper_release_action,
-            )
-            from robosuite.environments.factory_sorting.transport_attachment import (
-                clear_transport_attachment,
-            )
-
-            clear_transport_attachment(raw_env)
-            self.backend._held_crate_name = None
-            self.backend._held_crate_body_id = None
-            configured_release_steps = max(
-                1,
-                int(
-                    getattr(self.backend, "_rp", {})
-                    .get("place", {})
-                    .get("release_steps", 40)
-                ),
-            )
-            release_steps = delivery_release_steps(
-                object_name,
-                configured=configured_release_steps,
-            )
-            action = gripper_release_action(raw_env)
-            recorder = getattr(self.backend, "_record_trajectory_frame", None)
-            for _ in range(release_steps):
-                result = raw_env.step(action)
-                info = result[-1] if isinstance(result, tuple) else {}
-                if callable(recorder):
-                    recorder(_env=raw_env)
-                collision = collision or bool(
-                    (info or {}).get("has_judge_collision", False)
-                )
-            marker = getattr(self.backend, "_mark_trajectory_event", None)
-            if callable(marker):
-                marker(
-                    "place_end",
-                    target=target,
-                    object_name=object_name,
-                    success=not collision,
-                    method="physical_release_at_semantic_output",
-                )
-            return not collision
-        except Exception:
-            return False
+        if bool(result.get("success", False)):
+            self._physical_hold = dict(result.get("hold") or {})
+        else:
+            self._physical_hold = None
+        return result
 
     def place(self, target: str, object_name: str) -> bool:
-        if not self._physical_output_available(target):
-            return self._release_at_current_pose(target, object_name)
-        result = self.place_skill.run(
-            self._context(
-                f"place {object_name} at {target}",
-                target=target,
-                object_name=object_name,
-            )
+        from robot_agent.skills.competition_transport import run_physical_place
+
+        station = self.scene_context.output_ports.get(target)
+        if station is None or not self._physical_hold:
+            return False
+        self._last_place = run_physical_place(
+            self.backend,
+            object_name=object_name,
+            target_xy=delivery_slot_target(station.center[:2], object_name),
         )
-        return bool(result.success)
+        if bool(self._last_place.get("success", False)):
+            self._physical_hold = None
+        return bool(self._last_place.get("success", False))
 
     def verify(self, target: str, object_name: str) -> bool:
         import numpy as np
@@ -658,14 +479,11 @@ class OfficialCompetitionDriver:
         if station is None:
             return False
         try:
-            qpos_addr = self.backend._get_object_joint_addr(object_name)
-            if isinstance(qpos_addr, tuple):
-                object_xy = np.asarray(
-                    self.backend.env.sim.data.qpos[qpos_addr[0]:qpos_addr[0] + 2],
-                    dtype=float,
-                )
-            else:
-                return False
+            body_id = self.backend.env.obj_body_id[object_name]
+            object_xy = np.asarray(
+                self.backend.env.sim.data.body_xpos[body_id][:2],
+                dtype=float,
+            )
             target_xy = np.asarray(station.center[:2], dtype=float)
             distance = float(np.linalg.norm(object_xy - target_xy))
             recorder = getattr(self.backend, "_record_trajectory_frame", None)
