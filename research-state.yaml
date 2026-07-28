@@ -1,0 +1,96 @@
+project:
+  title: "JCIIOT 2026 robust hybrid mobile manipulation"
+  question: "Can a verified hybrid controller retain full public score while generalizing to explicit pose and dynamics perturbations without private simulator-state shortcuts?"
+  status: active
+  started: "2026-07-28"
+  domain: "robot imitation learning and mobile manipulation"
+
+competition:
+  official_commit: "0dcdddf18a9e694569aa1433cdfc04eb097fed78"
+  public_score_total: 100
+  scoring_priority:
+    - task_score
+    - zero_collision
+    - held_out_success
+    - elapsed_time
+    - innovation
+  claim_boundary: "Public fixed-scene local scorer only; no BienData or organizer-verified score."
+
+literature:
+  key_papers:
+    - id: robomimic-v05
+      title: "robomimic v0.5"
+      authors: "ARISE Initiative"
+      year: 2026
+      relevance: "Bundled implementation provides BC-RNN, BC-Transformer, action normalization, future action prediction, and UNet Diffusion Policy."
+    - id: mimicgen
+      title: "MimicGen: A Data Generation System for Scalable Robot Learning using Human Demonstrations"
+      authors: "Mandlekar et al."
+      year: 2023
+      relevance: "Object-relative subtask transformation is applicable to generating perturbed JCIIOT teacher trajectories."
+    - id: diffusion-policy
+      title: "Diffusion Policy: Visuomotor Policy Learning via Action Diffusion"
+      authors: "Chi et al."
+      year: 2023
+      relevance: "Candidate only if simple BC exhibits persistent multimodal correction failures."
+    - id: act
+      title: "Learning Fine-Grained Bimanual Manipulation with Low-Cost Hardware"
+      authors: "Zhao et al."
+      year: 2023
+      relevance: "Action chunking is a candidate only if compounding error is measured after the BC data interface is proven."
+  open_problems:
+    - "Reliable bimanual grasp under small object and base pose shifts."
+    - "Physical multi-object placement without direct qpos or attachment-state mutation."
+    - "Separating task-policy error from data and action-interface error."
+  evidence_gaps:
+    - "No explicit pose or dynamics perturbation results for the incumbent."
+    - "No competition-native Tiago HDF5 with issued actions and exact observations."
+    - "No clean scored-path compliance result."
+
+hypotheses:
+  - id: H1
+    statement: "Explicit object and base pose perturbations will reveal failures hidden by deterministic multi-seed resets."
+    status: active
+    motivation: "The previous 80-run batch had identical trajectory lengths and final geometry."
+    parent: null
+    priority: high
+  - id: H2
+    statement: "Object-relative, physically replayed teacher segments will be more robust than fixed world-waypoint replay."
+    status: pending
+    motivation: "MimicGen-style transformation preserves task geometry while varying initial state."
+    parent: null
+    priority: high
+  - id: H3
+    statement: "BC-Transformer will improve over BC-RNN only after exact Tiago action, observation, and temporal alignment are validated."
+    status: pending
+    motivation: "The official 500-epoch checkpoint recorded zero best rollout success despite a relevant architecture."
+    parent: null
+    priority: high
+  - id: H4
+    statement: "Diffusion Policy or ACT will add value only when simple BC failures remain multimodal or temporally inconsistent after data correction."
+    status: pending
+    motivation: "Larger generative policies cannot repair an invalid dataset or evaluation adapter."
+    parent: null
+    priority: medium
+
+experiments:
+  proxy_metric: "Held-out full-score rate subject to zero scored collisions."
+  baseline_value: null
+  best_value: null
+  total_runs: 0
+  next_experiment: "experiments/h1-explicit-pose-perturbation/protocol.md"
+  trajectory: []
+
+outer_loop:
+  cycle: 0
+  last_direction: null
+  last_reflection: "Bootstrap complete; measure H1 before modifying the incumbent."
+
+workspace:
+  findings: "findings.md"
+  log: "research-log.md"
+  literature_dir: "literature/"
+  experiments_dir: "experiments/"
+  to_human_dir: "to_human/"
+  paper_dir: "paper/"
+  large_artifacts: "/Users/wangpeng/jciiot-2026-assets and remote experiment directories"
