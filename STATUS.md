@@ -27,6 +27,9 @@
 - 下载并逐项哈希核验官方 11 个 Git LFS 资产；权重、示例 HDF5、五个 USD 和四个 mesh ZIP 均与 LFS 对象及用户给定大小一致。
 - 安全解析公开 checkpoint：实际为 L1 Tiago 20 维 BC-Transformer、epoch 500，保存的最佳 rollout success rate 为 0.0；服务器在完全匹配核心 requirements 的隔离环境通过未修改公开抓取 evaluator 重复 3 次均失败。
 - 审计 591 MB HDF5：仅含 5 条 Fetch/iGibson 厨房整理演示，action shape 为 10，与 JCIIOT Tiago 的 20 维动作不兼容，只能作为格式样例。
+- 完成五关官方 checkpoint 的 seed 0 真实抓取基线：11 个可配置物体尝试中 0/11 通过物理抓取门槛；两次碰撞均来自 L3 辅助工位，L1 far 物体缺少双侧 grasp site。
+- L1 完成 28 份支撑、重抓和推移诊断记录，其中两份脚本异常记录明确标为无效；其余实验均未通过 cradle 或 push hard gate，当前 8502 服务没有切换。
+- 证明 L1 官方端壁抓取能真实接触并抬升，但长距离移动发生滑落；箱体中段对向实验能获得瞬时双臂 fingertip 接触，却无法承重抬升。固定腕姿的位置参数扫描已终止，后续必须显式重定向 Robotiq 闭合轴或改用分段桌面推拖。
 - 核对 mesh 历史包：当前官方源码中的 44 个相关 OBJ 与 v5 包逐字节一致，无需覆盖解压；USD 仅作为场景/可视化源资产归档。
 - 证明候选的 `app.py`、`task_config.json` 和 `task_subprocess_runner.py` 与锁定官方源码 SHA-256 一致；服务器无可访问 X display，图形按钮/可见 viewer 本身未在该机验证。
 - 实现原创 SOP 生成器：不读取官方手写 SOP Markdown，确定性解析五份原始 DOCX，并用公开 Qwen3-VL-2B-Instruct 离线生成带哈希的图片证据；5/5 文档和 25/25 图片通过 schema 与官方配置/语义地图交叉检查。
@@ -38,7 +41,7 @@
 
 ## 当前结论
 
-主线仍采用可验证混合架构，但最终物理执行需要收回到标准原子技能和 `EnvBackend` 边界：确定性任务校验与安全导航保留；现有几何控制器转为离线示范教师和安全参考；抓取使用比赛专用 Tiago 数据训练的对象族 robomimic 策略；接触、抬升、运输和放置继续由显式物理验证器把关。当前候选是可复现固定场景基线，不是最终提交候选。详细审计见 `research/notes/official-assets-and-score-reality-audit-2026-07-28.md`。
+主线仍采用可验证混合架构，但最终物理执行需要收回到标准原子技能和 `EnvBackend` 边界：确定性任务校验与安全导航保留；几何控制器先解决腕姿对齐并作为离线示范教师和安全参考；只有采集到比赛专用 Tiago 成功轨迹后才比较 BC-RNN 与 Diffusion Policy；接触、抬升、运输和放置继续由显式物理验证器把关。当前候选是可复现固定场景基线，不是最终提交候选，也没有可宣称的真实物理满分。详细审计见 `research/notes/official-assets-and-score-reality-audit-2026-07-28.md` 和 `autoresearch/classic-260728-l1-physical/conclusion.md`。
 
 ## 阻塞与风险
 
@@ -49,6 +52,7 @@
 - 公开 checkpoint 在 requirements-pinned L1 evaluator 上稳定失败；示例 HDF5 又不是比赛数据，不能依赖官方资产替代自采 Tiago 演示。
 - L5 约 281.5 秒，可靠性已达标但效率仍有优化空间；缩短等待必须以满分和零碰撞为约束。
 - 当前创新以系统集成为主，SOP 原创证据链已完成，仍需用模块消融和失败统计增强 40% 创新论证。
+- L1 固定腕姿位置扫描已经被物理实验否决；腕姿旋转约束、关节可达性和旋转过程碰撞风险尚未验证。
 - VLM 图片描述可能为空或不精确，不能作为任务真值；当前实现只把它作为离线证据，任务合同仍由 Prompt、Erratum、官方配置和语义地图交叉验证。
 - 公开同赛题 fork 的自报结果尚未在未修改官方评分器上独立复现。
 - 评测服务器、联网策略、隐藏扰动和单关时间限制仍待组委会确认。
@@ -56,10 +60,10 @@
 
 ## 下一里程碑
 
-1. 保留 requirements-pinned checkpoint 0/3 复现及环境锁、日志和哈希，作为官方权重不可直接依赖的证据。
-2. 建立不修改锁定场景的独立扰动评测 harness，并先测现有几何基线的真实失效边界。
-3. 扩展官方 L1 collector 到四个对象族，先通过单轨迹 overfit，再做 50-demo/族的 BC-RNN 与 BC-Transformer 小规模对照。
-4. 用真实物理动作替换 attachment 相对位姿修改，恢复原子技能链；三训练种子和扰动验收通过后再做最终 ZIP。
+1. 在高位无接触区计算并执行双腕姿重定向，使 Robotiq 闭合轴与箱体中段两侧壁法向对齐；先验收单次零碰撞重抓和 0.13 m 抬升。
+2. 抬升通过后加入 0.50 m 接触保持运输门槛，连续通过两次之前不切换 8502；若腕姿路线不可达，则转入单独的桌面分段推拖 gate。
+3. 只有得到真实 Tiago 成功轨迹后才启动 collector、单轨迹 overfit、BC-RNN 与 Diffusion Policy 对照；示例 Fetch HDF5 不进入训练。
+4. 建立不修改锁定场景的独立扰动评测 harness；三训练种子和扰动验收通过后再做最终 ZIP。
 
 ## 更新规则
 

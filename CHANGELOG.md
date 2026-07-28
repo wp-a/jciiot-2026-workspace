@@ -4,6 +4,7 @@
 
 ## 2026-07-28
 
+- **真实物理门槛仍未通过**：requirements-pinned 五关官方 checkpoint 基线为 0/11；L1 完成 28 份支撑、重抓和推移诊断记录（其中 2 份脚本异常记录无效），没有任何 cradle/push hard gate 通过，当前 8502 服务未切换。确认固定腕姿的箱沿抓取虽能真实抬升，但运输会滑落；中段对向接触无法承重，下一步转为显式腕姿重定向或分段桌面推拖。
 - **成绩口径更正**：此前“官方满分/100/100”均指五个公开固定场景经未修改公开评分器得到的本地结果，不是 BienData 成绩、组委会复现或隐藏扰动成绩。当前预测 ZIP 降级为 `fixed-public-scene-baseline`，暂不称最终包。
 - 完整下载并核验 11 个官方 LFS 资产。公开 checkpoint 实际保存 L1 Tiago BC-Transformer epoch 500，元数据最佳 rollout success rate 为 0.0，服务器在 requirements-pinned 运行时通过公开 evaluator 复跑 0/3；示例 HDF5 是 5 条 Fetch/iGibson、10 维动作演示，不是赛题训练集。
 - 核对五个 USD 为场景视觉源包；mesh v5 的 44 个 OBJ 与当前官方源码逐字节一致，旧版 ZIP 不覆盖当前树。旧的“LFS 配额仍超限”状态结论失效。

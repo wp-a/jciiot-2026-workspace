@@ -1,0 +1,29 @@
+record	valid	accepted	mode	physical_grasp	lift_m	support_steps	physical_contact_steps	object_translation_m	base_translation_m	collision_frames	failure_stage	notes
+probe.json	yes	no	post_lift_hold_probe	yes	0.204334	0	0	0	0.000011	0	-	finger-only hold
+geometry.json	yes	no	post_lift_hold_probe	yes	0.204334	0	0	0	0.000011	0	-	geometry snapshot
+inward-040.json	yes	no	inward_support_probe	yes	0.204334	0	0	0	0.000011	0	-	40 mm inward; finger-only
+inward-080.json	yes	no	inward_support_probe	yes	0.204334	0	0	0	0.000011	0	-	80 mm inward; finger-only
+recenter-140.json	yes	no	inward_support_probe	yes	0.204334	0	0	0	0.000011	0	-	140 mm inward; finger-only
+center-regrasp-240.json	yes	no	table_assisted_center_regrasp	no	0	0	0	0	0.000087	0	lower_to_table	initial lowering limit
+center-regrasp-240-torso.json	yes	no	table_assisted_center_regrasp	no	0	0	0	0	0.000267	0	lower_torso_assist	torso-assisted lowering failed
+center-regrasp-240-release.json	yes	no	table_assisted_center_regrasp	no	0.000006	0	0	0	0.000075	0	retreat_from_walls	release succeeded; low retreat blocked
+center-regrasp-240-direct.json	yes	no	table_assisted_center_regrasp	no	0.001124	0	0	0	0.000172	0	translate_to_center	low translation blocked
+center-regrasp-240-clearance.json	yes	no	table_assisted_center_regrasp	no	0.006909	7	0	0	0.000534	0	approach_center_walls	transient top-rim support
+center-regrasp-contact-trigger.json	yes	no	table_assisted_center_regrasp	no	0.000000	1	0	0	0.000080	0	center_contact	contact not stable
+open-cradle-hold.json	yes	no	table_assisted_center_regrasp	no	-0.000016	1	0	0	0.000077	0	hold_table_cradle	table carried object
+open-cradle-compliant.json	yes	no	table_assisted_center_regrasp	no	0.000668	18	0	0	0.000147	0	hold_table_cradle	transient top-rim support
+open-cradle-lift.json	yes	no	table_assisted_center_regrasp	no	-0.000003	20	0	0	0.000160	0	hold_elevated_cradle	invalid as load-bearing evidence
+open-cradle-lift-fixed.json	yes	no	table_assisted_center_regrasp	no	0.000001	20	0	0	0.000151	0	lift_open_cradle	box stayed on table
+center-pinch-160.json	yes	no	table_assisted_center_regrasp	no	0.008175	16	0	0	0.000495	0	approach_center_walls	inside-container approach
+center-pinch-sync-z.json	no	no	post_lift_hold_probe	yes	0.204334	0	0	0	0	0	-	NameError debug record
+center-pinch-sync-z-fixed.json	yes	no	table_assisted_center_regrasp	no	0	0	0	0	0.000085	0	center_contact	no center contact
+center-pinch-acquire.json	yes	no	table_assisted_center_regrasp	no	0	0	0	0	0.000085	0	center_contact	no contact after 140 steps
+physical-push-500.json	no	no	physical_push_probe	yes	0.204334	0	166	0	0	0	collision	KeyError debug record
+physical-push-controller.json	yes	no	physical_push_probe	yes	0.204334	0	600	0	0.002087	0	timeout	controller base barely moved
+physical-push-coupled.json	yes	no	physical_push_probe	yes	0.204334	0	166	0	0.331513	2	collision	torso versus production-line proxy
+physical-push-staged.json	yes	no	physical_push_probe	yes	0.204334	0	0	0	0.000316	0	lower_to_table	high shift moved box about 0.175 m before lower failure
+center-opposed-100.json	yes	no	table_assisted_center_regrasp	no	-0.000112	0	0	0	0.000158	0	approach_center_walls	bilateral fingertips at final step
+center-opposed-contact-stop.json	yes	no	table_assisted_center_regrasp	no	-0.000114	0	0	0	0.000157	0	approach_center_walls	strict grasp stop was not met
+center-opposed-bilateral-stop.json	yes	no	table_assisted_center_regrasp	no	-0.000126	0	0	0	0.000219	0	center_contact	closing removed opposed contacts
+center-opposed-squeeze-025.json	yes	no	table_assisted_center_regrasp	no	0	0	0	0	0.000086	0	squeeze_center_walls	bilateral contact lasted only one step
+center-opposed-lift-on-contact.json	yes	no	table_assisted_center_regrasp	no	0	0	0	0	0.000086	0	lift_center_squeeze	180-step lift left box on table

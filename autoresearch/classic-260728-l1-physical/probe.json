@@ -1,0 +1,457 @@
+{
+  "accepted": false,
+  "attachment_calls": 0,
+  "base_translation_m": 1.1362421883990076e-05,
+  "collision_frames": 0,
+  "dropped": false,
+  "elapsed_s": 33.248823,
+  "final_object_z": 1.3200393008288058,
+  "gate_failures": [
+    "support_contact_steps",
+    "base_translation_m"
+  ],
+  "grasp_result": {
+    "contacts": {
+      "left": true,
+      "right": true
+    },
+    "error": null,
+    "failure_stage": null,
+    "hold": {
+      "base_xy": [
+        8.000020794876885,
+        4.599995138483302
+      ],
+      "base_yaw": -3.13944149017334,
+      "object_pos": [
+        7.361575557761213,
+        4.61740519766756,
+        1.3758788960646315
+      ],
+      "object_z": 1.3758788960646315
+    },
+    "lift_success": true,
+    "object_name": "line_5_container_h01_near",
+    "source": "input_5",
+    "success": true
+  },
+  "hold_probe": {
+    "collision_steps": 0,
+    "observations": [
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3293102782163906,
+        "step": 1
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.32881932319927,
+        "step": 2
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3283203858059165,
+        "step": 3
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.327824024131843,
+        "step": 4
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.327326378290652,
+        "step": 5
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3268400484725713,
+        "step": 6
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3263526617505839,
+        "step": 7
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3258647058570954,
+        "step": 8
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3253739086313023,
+        "step": 9
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3248921069054995,
+        "step": 10
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3244093387963762,
+        "step": 11
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3239166449663256,
+        "step": 12
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3234399162201105,
+        "step": 13
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3229464305356238,
+        "step": 14
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3224624154903135,
+        "step": 15
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3219801232601809,
+        "step": 16
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3214945920060632,
+        "step": 17
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.321009951446079,
+        "step": 18
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.32051906083046,
+        "step": 19
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3200393008288058,
+        "step": 20
+      }
+    ],
+    "support_contact_steps": 0
+  },
+  "infrastructure_error": null,
+  "lift_m": 0.20433407211910515,
+  "mode": "post_lift_hold_probe",
+  "move_success": true,
+  "object_name": "line_5_container_h01_near",
+  "object_pose_writes": 0,
+  "official_commit": "0dcdddf18a9e694569aa1433cdfc04eb097fed78",
+  "physical_grasp": true,
+  "post_grasp_object_z": 1.3298122243156876,
+  "pre_grasp_object_z": 1.1254781521965824,
+  "seed": 0,
+  "support_contact_steps": 0,
+  "trajectory": "/home/user/jciiot-2026/results/l1-cradle-20260728a/trajectory.json"
+}

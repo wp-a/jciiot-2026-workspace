@@ -1,0 +1,6276 @@
+{
+  "accepted": false,
+  "attachment_calls": 0,
+  "base_translation_m": 1.1245792589340788e-05,
+  "collision_frames": 0,
+  "dropped": false,
+  "elapsed_s": 38.369433,
+  "final_geometry": {
+    "geometries": [
+      {
+        "is_object": false,
+        "name": "robot0_arm_5_collision",
+        "size": [
+          0.06305478200882722,
+          0.06666089706284406,
+          0.11190343402346214
+        ],
+        "type": 7,
+        "world_position": [
+          7.439777369675907,
+          4.7476520368330934,
+          1.5228417663754672
+        ],
+        "world_rotation": [
+          [
+            0.38438488685606664,
+            -0.6525533201156986,
+            -0.6530102779915701
+          ],
+          [
+            -0.5483757677258962,
+            0.40763887740629756,
+            -0.7301469461676652
+          ],
+          [
+            0.742652190549306,
+            0.6387524638174887,
+            -0.20115420413057494
+          ]
+        ]
+      },
+      {
+        "is_object": false,
+        "name": "robot0_arm_6_collision",
+        "size": [
+          0.02048059501737246,
+          0.041414488916123836,
+          0.05674147286507764
+        ],
+        "type": 7,
+        "world_position": [
+          7.385813787050402,
+          4.694467722850117,
+          1.50136783581356
+        ],
+        "world_rotation": [
+          [
+            -0.6540805158706453,
+            0.3194093335949477,
+            -0.6856794851611281
+          ],
+          [
+            0.40642903031202215,
+            0.912909979621894,
+            0.037560783090747965
+          ],
+          [
+            0.6379609095219139,
+            -0.2541122718783811,
+            -0.7269338561401497
+          ]
+        ]
+      },
+      {
+        "is_object": false,
+        "name": "gripper0_right_hand_collision",
+        "size": [
+          0.037500953339323954,
+          0.04279378621695762,
+          0.05440415346503039
+        ],
+        "type": 7,
+        "world_position": [
+          7.335466900894413,
+          4.6971908532369095,
+          1.447862463550591
+        ],
+        "world_rotation": [
+          [
+            -0.31896334500334705,
+            -0.6377064198630363,
+            -0.7011368672447236
+          ],
+          [
+            -0.9132021820625024,
+            0.40475217661042157,
+            0.04730169347296942
+          ],
+          [
+            0.2536220795210079,
+            0.6553672234668098,
+            -0.7114560022832365
+          ]
+        ]
+      },
+      {
+        "is_object": false,
+        "name": "robot0_arm_5_left_collision",
+        "size": [
+          0.06305478200882722,
+          0.06666089706284406,
+          0.11190343402346214
+        ],
+        "type": 7,
+        "world_position": [
+          7.4446498633147575,
+          4.440737318072911,
+          1.5153509002468737
+        ],
+        "world_rotation": [
+          [
+            -0.4090879362267858,
+            0.6446898003328269,
+            0.6457725000187987
+          ],
+          [
+            -0.5733027638884988,
+            0.36899176137095613,
+            -0.7315524731406273
+          ],
+          [
+            -0.7099091500688789,
+            -0.6694924505826632,
+            0.21865236623760292
+          ]
+        ]
+      },
+      {
+        "is_object": false,
+        "name": "robot0_arm_6_left_collision",
+        "size": [
+          0.020480595017372455,
+          0.041414488916123836,
+          0.05674147286507764
+        ],
+        "type": 7,
+        "world_position": [
+          7.391027753771159,
+          4.493957505617439,
+          1.4927755164736487
+        ],
+        "world_rotation": [
+          [
+            0.6462142722349662,
+            -0.2915154041181698,
+            0.7052842572478573
+          ],
+          [
+            0.36779183579243624,
+            0.928725577411148,
+            0.046882484861277496
+          ],
+          [
+            -0.6686824955719053,
+            0.22910166089349604,
+            0.7073727087551362
+          ]
+        ]
+      },
+      {
+        "is_object": false,
+        "name": "gripper0_left_hand_collision",
+        "size": [
+          0.037500953339323954,
+          0.04279378621695762,
+          0.05440415346503039
+        ],
+        "type": 7,
+        "world_position": [
+          7.339238341720378,
+          4.490547445718527,
+          1.4407055865445149
+        ],
+        "world_rotation": [
+          [
+            0.29205384534316536,
+            -0.6288859786582259,
+            -0.7205601829600056
+          ],
+          [
+            -0.9284046789873646,
+            -0.36737845627071763,
+            -0.05565808029849789
+          ],
+          [
+            -0.22971570136723352,
+            0.6852266017276554,
+            -0.6911549759859437
+          ]
+        ]
+      },
+      {
+        "is_object": true,
+        "name": "line_5_container_h01_near_visual",
+        "size": [
+          0.1421622734878171,
+          0.20265768621790992,
+          0.30262294453150024
+        ],
+        "type": 7,
+        "world_position": [
+          6.921725888463414,
+          4.588045116712329,
+          1.3764565692745767
+        ],
+        "world_rotation": [
+          [
+            0.4773910632806597,
+            0.0016871177502515537,
+            0.8786893229881997
+          ],
+          [
+            -0.019417919050502313,
+            -0.999733695473606,
+            0.012469264390415638
+          ],
+          [
+            0.8784763611614782,
+            -0.0230150335299937,
+            -0.4772311715637445
+          ]
+        ]
+      },
+      {
+        "is_object": true,
+        "name": "line_5_container_h01_near_container_h01_col_bottom",
+        "size": [
+          0.3,
+          0.2,
+          0.009
+        ],
+        "type": 6,
+        "world_position": [
+          6.8729907586181165,
+          4.589977757273049,
+          1.286669664998807
+        ],
+        "world_rotation": [
+          [
+            0.8786785999496032,
+            -0.001968552908152999,
+            0.4774097221360803
+          ],
+          [
+            0.01247222191065523,
+            0.9997448496641643,
+            -0.01883292995222066
+          ],
+          [
+            -0.47725083726612044,
+            0.022502452520151685,
+            0.8784789570384495
+          ]
+        ]
+      },
+      {
+        "is_object": true,
+        "name": "line_5_container_h01_near_container_h01_col_front",
+        "size": [
+          0.3,
+          0.007,
+          0.125
+        ],
+        "type": 6,
+        "world_position": [
+          6.928750217097176,
+          4.394842381413408,
+          1.3842302506788777
+        ],
+        "world_rotation": [
+          [
+            0.8786785999496032,
+            -0.001968552908152999,
+            0.4774097221360803
+          ],
+          [
+            0.01247222191065523,
+            0.9997448496641643,
+            -0.01883292995222066
+          ],
+          [
+            -0.47725083726612044,
+            0.022502452520151685,
+            0.8784789570384495
+          ]
+        ]
+      },
+      {
+        "is_object": true,
+        "name": "line_5_container_h01_near_container_h01_col_back",
+        "size": [
+          0.3,
+          0.007,
+          0.125
+        ],
+        "type": 6,
+        "world_position": [
+          6.927990355674628,
+          4.780743893383775,
+          1.3929161973516564
+        ],
+        "world_rotation": [
+          [
+            0.8786785999496032,
+            -0.001968552908152999,
+            0.4774097221360803
+          ],
+          [
+            0.01247222191065523,
+            0.9997448496641643,
+            -0.01883292995222066
+          ],
+          [
+            -0.47725083726612044,
+            0.022502452520151685,
+            0.8784789570384495
+          ]
+        ]
+      },
+      {
+        "is_object": true,
+        "name": "line_5_container_h01_near_container_h01_col_left",
+        "size": [
+          0.007,
+          0.2,
+          0.125
+        ],
+        "type": 6,
+        "world_position": [
+          6.670917456600668,
+          4.5841387763787695,
+          1.5284077193342402
+        ],
+        "world_rotation": [
+          [
+            0.8786785999496032,
+            -0.001968552908152999,
+            0.4774097221360803
+          ],
+          [
+            0.01247222191065523,
+            0.9997448496641643,
+            -0.01883292995222066
+          ],
+          [
+            -0.47725083726612044,
+            0.022502452520151685,
+            0.8784789570384495
+          ]
+        ]
+      },
+      {
+        "is_object": true,
+        "name": "line_5_container_h01_near_container_h01_col_right",
+        "size": [
+          0.007,
+          0.2,
+          0.125
+        ],
+        "type": 6,
+        "world_position": [
+          7.185823116171136,
+          4.591447498418414,
+          1.2487387286962939
+        ],
+        "world_rotation": [
+          [
+            0.8786785999496032,
+            -0.001968552908152999,
+            0.4774097221360803
+          ],
+          [
+            0.01247222191065523,
+            0.9997448496641643,
+            -0.01883292995222066
+          ],
+          [
+            -0.47725083726612044,
+            0.022502452520151685,
+            0.8784789570384495
+          ]
+        ]
+      }
+    ],
+    "object_position": [
+      6.928370286385902,
+      4.587793137398592,
+      1.388573224015267
+    ]
+  },
+  "final_object_z": 1.388573224015267,
+  "gate_failures": [
+    "support_contact_steps",
+    "base_translation_m"
+  ],
+  "grasp_result": {
+    "contacts": {
+      "left": true,
+      "right": true
+    },
+    "error": null,
+    "failure_stage": null,
+    "hold": {
+      "base_xy": [
+        8.000020794876885,
+        4.599995138483302
+      ],
+      "base_yaw": -3.13944149017334,
+      "object_pos": [
+        7.361575557761213,
+        4.61740519766756,
+        1.3758788960646315
+      ],
+      "object_z": 1.3758788960646315
+    },
+    "lift_success": true,
+    "object_name": "line_5_container_h01_near",
+    "source": "input_5",
+    "success": true
+  },
+  "hold_probe": {
+    "collision_steps": 0,
+    "end_geometry": {
+      "geometries": [
+        {
+          "is_object": false,
+          "name": "robot0_arm_5_collision",
+          "size": [
+            0.06305478200882722,
+            0.06666089706284406,
+            0.11190343402346214
+          ],
+          "type": 7,
+          "world_position": [
+            7.439777369675907,
+            4.7476520368330934,
+            1.5228417663754672
+          ],
+          "world_rotation": [
+            [
+              0.38438488685606664,
+              -0.6525533201156986,
+              -0.6530102779915701
+            ],
+            [
+              -0.5483757677258962,
+              0.40763887740629756,
+              -0.7301469461676652
+            ],
+            [
+              0.742652190549306,
+              0.6387524638174887,
+              -0.20115420413057494
+            ]
+          ]
+        },
+        {
+          "is_object": false,
+          "name": "robot0_arm_6_collision",
+          "size": [
+            0.02048059501737246,
+            0.041414488916123836,
+            0.05674147286507764
+          ],
+          "type": 7,
+          "world_position": [
+            7.385813787050402,
+            4.694467722850117,
+            1.50136783581356
+          ],
+          "world_rotation": [
+            [
+              -0.6540805158706453,
+              0.3194093335949477,
+              -0.6856794851611281
+            ],
+            [
+              0.40642903031202215,
+              0.912909979621894,
+              0.037560783090747965
+            ],
+            [
+              0.6379609095219139,
+              -0.2541122718783811,
+              -0.7269338561401497
+            ]
+          ]
+        },
+        {
+          "is_object": false,
+          "name": "gripper0_right_hand_collision",
+          "size": [
+            0.037500953339323954,
+            0.04279378621695762,
+            0.05440415346503039
+          ],
+          "type": 7,
+          "world_position": [
+            7.335466900894413,
+            4.6971908532369095,
+            1.447862463550591
+          ],
+          "world_rotation": [
+            [
+              -0.31896334500334705,
+              -0.6377064198630363,
+              -0.7011368672447236
+            ],
+            [
+              -0.9132021820625024,
+              0.40475217661042157,
+              0.04730169347296942
+            ],
+            [
+              0.2536220795210079,
+              0.6553672234668098,
+              -0.7114560022832365
+            ]
+          ]
+        },
+        {
+          "is_object": false,
+          "name": "robot0_arm_5_left_collision",
+          "size": [
+            0.06305478200882722,
+            0.06666089706284406,
+            0.11190343402346214
+          ],
+          "type": 7,
+          "world_position": [
+            7.4446498633147575,
+            4.440737318072911,
+            1.5153509002468737
+          ],
+          "world_rotation": [
+            [
+              -0.4090879362267858,
+              0.6446898003328269,
+              0.6457725000187987
+            ],
+            [
+              -0.5733027638884988,
+              0.36899176137095613,
+              -0.7315524731406273
+            ],
+            [
+              -0.7099091500688789,
+              -0.6694924505826632,
+              0.21865236623760292
+            ]
+          ]
+        },
+        {
+          "is_object": false,
+          "name": "robot0_arm_6_left_collision",
+          "size": [
+            0.020480595017372455,
+            0.041414488916123836,
+            0.05674147286507764
+          ],
+          "type": 7,
+          "world_position": [
+            7.391027753771159,
+            4.493957505617439,
+            1.4927755164736487
+          ],
+          "world_rotation": [
+            [
+              0.6462142722349662,
+              -0.2915154041181698,
+              0.7052842572478573
+            ],
+            [
+              0.36779183579243624,
+              0.928725577411148,
+              0.046882484861277496
+            ],
+            [
+              -0.6686824955719053,
+              0.22910166089349604,
+              0.7073727087551362
+            ]
+          ]
+        },
+        {
+          "is_object": false,
+          "name": "gripper0_left_hand_collision",
+          "size": [
+            0.037500953339323954,
+            0.04279378621695762,
+            0.05440415346503039
+          ],
+          "type": 7,
+          "world_position": [
+            7.339238341720378,
+            4.490547445718527,
+            1.4407055865445149
+          ],
+          "world_rotation": [
+            [
+              0.29205384534316536,
+              -0.6288859786582259,
+              -0.7205601829600056
+            ],
+            [
+              -0.9284046789873646,
+              -0.36737845627071763,
+              -0.05565808029849789
+            ],
+            [
+              -0.22971570136723352,
+              0.6852266017276554,
+              -0.6911549759859437
+            ]
+          ]
+        },
+        {
+          "is_object": true,
+          "name": "line_5_container_h01_near_visual",
+          "size": [
+            0.1421622734878171,
+            0.20265768621790992,
+            0.30262294453150024
+          ],
+          "type": 7,
+          "world_position": [
+            6.921725888463414,
+            4.588045116712329,
+            1.3764565692745767
+          ],
+          "world_rotation": [
+            [
+              0.4773910632806597,
+              0.0016871177502515537,
+              0.8786893229881997
+            ],
+            [
+              -0.019417919050502313,
+              -0.999733695473606,
+              0.012469264390415638
+            ],
+            [
+              0.8784763611614782,
+              -0.0230150335299937,
+              -0.4772311715637445
+            ]
+          ]
+        },
+        {
+          "is_object": true,
+          "name": "line_5_container_h01_near_container_h01_col_bottom",
+          "size": [
+            0.3,
+            0.2,
+            0.009
+          ],
+          "type": 6,
+          "world_position": [
+            6.8729907586181165,
+            4.589977757273049,
+            1.286669664998807
+          ],
+          "world_rotation": [
+            [
+              0.8786785999496032,
+              -0.001968552908152999,
+              0.4774097221360803
+            ],
+            [
+              0.01247222191065523,
+              0.9997448496641643,
+              -0.01883292995222066
+            ],
+            [
+              -0.47725083726612044,
+              0.022502452520151685,
+              0.8784789570384495
+            ]
+          ]
+        },
+        {
+          "is_object": true,
+          "name": "line_5_container_h01_near_container_h01_col_front",
+          "size": [
+            0.3,
+            0.007,
+            0.125
+          ],
+          "type": 6,
+          "world_position": [
+            6.928750217097176,
+            4.394842381413408,
+            1.3842302506788777
+          ],
+          "world_rotation": [
+            [
+              0.8786785999496032,
+              -0.001968552908152999,
+              0.4774097221360803
+            ],
+            [
+              0.01247222191065523,
+              0.9997448496641643,
+              -0.01883292995222066
+            ],
+            [
+              -0.47725083726612044,
+              0.022502452520151685,
+              0.8784789570384495
+            ]
+          ]
+        },
+        {
+          "is_object": true,
+          "name": "line_5_container_h01_near_container_h01_col_back",
+          "size": [
+            0.3,
+            0.007,
+            0.125
+          ],
+          "type": 6,
+          "world_position": [
+            6.927990355674628,
+            4.780743893383775,
+            1.3929161973516564
+          ],
+          "world_rotation": [
+            [
+              0.8786785999496032,
+              -0.001968552908152999,
+              0.4774097221360803
+            ],
+            [
+              0.01247222191065523,
+              0.9997448496641643,
+              -0.01883292995222066
+            ],
+            [
+              -0.47725083726612044,
+              0.022502452520151685,
+              0.8784789570384495
+            ]
+          ]
+        },
+        {
+          "is_object": true,
+          "name": "line_5_container_h01_near_container_h01_col_left",
+          "size": [
+            0.007,
+            0.2,
+            0.125
+          ],
+          "type": 6,
+          "world_position": [
+            6.670917456600668,
+            4.5841387763787695,
+            1.5284077193342402
+          ],
+          "world_rotation": [
+            [
+              0.8786785999496032,
+              -0.001968552908152999,
+              0.4774097221360803
+            ],
+            [
+              0.01247222191065523,
+              0.9997448496641643,
+              -0.01883292995222066
+            ],
+            [
+              -0.47725083726612044,
+              0.022502452520151685,
+              0.8784789570384495
+            ]
+          ]
+        },
+        {
+          "is_object": true,
+          "name": "line_5_container_h01_near_container_h01_col_right",
+          "size": [
+            0.007,
+            0.2,
+            0.125
+          ],
+          "type": 6,
+          "world_position": [
+            7.185823116171136,
+            4.591447498418414,
+            1.2487387286962939
+          ],
+          "world_rotation": [
+            [
+              0.8786785999496032,
+              -0.001968552908152999,
+              0.4774097221360803
+            ],
+            [
+              0.01247222191065523,
+              0.9997448496641643,
+              -0.01883292995222066
+            ],
+            [
+              -0.47725083726612044,
+              0.022502452520151685,
+              0.8784789570384495
+            ]
+          ]
+        }
+      ],
+      "object_position": [
+        6.928370286385902,
+        4.587793137398592,
+        1.388573224015267
+      ]
+    },
+    "hold_steps": 20,
+    "move_steps": 120,
+    "observations": [
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.358032700155205,
+            4.501783068602335,
+            1.3386585685591608
+          ],
+          "right": [
+            7.358378521683966,
+            4.73674594612986,
+            1.3421499640338412
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3301469848331364,
+        "phase": "inward",
+        "step": 1
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.35573394091484,
+            4.501691645979637,
+            1.338106007148153
+          ],
+          "right": [
+            7.3559117391191275,
+            4.7364027646985605,
+            1.3415932982775076
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3312473531631663,
+        "phase": "inward",
+        "step": 2
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.353525988318752,
+            4.5015223422954875,
+            1.3374458838260916
+          ],
+          "right": [
+            7.35349056314328,
+            4.735951291778088,
+            1.3409419860116072
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3318284842393708,
+        "phase": "inward",
+        "step": 3
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.351406801366636,
+            4.501303343745227,
+            1.3367618536530999
+          ],
+          "right": [
+            7.351143569426245,
+            4.735448718428655,
+            1.340283605334767
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.332266359884553,
+        "phase": "inward",
+        "step": 4
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.349322317497418,
+            4.501049534541911,
+            1.3361187815658684
+          ],
+          "right": [
+            7.348840872314097,
+            4.734917416731236,
+            1.339679277600308
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.332785584678607,
+        "phase": "inward",
+        "step": 5
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.347267363002643,
+            4.500779000440163,
+            1.3355657254548414
+          ],
+          "right": [
+            7.346565068775712,
+            4.734369317335094,
+            1.339149561803083
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3334201035820394,
+        "phase": "inward",
+        "step": 6
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.345225650539911,
+            4.5005026703792534,
+            1.3350615164111448
+          ],
+          "right": [
+            7.344305045704068,
+            4.733824136013963,
+            1.3386963195595802
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.334111365274352,
+        "phase": "inward",
+        "step": 7
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.343181698569538,
+            4.500211351597798,
+            1.3346357940288767
+          ],
+          "right": [
+            7.342067064782296,
+            4.733269682998749,
+            1.338312979678887
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3348844788079097,
+        "phase": "inward",
+        "step": 8
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.341171920866022,
+            4.499928389790347,
+            1.3342543757635523
+          ],
+          "right": [
+            7.339836834797545,
+            4.732726571842456,
+            1.3379795706445736
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3357212921655732,
+        "phase": "inward",
+        "step": 9
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.339138298681446,
+            4.499636217948879,
+            1.3339527197004373
+          ],
+          "right": [
+            7.337612730656673,
+            4.732178307194955,
+            1.3377097921616568
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3366294772786047,
+        "phase": "inward",
+        "step": 10
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.33713803189948,
+            4.4993486053573575,
+            1.3336776329626017
+          ],
+          "right": [
+            7.335402503147614,
+            4.731633814060061,
+            1.3374682197256478
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3375934453589753,
+        "phase": "inward",
+        "step": 11
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.335151925180188,
+            4.499055839939128,
+            1.3334292339523555
+          ],
+          "right": [
+            7.3332148766277445,
+            4.7310882835799255,
+            1.33724403444689
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3385891384254385,
+        "phase": "inward",
+        "step": 12
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.333149583633416,
+            4.498762476930533,
+            1.333243370109969
+          ],
+          "right": [
+            7.331019655333084,
+            4.730542935668039,
+            1.3370726705829459
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3396324857049149,
+        "phase": "inward",
+        "step": 13
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.331132346599926,
+            4.498464491800716,
+            1.333051018112318
+          ],
+          "right": [
+            7.328832845767052,
+            4.730005173031535,
+            1.336924522310849
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3406754649157107,
+        "phase": "inward",
+        "step": 14
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.3291696851506245,
+            4.498182512817256,
+            1.3329031823574735
+          ],
+          "right": [
+            7.326645221526974,
+            4.729473957969722,
+            1.336797631716911
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3417788859214093,
+        "phase": "inward",
+        "step": 15
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.327168615861487,
+            4.497883056648934,
+            1.332781950759342
+          ],
+          "right": [
+            7.3244681976584065,
+            4.728934078722819,
+            1.3366898807001308
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3428875314325117,
+        "phase": "inward",
+        "step": 16
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.325178859928725,
+            4.49758684599534,
+            1.332672292306968
+          ],
+          "right": [
+            7.322294239099135,
+            4.728397939362241,
+            1.3365956913741037
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3440336001058781,
+        "phase": "inward",
+        "step": 17
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.323187728338512,
+            4.497287993010854,
+            1.3325651503612161
+          ],
+          "right": [
+            7.320124646073056,
+            4.72786591220956,
+            1.3365122643538552
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3451629217826573,
+        "phase": "inward",
+        "step": 18
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.321223033974854,
+            4.4969952666846265,
+            1.3324794031830576
+          ],
+          "right": [
+            7.31795864845394,
+            4.727334435049877,
+            1.3364362987005682
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3463400578634614,
+        "phase": "inward",
+        "step": 19
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.31922087041254,
+            4.496689949920889,
+            1.332401640160429
+          ],
+          "right": [
+            7.315797108644153,
+            4.726802425823889,
+            1.336374636599729
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3474960111104433,
+        "phase": "inward",
+        "step": 20
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.317228415363839,
+            4.4963835871952185,
+            1.332326485244045
+          ],
+          "right": [
+            7.313641215999786,
+            4.7262732890568895,
+            1.336315000971078
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3486521351571121,
+        "phase": "inward",
+        "step": 21
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.3152833757546,
+            4.4960837100659745,
+            1.3322743724788073
+          ],
+          "right": [
+            7.311495939076915,
+            4.7257390235915615,
+            1.3362446969097177
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3498662222490967,
+        "phase": "inward",
+        "step": 22
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.313293962579326,
+            4.495778849313446,
+            1.332235511200921
+          ],
+          "right": [
+            7.309339446418706,
+            4.725210119981867,
+            1.3362064477384221
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3510699181971153,
+        "phase": "inward",
+        "step": 23
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.3112998831882186,
+            4.495476117106312,
+            1.3322057582678752
+          ],
+          "right": [
+            7.307177552265173,
+            4.7246855446155065,
+            1.3361859151824227
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3522675071673542,
+        "phase": "inward",
+        "step": 24
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.309312361088239,
+            4.49516311903265,
+            1.3321623944526721
+          ],
+          "right": [
+            7.30503528659616,
+            4.724155802261014,
+            1.336140153906369
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.353475074553327,
+        "phase": "inward",
+        "step": 25
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.307328114788775,
+            4.494852315471965,
+            1.332128201086818
+          ],
+          "right": [
+            7.302891010021977,
+            4.723629060408385,
+            1.336101752332226
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3546772218273386,
+        "phase": "inward",
+        "step": 26
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.305346930398775,
+            4.4945463587129595,
+            1.3321046689899325
+          ],
+          "right": [
+            7.300740025387027,
+            4.723107365180635,
+            1.3360789095915604
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3558922651582739,
+        "phase": "inward",
+        "step": 27
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.303368344184767,
+            4.494239456206195,
+            1.3320850062928589
+          ],
+          "right": [
+            7.298591078168148,
+            4.722586473139373,
+            1.336057855614715
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.357113797641279,
+        "phase": "inward",
+        "step": 28
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.30139896228314,
+            4.493925521921497,
+            1.3320611831829505
+          ],
+          "right": [
+            7.296456704854746,
+            4.722063675909812,
+            1.3360205863697265
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3583239927981086,
+        "phase": "inward",
+        "step": 29
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.299433188046894,
+            4.493613877336385,
+            1.3320289142830997
+          ],
+          "right": [
+            7.29432100809666,
+            4.7215447325927125,
+            1.3359828081429046
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3595376700323334,
+        "phase": "inward",
+        "step": 30
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.297421627492908,
+            4.493295509546785,
+            1.3320126052339856
+          ],
+          "right": [
+            7.292172864359652,
+            4.721029082236606,
+            1.335976290744275
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3607243636445485,
+        "phase": "inward",
+        "step": 31
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.295434202323948,
+            4.492982433914095,
+            1.3320010773337212
+          ],
+          "right": [
+            7.290031192153294,
+            4.72051173826884,
+            1.3359620882590302
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.361970722451537,
+        "phase": "inward",
+        "step": 32
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.293462764142315,
+            4.492661783642617,
+            1.3319942137589265
+          ],
+          "right": [
+            7.287908358564438,
+            4.719986105095508,
+            1.33592241790569
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3632200675575723,
+        "phase": "inward",
+        "step": 33
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.291493626063725,
+            4.4923489752181975,
+            1.332004318530188
+          ],
+          "right": [
+            7.285767823725555,
+            4.719469308503367,
+            1.335912970766799
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3644386380285833,
+        "phase": "inward",
+        "step": 34
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.289474084794849,
+            4.492023241317972,
+            1.3319852569293003
+          ],
+          "right": [
+            7.283626524161866,
+            4.718956062652937,
+            1.335908100712199
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.36564702496983,
+        "phase": "inward",
+        "step": 35
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.287508986040985,
+            4.491700287857169,
+            1.3319914989494093
+          ],
+          "right": [
+            7.281511206240896,
+            4.718432771889665,
+            1.3358673034747548
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.366904987375787,
+        "phase": "inward",
+        "step": 36
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.285491315445999,
+            4.491372883248995,
+            1.3319870310813675
+          ],
+          "right": [
+            7.279367114689345,
+            4.717922880208503,
+            1.3358717473394286
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3680896088467953,
+        "phase": "inward",
+        "step": 37
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.283533345144264,
+            4.491049145652967,
+            1.331985339399313
+          ],
+          "right": [
+            7.277255842736814,
+            4.717402454241331,
+            1.3358266360444893
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.369365641234238,
+        "phase": "inward",
+        "step": 38
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.281523808950185,
+            4.490721715227856,
+            1.3319765511678288
+          ],
+          "right": [
+            7.2751166941225485,
+            4.716896240441516,
+            1.3358256524409475
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3705483180129647,
+        "phase": "inward",
+        "step": 39
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.279582077610191,
+            4.490401059378071,
+            1.3319775469235602
+          ],
+          "right": [
+            7.273007393560366,
+            4.71638367203723,
+            1.335784938916595
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3718056362463906,
+        "phase": "inward",
+        "step": 40
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.277562684792105,
+            4.49007927688643,
+            1.331975353458916
+          ],
+          "right": [
+            7.270855650860387,
+            4.71588117713468,
+            1.335802738775373
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3730560552154603,
+        "phase": "inward",
+        "step": 41
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.275552939953974,
+            4.489724799780881,
+            1.331989721367442
+          ],
+          "right": [
+            7.268758849476875,
+            4.715359310104974,
+            1.3357630667454554
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3742058781959823,
+        "phase": "inward",
+        "step": 42
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.273568162585427,
+            4.489397032402748,
+            1.3319871258255285
+          ],
+          "right": [
+            7.266633803684938,
+            4.714864304505438,
+            1.3357501745096836
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3754347800251179,
+        "phase": "inward",
+        "step": 43
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.271571889086212,
+            4.489046939420003,
+            1.3319945834500373
+          ],
+          "right": [
+            7.264528544441653,
+            4.714352238173871,
+            1.3357149358969664
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3766808432585504,
+        "phase": "inward",
+        "step": 44
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.2695746583742675,
+            4.488714201963594,
+            1.3320186442147397
+          ],
+          "right": [
+            7.2624010023089305,
+            4.713853488049331,
+            1.3357143980147432
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3779267449118051,
+        "phase": "inward",
+        "step": 45
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.267598233759564,
+            4.4883729736384055,
+            1.3320004583274938
+          ],
+          "right": [
+            7.260297070206532,
+            4.713354464175931,
+            1.3356716597689982
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3791496056583599,
+        "phase": "inward",
+        "step": 46
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.265594417917719,
+            4.488037414097555,
+            1.3320345651935677
+          ],
+          "right": [
+            7.258170941801254,
+            4.712853884218221,
+            1.3356767553518738
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.38040842015722,
+        "phase": "inward",
+        "step": 47
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.263609785968389,
+            4.487692796594239,
+            1.3320299149293593
+          ],
+          "right": [
+            7.256068554245831,
+            4.712352348840177,
+            1.3356399562279213
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3816414012007414,
+        "phase": "inward",
+        "step": 48
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.261620764998408,
+            4.487364317255676,
+            1.3320393037220635
+          ],
+          "right": [
+            7.2539433603731265,
+            4.711861826797604,
+            1.3356390469453987
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3828946703695257,
+        "phase": "inward",
+        "step": 49
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.2596242288894235,
+            4.487013560169421,
+            1.3320532692139901
+          ],
+          "right": [
+            7.2518424076498,
+            4.711354123118124,
+            1.3356105746098819
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3841376580661213,
+        "phase": "inward",
+        "step": 50
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.25764369805208,
+            4.48668828908616,
+            1.3320564496928902
+          ],
+          "right": [
+            7.249720249406307,
+            4.71086977704789,
+            1.3356073849059968
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.385384105680265,
+        "phase": "inward",
+        "step": 51
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.2556415841735395,
+            4.486334006738064,
+            1.3320782996937084
+          ],
+          "right": [
+            7.247621339706914,
+            4.710359784580824,
+            1.3355811005801201
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3866382942806648,
+        "phase": "inward",
+        "step": 52
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.253663963877589,
+            4.486009403147975,
+            1.3320749168076818
+          ],
+          "right": [
+            7.245500664482764,
+            4.709878011493627,
+            1.3355791571779951
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3878820332032151,
+        "phase": "inward",
+        "step": 53
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.2516644970912125,
+            4.485656991297618,
+            1.3320915250358674
+          ],
+          "right": [
+            7.2434031898551865,
+            4.7093714669223825,
+            1.3355508300285968
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3891451942750515,
+        "phase": "inward",
+        "step": 54
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.24967626543234,
+            4.48531284731102,
+            1.3321119618339468
+          ],
+          "right": [
+            7.241344073642998,
+            4.708874026072751,
+            1.3355409140677055
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3903779487036794,
+        "phase": "inward",
+        "step": 55
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.247723992745698,
+            4.4850022177327125,
+            1.332115254891923
+          ],
+          "right": [
+            7.239460108259189,
+            4.708412107140788,
+            1.335560076497503
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.391590350089879,
+        "phase": "inward",
+        "step": 56
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.245792569019371,
+            4.484709749702686,
+            1.332153286137937
+          ],
+          "right": [
+            7.237836747953011,
+            4.707977564808543,
+            1.3356001947905756
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3926989226966147,
+        "phase": "inward",
+        "step": 57
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.243937600110576,
+            4.484496659970263,
+            1.3321787234035736
+          ],
+          "right": [
+            7.236428016130294,
+            4.707625485519129,
+            1.3356703184664478
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.393727819106243,
+        "phase": "inward",
+        "step": 58
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.242101908328264,
+            4.484367326659013,
+            1.3322419125967695
+          ],
+          "right": [
+            7.235183049827074,
+            4.707337342209385,
+            1.3358063642186033
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3948243975186072,
+        "phase": "inward",
+        "step": 59
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.240476789875412,
+            4.484290891001844,
+            1.3323116398101966
+          ],
+          "right": [
+            7.23414966883926,
+            4.707087522951971,
+            1.3359171086429904
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3957890314280648,
+        "phase": "inward",
+        "step": 60
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.239074675971825,
+            4.484261296276642,
+            1.3323593104143345
+          ],
+          "right": [
+            7.233270858188894,
+            4.706887313251329,
+            1.336050309208273
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3966046772062541,
+        "phase": "inward",
+        "step": 61
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.237857463704357,
+            4.484259983322938,
+            1.3324691735850922
+          ],
+          "right": [
+            7.2325127868339685,
+            4.706710848904844,
+            1.3362332361828588
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.397371053410215,
+        "phase": "inward",
+        "step": 62
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.23684172826713,
+            4.484262968574169,
+            1.3325374950690851
+          ],
+          "right": [
+            7.231895008255744,
+            4.706548328639505,
+            1.336368853132309
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3980219616905305,
+        "phase": "inward",
+        "step": 63
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.235953802460583,
+            4.484265707885713,
+            1.332648366915167
+          ],
+          "right": [
+            7.231374344134429,
+            4.706385076666751,
+            1.3365251135710754
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3986154972498663,
+        "phase": "inward",
+        "step": 64
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.235194485776892,
+            4.484286154909492,
+            1.3327740052525368
+          ],
+          "right": [
+            7.230917967482106,
+            4.706236820438393,
+            1.3367065216847314
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3991720959295821,
+        "phase": "inward",
+        "step": 65
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.234544279377181,
+            4.484293525761268,
+            1.332846809857919
+          ],
+          "right": [
+            7.230553656107494,
+            4.706087904533712,
+            1.3368357965589497
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3996313282875175,
+        "phase": "inward",
+        "step": 66
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.233998198734904,
+            4.484301388568518,
+            1.332956473048022
+          ],
+          "right": [
+            7.230245903463267,
+            4.705929218952803,
+            1.3369735012617954
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4000588356086752,
+        "phase": "inward",
+        "step": 67
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.2335175420423266,
+            4.484318732141942,
+            1.3330659762608055
+          ],
+          "right": [
+            7.229970710537067,
+            4.705782872379317,
+            1.3371303051822707
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.400453066244715,
+        "phase": "inward",
+        "step": 68
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.233107484306936,
+            4.484317498704485,
+            1.33313318779765
+          ],
+          "right": [
+            7.229759248011548,
+            4.70562723526581,
+            1.3372382339549298
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4007710971353553,
+        "phase": "inward",
+        "step": 69
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.232740184900962,
+            4.48430683991489,
+            1.3332209474400218
+          ],
+          "right": [
+            7.229581079858559,
+            4.70546391423756,
+            1.337350790035326
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4010437951394248,
+        "phase": "inward",
+        "step": 70
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.232430275319801,
+            4.484314958444763,
+            1.3332978562096895
+          ],
+          "right": [
+            7.229406492378122,
+            4.70531519093917,
+            1.3374808454513467
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4013368763132605,
+        "phase": "inward",
+        "step": 71
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.232152374466782,
+            4.484294556115524,
+            1.3333688823987426
+          ],
+          "right": [
+            7.229285865248048,
+            4.705145232826048,
+            1.3375621162087175
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4015531554640592,
+        "phase": "inward",
+        "step": 72
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.231921392842087,
+            4.484280031383138,
+            1.3334125120771403
+          ],
+          "right": [
+            7.229184084498864,
+            4.7049860029115464,
+            1.3376339518469873
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4017228612428307,
+        "phase": "inward",
+        "step": 73
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.231711570507104,
+            4.484274355552008,
+            1.3334729110744024
+          ],
+          "right": [
+            7.22908011082115,
+            4.704831823003102,
+            1.337736872962432
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4019108780326297,
+        "phase": "inward",
+        "step": 74
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.231523466160758,
+            4.484246996755841,
+            1.3335308566627413
+          ],
+          "right": [
+            7.229011631304292,
+            4.704659805631032,
+            1.337796213344972
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4020741373571428,
+        "phase": "inward",
+        "step": 75
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.231380046117072,
+            4.484222695753582,
+            1.3335657753513424
+          ],
+          "right": [
+            7.228959099036551,
+            4.704493033822238,
+            1.3378418712136608
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4021883634904395,
+        "phase": "inward",
+        "step": 76
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.231231055971199,
+            4.484190867189948,
+            1.3335959810917486
+          ],
+          "right": [
+            7.228912399295889,
+            4.7043249744461,
+            1.3378937428371704
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.402286548874098,
+        "phase": "inward",
+        "step": 77
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.231112679167315,
+            4.484171211889072,
+            1.3336638597401378
+          ],
+          "right": [
+            7.228857322756074,
+            4.704157995529186,
+            1.3379725882144107
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.402434530638821,
+        "phase": "inward",
+        "step": 78
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.231009268586069,
+            4.484134432689098,
+            1.3336770817041594
+          ],
+          "right": [
+            7.228832073805501,
+            4.703987673352768,
+            1.337995898338848
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4025040778909657,
+        "phase": "inward",
+        "step": 79
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230915278853017,
+            4.484094062294714,
+            1.333724480245286
+          ],
+          "right": [
+            7.228812267391551,
+            4.703805999310953,
+            1.3380323762497468
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.402590065694764,
+        "phase": "inward",
+        "step": 80
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230820603635369,
+            4.484053036190579,
+            1.333748953363052
+          ],
+          "right": [
+            7.228795121179179,
+            4.703632578152657,
+            1.3380637308407208
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4026474901689663,
+        "phase": "inward",
+        "step": 81
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230753523264597,
+            4.484030521356585,
+            1.3337799119653817
+          ],
+          "right": [
+            7.228761498949529,
+            4.703468488908189,
+            1.338115535213154
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4027385509691794,
+        "phase": "inward",
+        "step": 82
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.2306807936058775,
+            4.483983610412218,
+            1.3338145313008691
+          ],
+          "right": [
+            7.228757690867392,
+            4.703285257106597,
+            1.3381313639044217
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.402795482750229,
+        "phase": "inward",
+        "step": 83
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230612490691834,
+            4.483942160445028,
+            1.3338359458279538
+          ],
+          "right": [
+            7.2287542157826,
+            4.7031111558390695,
+            1.338147789982402
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.402830022190932,
+        "phase": "inward",
+        "step": 84
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230554087696073,
+            4.483904784774734,
+            1.3338431894778406
+          ],
+          "right": [
+            7.22874821459011,
+            4.702941957130246,
+            1.3381629970783517
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4028695863034648,
+        "phase": "inward",
+        "step": 85
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230486687572567,
+            4.483863578895638,
+            1.3338793999680645
+          ],
+          "right": [
+            7.228740616954347,
+            4.702766167389608,
+            1.3381927415105297
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4029110120886101,
+        "phase": "inward",
+        "step": 86
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230452241139606,
+            4.483840320744856,
+            1.333917660214095
+          ],
+          "right": [
+            7.228725152399247,
+            4.7026003609456435,
+            1.3382316446474936
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4029673644510396,
+        "phase": "inward",
+        "step": 87
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230409531029824,
+            4.483800713717196,
+            1.3339128760357637
+          ],
+          "right": [
+            7.22872636757768,
+            4.702430234368972,
+            1.3382255524846396
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.402996444889086,
+        "phase": "inward",
+        "step": 88
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230369413440158,
+            4.483760300623125,
+            1.3339345661556674
+          ],
+          "right": [
+            7.228736736297838,
+            4.70225653629866,
+            1.3382253626280076
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4030093850934737,
+        "phase": "inward",
+        "step": 89
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230337483358926,
+            4.48373488722779,
+            1.3339523345331248
+          ],
+          "right": [
+            7.228747507984442,
+            4.702099575269083,
+            1.3382279297862374
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4030293928172626,
+        "phase": "inward",
+        "step": 90
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230319965175209,
+            4.4837367694248496,
+            1.3339516919120333
+          ],
+          "right": [
+            7.228742805293473,
+            4.701971636740959,
+            1.3382499994865658
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4030400336188331,
+        "phase": "inward",
+        "step": 91
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230281525525012,
+            4.48372329860786,
+            1.3339715205028684
+          ],
+          "right": [
+            7.228753750663303,
+            4.701831301320981,
+            1.3382511823872874
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.40306175694336,
+        "phase": "inward",
+        "step": 92
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230257306454581,
+            4.483718816280704,
+            1.333987504710697
+          ],
+          "right": [
+            7.228769210711727,
+            4.70170053952963,
+            1.338247565168476
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.403064216378259,
+        "phase": "inward",
+        "step": 93
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230233707795236,
+            4.4837248913057834,
+            1.3339825703191137
+          ],
+          "right": [
+            7.228780824303442,
+            4.701587370361407,
+            1.3382451787608822
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.403043394087602,
+        "phase": "inward",
+        "step": 94
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230209273972948,
+            4.483748378320609,
+            1.3339984496932769
+          ],
+          "right": [
+            7.228775787938425,
+            4.701486648160394,
+            1.3382741425194662
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4030609844424937,
+        "phase": "inward",
+        "step": 95
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230190583642196,
+            4.483769195161763,
+            1.3340260105852224
+          ],
+          "right": [
+            7.228784144936327,
+            4.701380934089014,
+            1.3382783019905578
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4030898816189892,
+        "phase": "inward",
+        "step": 96
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230190682804864,
+            4.483799419397477,
+            1.3340170871979065
+          ],
+          "right": [
+            7.228795499307738,
+            4.701289485468222,
+            1.338266826862211
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4030864325321895,
+        "phase": "inward",
+        "step": 97
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230175961562924,
+            4.483832471735257,
+            1.3340352856588402
+          ],
+          "right": [
+            7.228803553435133,
+            4.701199297355391,
+            1.3382720818825073
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4030847602337617,
+        "phase": "inward",
+        "step": 98
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230158021411782,
+            4.483877780930483,
+            1.3340556694606072
+          ],
+          "right": [
+            7.228804326333629,
+            4.701122688825921,
+            1.3382906258236262
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4030893588612496,
+        "phase": "inward",
+        "step": 99
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230133834297662,
+            4.483932272889115,
+            1.3340479641882177
+          ],
+          "right": [
+            7.22880132919197,
+            4.701062477625145,
+            1.338298094143831
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4030951003873662,
+        "phase": "inward",
+        "step": 100
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230120953858919,
+            4.4839780547526935,
+            1.33406372352328
+          ],
+          "right": [
+            7.228812407242435,
+            4.700989417644791,
+            1.3382921026537287
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4030985378245175,
+        "phase": "inward",
+        "step": 101
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230128059396598,
+            4.484040109339791,
+            1.33406732747095
+          ],
+          "right": [
+            7.2288198288920915,
+            4.700929961007326,
+            1.33828953806871
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.403088245920676,
+        "phase": "inward",
+        "step": 102
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230111444925077,
+            4.4840990193773385,
+            1.3340909918686341
+          ],
+          "right": [
+            7.228824009519701,
+            4.700867708237384,
+            1.3382986585812362
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4030980243335562,
+        "phase": "inward",
+        "step": 103
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.2300748565338715,
+            4.484172865357541,
+            1.334110540703468
+          ],
+          "right": [
+            7.228812772597241,
+            4.700825594247391,
+            1.338327349030834
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4031135018082506,
+        "phase": "inward",
+        "step": 104
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230089097940793,
+            4.484248719523402,
+            1.334095782147231
+          ],
+          "right": [
+            7.228822184959968,
+            4.700782208540973,
+            1.3383085286081018
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4031057463925358,
+        "phase": "inward",
+        "step": 105
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230080335909617,
+            4.484321113179574,
+            1.3341098820274309
+          ],
+          "right": [
+            7.228827722201087,
+            4.700735000288735,
+            1.3383098968593425
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.40309487651109,
+        "phase": "inward",
+        "step": 106
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230047075671253,
+            4.484391271517335,
+            1.3341241766202854
+          ],
+          "right": [
+            7.228832564843009,
+            4.700692420599747,
+            1.3383158103245694
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.403083653380356,
+        "phase": "inward",
+        "step": 107
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230050534905918,
+            4.484489097139805,
+            1.334145350251204
+          ],
+          "right": [
+            7.2288205124837965,
+            4.700665966811689,
+            1.3383400966646992
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.403116347307206,
+        "phase": "inward",
+        "step": 108
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230036396282156,
+            4.484567623806097,
+            1.3341281164608532
+          ],
+          "right": [
+            7.2288288185012135,
+            4.700634637403414,
+            1.3383241633197138
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.403088873793077,
+        "phase": "inward",
+        "step": 109
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230028630345316,
+            4.484651215965474,
+            1.334141929920225
+          ],
+          "right": [
+            7.228835738058705,
+            4.700599399827835,
+            1.3383224421200883
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4030859569653782,
+        "phase": "inward",
+        "step": 110
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230028456580783,
+            4.484740159340566,
+            1.3341571760757613
+          ],
+          "right": [
+            7.228840842873893,
+            4.700568369062543,
+            1.3383241374246706
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4030860101994567,
+        "phase": "inward",
+        "step": 111
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230003318185881,
+            4.48483134742933,
+            1.334157055488259
+          ],
+          "right": [
+            7.228840530767007,
+            4.700549113811752,
+            1.3383309327056692
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.403069513401384,
+        "phase": "inward",
+        "step": 112
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230015796984135,
+            4.484931805342848,
+            1.3341582621874757
+          ],
+          "right": [
+            7.228841729351124,
+            4.700529284618396,
+            1.3383307171442975
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4030742049674838,
+        "phase": "inward",
+        "step": 113
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.229976137098097,
+            4.485024935772799,
+            1.3341776081617438
+          ],
+          "right": [
+            7.228834903416063,
+            4.700510678194567,
+            1.3383510099002245
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4030701553179574,
+        "phase": "inward",
+        "step": 114
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.229986187709688,
+            4.485119394824402,
+            1.3341871666307275
+          ],
+          "right": [
+            7.228846802497211,
+            4.700484707059301,
+            1.3383371463773401
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4030757806254608,
+        "phase": "inward",
+        "step": 115
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.229983983471964,
+            4.485216019287805,
+            1.3341801396068993
+          ],
+          "right": [
+            7.228854677327999,
+            4.700468550646281,
+            1.3383288417265626
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.403041048209794,
+        "phase": "inward",
+        "step": 116
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.22997951373957,
+            4.485316037415497,
+            1.3341754348199442
+          ],
+          "right": [
+            7.2288599484898866,
+            4.70045467041081,
+            1.3383241842645965
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4030375949242226,
+        "phase": "inward",
+        "step": 117
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.229973609072868,
+            4.485425303040145,
+            1.3342050857332954
+          ],
+          "right": [
+            7.228849744631772,
+            4.70044435646526,
+            1.3383497059095315
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.403059243432331,
+        "phase": "inward",
+        "step": 118
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.229953994606787,
+            4.485517942821982,
+            1.3341915451980602
+          ],
+          "right": [
+            7.228861322401264,
+            4.700430931434424,
+            1.3383336806573882
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4030294731074402,
+        "phase": "inward",
+        "step": 119
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.2299661206312145,
+            4.485621681054315,
+            1.3341965311976125
+          ],
+          "right": [
+            7.228868436235774,
+            4.700415028942859,
+            1.3383271027108237
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4030248257507933,
+        "phase": "inward",
+        "step": 120
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230241363534155,
+            4.485611044084838,
+            1.3336203498903143
+          ],
+          "right": [
+            7.229207232334213,
+            4.7004121021524226,
+            1.3377570679324298
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4022825665148508,
+        "phase": "hold",
+        "step": 121
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230588265863284,
+            4.485578652849154,
+            1.3329996675934268
+          ],
+          "right": [
+            7.229576433633431,
+            4.700392979080085,
+            1.3371092073030433
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.4008890232923505,
+        "phase": "hold",
+        "step": 122
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.230858680866216,
+            4.485591162193541,
+            1.3325035232349474
+          ],
+          "right": [
+            7.229819757911683,
+            4.7004020710522845,
+            1.336640345104846
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.399972044553871,
+        "phase": "hold",
+        "step": 123
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.23106922788916,
+            4.485592331471079,
+            1.3320780475068692
+          ],
+          "right": [
+            7.230028442805464,
+            4.700398039562245,
+            1.3362147159811029
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3992781816202478,
+        "phase": "hold",
+        "step": 124
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.231257420875901,
+            4.485609798023771,
+            1.3316979053839182
+          ],
+          "right": [
+            7.230197931188298,
+            4.700405498392824,
+            1.3358550078102507
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3985797093102248,
+        "phase": "hold",
+        "step": 125
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.231445287975201,
+            4.485615807396135,
+            1.3313078941238434
+          ],
+          "right": [
+            7.230378562638871,
+            4.700401735314128,
+            1.3354644204694286
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3978905204666023,
+        "phase": "hold",
+        "step": 126
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.231631554016882,
+            4.4856295517983025,
+            1.330929088230028
+          ],
+          "right": [
+            7.230549312089147,
+            4.700403127066682,
+            1.3350943059779352
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3972059778937385,
+        "phase": "hold",
+        "step": 127
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.231815210642574,
+            4.485653001899179,
+            1.3305599621958395
+          ],
+          "right": [
+            7.230708297077072,
+            4.700412472686704,
+            1.3347417155261976
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3965471636971103,
+        "phase": "hold",
+        "step": 128
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.2320048035180715,
+            4.48566153082929,
+            1.3301622762351908
+          ],
+          "right": [
+            7.2308861215767894,
+            4.700411606964244,
+            1.3343498695616147
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.395864751226772,
+        "phase": "hold",
+        "step": 129
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.232191043804221,
+            4.485685604469122,
+            1.329787579844887
+          ],
+          "right": [
+            7.231043651558235,
+            4.7004215535560725,
+            1.3339988404000136
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3951973176743322,
+        "phase": "hold",
+        "step": 130
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.232374183724853,
+            4.485691259335457,
+            1.3294023281527079
+          ],
+          "right": [
+            7.231221928857581,
+            4.700416937123614,
+            1.3336111962660004
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3945272642414204,
+        "phase": "hold",
+        "step": 131
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.23255348131144,
+            4.4856999291259285,
+            1.329036355526688
+          ],
+          "right": [
+            7.231394494498911,
+            4.700412560368798,
+            1.3332449607308534
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3938495814623892,
+        "phase": "hold",
+        "step": 132
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.232735007262356,
+            4.4857216646627665,
+            1.3286680739131467
+          ],
+          "right": [
+            7.231552448748246,
+            4.700420111030406,
+            1.3328927814323446
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.393206274118288,
+        "phase": "hold",
+        "step": 133
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.232918577598145,
+            4.4857262315185285,
+            1.328284301093807
+          ],
+          "right": [
+            7.231731868109913,
+            4.700414493635321,
+            1.3325064770318118
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.392530482349283,
+        "phase": "hold",
+        "step": 134
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.233100756246134,
+            4.4857474016015715,
+            1.3279156548228608
+          ],
+          "right": [
+            7.231891106747701,
+            4.700421382131056,
+            1.33215438376382
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3918742006664766,
+        "phase": "hold",
+        "step": 135
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.2332841878732665,
+            4.4857524582663135,
+            1.327531607680327
+          ],
+          "right": [
+            7.232070268475674,
+            4.70041607279691,
+            1.3317694580389579
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3912035736398798,
+        "phase": "hold",
+        "step": 136
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.2334657856649915,
+            4.4857728674229715,
+            1.327162843603273
+          ],
+          "right": [
+            7.232230389695455,
+            4.7004223639746225,
+            1.3314164918277256
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3905506941056973,
+        "phase": "hold",
+        "step": 137
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.2336494179423525,
+            4.4857829325704115,
+            1.3267840482462803
+          ],
+          "right": [
+            7.23240333936221,
+            4.70042080132136,
+            1.331045053401024
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3898844714250458,
+        "phase": "hold",
+        "step": 138
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.233829597913916,
+            4.48579751930075,
+            1.326410886982819
+          ],
+          "right": [
+            7.2325700733241955,
+            4.700422506206062,
+            1.3306794789727343
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.3892340122683993,
+        "phase": "hold",
+        "step": 139
+      },
+      {
+        "bilateral_support": false,
+        "contacts": {
+          "left": [
+            "gripper0_left_left_fingerpad_collision",
+            "gripper0_left_left_fingertip_collision",
+            "gripper0_left_right_fingerpad_collision",
+            "gripper0_left_right_fingertip_collision"
+          ],
+          "right": [
+            "gripper0_right_left_fingerpad_collision",
+            "gripper0_right_left_fingertip_collision",
+            "gripper0_right_right_fingerpad_collision",
+            "gripper0_right_right_fingertip_collision"
+          ]
+        },
+        "eef_positions": {
+          "left": [
+            7.234012195717647,
+            4.48581403282123,
+            1.3260393458051727
+          ],
+          "right": [
+            7.232734630014011,
+            4.700425648521196,
+            1.330324049116276
+          ]
+        },
+        "judge_collision": false,
+        "object_z": 1.388573224015267,
+        "phase": "hold",
+        "step": 140
+      }
+    ],
+    "requested_inward_m": 0.14,
+    "start_eef_positions": {
+      "left": [
+        7.359515535088841,
+        4.501751136452201,
+        1.3388631027458389
+      ],
+      "right": [
+        7.360029632746369,
+        4.736901608212899,
+        1.342406516660872
+      ]
+    },
+    "start_geometry": {
+      "geometries": [
+        {
+          "is_object": false,
+          "name": "robot0_arm_5_collision",
+          "size": [
+            0.06305478200882722,
+            0.06666089706284406,
+            0.11190343402346214
+          ],
+          "type": 7,
+          "world_position": [
+            7.518902402698618,
+            4.807082877592236,
+            1.5555161986687844
+          ],
+          "world_rotation": [
+            [
+              0.38662593246143934,
+              -0.7811598078118466,
+              -0.49021397675676315
+            ],
+            [
+              -0.34389231826339806,
+              0.3710965729989728,
+              -0.8625690737256017
+            ],
+            [
+              0.855721018666567,
+              0.5020723933535639,
+              -0.12515929867363398
+            ]
+          ]
+        },
+        {
+          "is_object": false,
+          "name": "robot0_arm_6_collision",
+          "size": [
+            0.02048059501737246,
+            0.041414488916123836,
+            0.05674147286507764
+          ],
+          "type": 7,
+          "world_position": [
+            7.47827568868405,
+            4.744138993951556,
+            1.5384734891541287
+          ],
+          "world_rotation": [
+            [
+              -0.7823647391524504,
+              0.3006043106321403,
+              -0.5454745304414327
+            ],
+            [
+              0.3695103465737474,
+              0.9290523971030684,
+              -0.01799297674091835
+            ],
+            [
+              0.5013656536958578,
+              -0.21563555334504975,
+              -0.8379342393217424
+            ]
+          ]
+        },
+        {
+          "is_object": false,
+          "name": "gripper0_right_hand_collision",
+          "size": [
+            0.037500953339323954,
+            0.04279378621695762,
+            0.05440415346503039
+          ],
+          "type": 7,
+          "world_position": [
+            7.4382489068813165,
+            4.742781454737459,
+            1.4768207270788973
+          ],
+          "world_rotation": [
+            [
+              -0.3000600063265717,
+              -0.7692972301928805,
+              -0.5640441154917395
+            ],
+            [
+              -0.9293200934125724,
+              0.3691625579280726,
+              -0.009119748003600547
+            ],
+            [
+              0.2152397653384349,
+              0.5214410584539382,
+              -0.8256942932923124
+            ]
+          ]
+        },
+        {
+          "is_object": false,
+          "name": "robot0_arm_5_left_collision",
+          "size": [
+            0.06305478200882722,
+            0.06666089706284406,
+            0.11190343402346214
+          ],
+          "type": 7,
+          "world_position": [
+            7.517574399506952,
+            4.425964617835055,
+            1.5494894480007346
+          ],
+          "world_rotation": [
+            [
+              -0.4270517027398314,
+              0.7921262939529954,
+              0.43607657310993286
+            ],
+            [
+              -0.3283628502658662,
+              0.31348761484340704,
+              -0.8910125441906345
+            ],
+            [
+              -0.8424990692886766,
+              -0.5236997706397089,
+              0.1262294279462176
+            ]
+          ]
+        },
+        {
+          "is_object": false,
+          "name": "robot0_arm_6_left_collision",
+          "size": [
+            0.020480595017372455,
+            0.041414488916123836,
+            0.05674147286507764
+          ],
+          "type": 7,
+          "world_position": [
+            7.480756276898036,
+            4.491110177914293,
+            1.532455349799429
+          ],
+          "world_rotation": [
+            [
+              0.7932419611658496,
+              -0.23985013125340957,
+              0.5596776800833553
+            ],
+            [
+              0.31183510213998217,
+              0.9494889397827154,
+              -0.035065970735878804
+            ],
+            [
+              -0.522997189398864,
+              0.20234294593097338,
+              0.8279681588762163
+            ]
+          ]
+        },
+        {
+          "is_object": false,
+          "name": "gripper0_left_hand_collision",
+          "size": [
+            0.037500953339323954,
+            0.04279378621695762,
+            0.05440415346503039
+          ],
+          "type": 7,
+          "world_position": [
+            7.439686029769355,
+            4.4937194794367805,
+            1.471533468194718
+          ],
+          "world_rotation": [
+            [
+              0.24052323221525607,
+              -0.7794031298999864,
+              -0.5785147671985831
+            ],
+            [
+              -0.9492138417569567,
+              -0.31341814255381173,
+              0.027607074005000898
+            ],
+            [
+              -0.20283406366220902,
+              0.5424940820140098,
+              -0.8152045838917071
+            ]
+          ]
+        },
+        {
+          "is_object": true,
+          "name": "line_5_container_h01_near_visual",
+          "size": [
+            0.1421622734878171,
+            0.20265768621790992,
+            0.30262294453150024
+          ],
+          "type": 7,
+          "world_position": [
+            7.0455615096676425,
+            4.620203182981259,
+            1.3164733865392706
+          ],
+          "world_rotation": [
+            [
+              0.25748192944482345,
+              -0.005466082917727211,
+              0.9662676533688347
+            ],
+            [
+              -0.02026989812502452,
+              -0.9997945121403944,
+              -0.0002544090390583162
+            ],
+            [
+              0.9660704877178369,
+              -0.01952064116504778,
+              -0.25753981697813894
+            ]
+          ]
+        },
+        {
+          "is_object": true,
+          "name": "line_5_container_h01_near_container_h01_col_bottom",
+          "size": [
+            0.3,
+            0.2,
+            0.009
+          ],
+          "type": 6,
+          "world_position": [
+            7.019300477900106,
+            4.622222236326785,
+            1.2177474132896053
+          ],
+          "world_rotation": [
+            [
+              0.9662618858302446,
+              0.0053130408852852095,
+              0.2575067758105236
+            ],
+            [
+              -0.0002514322332320285,
+              0.9998061968692676,
+              -0.019685158969240155
+            ],
+            [
+              -0.2575614582456235,
+              0.01895627332477172,
+              0.966075957121398
+            ]
+          ]
+        },
+        {
+          "is_object": true,
+          "name": "line_5_container_h01_near_container_h01_col_front",
+          "size": [
+            0.3,
+            0.007,
+            0.125
+          ],
+          "type": 6,
+          "world_position": [
+            7.0481458470032665,
+            4.426976161890584,
+            1.3261536635640065
+          ],
+          "world_rotation": [
+            [
+              0.9662618858302446,
+              0.0053130408852852095,
+              0.2575067758105236
+            ],
+            [
+              -0.0002514322332320285,
+              0.9998061968692676,
+              -0.019685158969240155
+            ],
+            [
+              -0.2575614582456235,
+              0.01895627332477172,
+              0.966075957121398
+            ]
+          ]
+        },
+        {
+          "is_object": true,
+          "name": "line_5_container_h01_near_container_h01_col_back",
+          "size": [
+            0.3,
+            0.007,
+            0.125
+          ],
+          "type": 6,
+          "world_position": [
+            7.050196680784986,
+            4.812901353882122,
+            1.3334707850673686
+          ],
+          "world_rotation": [
+            [
+              0.9662618858302446,
+              0.0053130408852852095,
+              0.2575067758105236
+            ],
+            [
+              -0.0002514322332320285,
+              0.9998061968692676,
+              -0.019685158969240155
+            ],
+            [
+              -0.2575614582456235,
+              0.01895627332477172,
+              0.966075957121398
+            ]
+          ]
+        },
+        {
+          "is_object": true,
+          "name": "line_5_container_h01_near_container_h01_col_left",
+          "size": [
+            0.007,
+            0.2,
+            0.125
+          ],
+          "type": 6,
+          "world_position": [
+            6.766056531345865,
+            4.62001242753069,
+            1.4052777315816551
+          ],
+          "world_rotation": [
+            [
+              0.9662618858302446,
+              0.0053130408852852095,
+              0.2575067758105236
+            ],
+            [
+              -0.0002514322332320285,
+              0.9998061968692676,
+              -0.019685158969240155
+            ],
+            [
+              -0.2575614582456235,
+              0.01895627332477172,
+              0.966075957121398
+            ]
+          ]
+        },
+        {
+          "is_object": true,
+          "name": "line_5_container_h01_near_container_h01_col_right",
+          "size": [
+            0.007,
+            0.2,
+            0.125
+          ],
+          "type": 6,
+          "world_position": [
+            7.332285996442388,
+            4.619865088242016,
+            1.25434671704972
+          ],
+          "world_rotation": [
+            [
+              0.9662618858302446,
+              0.0053130408852852095,
+              0.2575067758105236
+            ],
+            [
+              -0.0002514322332320285,
+              0.9998061968692676,
+              -0.019685158969240155
+            ],
+            [
+              -0.2575614582456235,
+              0.01895627332477172,
+              0.966075957121398
+            ]
+          ]
+        }
+      ],
+      "object_position": [
+        7.049171263894126,
+        4.619938757886353,
+        1.3298122243156876
+      ]
+    },
+    "support_contact_steps": 0,
+    "target_eef_positions": {
+      "left": [
+        7.228681815935266,
+        4.551576209783241,
+        1.3388631027458389
+      ],
+      "right": [
+        7.228997807278224,
+        4.687599876859064,
+        1.342406516660872
+      ]
+    }
+  },
+  "infrastructure_error": null,
+  "lift_m": 0.20433407211910515,
+  "mode": "inward_support_probe",
+  "move_success": true,
+  "object_name": "line_5_container_h01_near",
+  "object_pose_writes": 0,
+  "official_commit": "0dcdddf18a9e694569aa1433cdfc04eb097fed78",
+  "physical_grasp": true,
+  "post_grasp_geometry": {
+    "geometries": [
+      {
+        "is_object": false,
+        "name": "robot0_arm_5_collision",
+        "size": [
+          0.06305478200882722,
+          0.06666089706284406,
+          0.11190343402346214
+        ],
+        "type": 7,
+        "world_position": [
+          7.518902402698618,
+          4.807082877592236,
+          1.5555161986687844
+        ],
+        "world_rotation": [
+          [
+            0.38662593246143934,
+            -0.7811598078118466,
+            -0.49021397675676315
+          ],
+          [
+            -0.34389231826339806,
+            0.3710965729989728,
+            -0.8625690737256017
+          ],
+          [
+            0.855721018666567,
+            0.5020723933535639,
+            -0.12515929867363398
+          ]
+        ]
+      },
+      {
+        "is_object": false,
+        "name": "robot0_arm_6_collision",
+        "size": [
+          0.02048059501737246,
+          0.041414488916123836,
+          0.05674147286507764
+        ],
+        "type": 7,
+        "world_position": [
+          7.47827568868405,
+          4.744138993951556,
+          1.5384734891541287
+        ],
+        "world_rotation": [
+          [
+            -0.7823647391524504,
+            0.3006043106321403,
+            -0.5454745304414327
+          ],
+          [
+            0.3695103465737474,
+            0.9290523971030684,
+            -0.01799297674091835
+          ],
+          [
+            0.5013656536958578,
+            -0.21563555334504975,
+            -0.8379342393217424
+          ]
+        ]
+      },
+      {
+        "is_object": false,
+        "name": "gripper0_right_hand_collision",
+        "size": [
+          0.037500953339323954,
+          0.04279378621695762,
+          0.05440415346503039
+        ],
+        "type": 7,
+        "world_position": [
+          7.4382489068813165,
+          4.742781454737459,
+          1.4768207270788973
+        ],
+        "world_rotation": [
+          [
+            -0.3000600063265717,
+            -0.7692972301928805,
+            -0.5640441154917395
+          ],
+          [
+            -0.9293200934125724,
+            0.3691625579280726,
+            -0.009119748003600547
+          ],
+          [
+            0.2152397653384349,
+            0.5214410584539382,
+            -0.8256942932923124
+          ]
+        ]
+      },
+      {
+        "is_object": false,
+        "name": "robot0_arm_5_left_collision",
+        "size": [
+          0.06305478200882722,
+          0.06666089706284406,
+          0.11190343402346214
+        ],
+        "type": 7,
+        "world_position": [
+          7.517574399506952,
+          4.425964617835055,
+          1.5494894480007346
+        ],
+        "world_rotation": [
+          [
+            -0.4270517027398314,
+            0.7921262939529954,
+            0.43607657310993286
+          ],
+          [
+            -0.3283628502658662,
+            0.31348761484340704,
+            -0.8910125441906345
+          ],
+          [
+            -0.8424990692886766,
+            -0.5236997706397089,
+            0.1262294279462176
+          ]
+        ]
+      },
+      {
+        "is_object": false,
+        "name": "robot0_arm_6_left_collision",
+        "size": [
+          0.020480595017372455,
+          0.041414488916123836,
+          0.05674147286507764
+        ],
+        "type": 7,
+        "world_position": [
+          7.480756276898036,
+          4.491110177914293,
+          1.532455349799429
+        ],
+        "world_rotation": [
+          [
+            0.7932419611658496,
+            -0.23985013125340957,
+            0.5596776800833553
+          ],
+          [
+            0.31183510213998217,
+            0.9494889397827154,
+            -0.035065970735878804
+          ],
+          [
+            -0.522997189398864,
+            0.20234294593097338,
+            0.8279681588762163
+          ]
+        ]
+      },
+      {
+        "is_object": false,
+        "name": "gripper0_left_hand_collision",
+        "size": [
+          0.037500953339323954,
+          0.04279378621695762,
+          0.05440415346503039
+        ],
+        "type": 7,
+        "world_position": [
+          7.439686029769355,
+          4.4937194794367805,
+          1.471533468194718
+        ],
+        "world_rotation": [
+          [
+            0.24052323221525607,
+            -0.7794031298999864,
+            -0.5785147671985831
+          ],
+          [
+            -0.9492138417569567,
+            -0.31341814255381173,
+            0.027607074005000898
+          ],
+          [
+            -0.20283406366220902,
+            0.5424940820140098,
+            -0.8152045838917071
+          ]
+        ]
+      },
+      {
+        "is_object": true,
+        "name": "line_5_container_h01_near_visual",
+        "size": [
+          0.1421622734878171,
+          0.20265768621790992,
+          0.30262294453150024
+        ],
+        "type": 7,
+        "world_position": [
+          7.0455615096676425,
+          4.620203182981259,
+          1.3164733865392706
+        ],
+        "world_rotation": [
+          [
+            0.25748192944482345,
+            -0.005466082917727211,
+            0.9662676533688347
+          ],
+          [
+            -0.02026989812502452,
+            -0.9997945121403944,
+            -0.0002544090390583162
+          ],
+          [
+            0.9660704877178369,
+            -0.01952064116504778,
+            -0.25753981697813894
+          ]
+        ]
+      },
+      {
+        "is_object": true,
+        "name": "line_5_container_h01_near_container_h01_col_bottom",
+        "size": [
+          0.3,
+          0.2,
+          0.009
+        ],
+        "type": 6,
+        "world_position": [
+          7.019300477900106,
+          4.622222236326785,
+          1.2177474132896053
+        ],
+        "world_rotation": [
+          [
+            0.9662618858302446,
+            0.0053130408852852095,
+            0.2575067758105236
+          ],
+          [
+            -0.0002514322332320285,
+            0.9998061968692676,
+            -0.019685158969240155
+          ],
+          [
+            -0.2575614582456235,
+            0.01895627332477172,
+            0.966075957121398
+          ]
+        ]
+      },
+      {
+        "is_object": true,
+        "name": "line_5_container_h01_near_container_h01_col_front",
+        "size": [
+          0.3,
+          0.007,
+          0.125
+        ],
+        "type": 6,
+        "world_position": [
+          7.0481458470032665,
+          4.426976161890584,
+          1.3261536635640065
+        ],
+        "world_rotation": [
+          [
+            0.9662618858302446,
+            0.0053130408852852095,
+            0.2575067758105236
+          ],
+          [
+            -0.0002514322332320285,
+            0.9998061968692676,
+            -0.019685158969240155
+          ],
+          [
+            -0.2575614582456235,
+            0.01895627332477172,
+            0.966075957121398
+          ]
+        ]
+      },
+      {
+        "is_object": true,
+        "name": "line_5_container_h01_near_container_h01_col_back",
+        "size": [
+          0.3,
+          0.007,
+          0.125
+        ],
+        "type": 6,
+        "world_position": [
+          7.050196680784986,
+          4.812901353882122,
+          1.3334707850673686
+        ],
+        "world_rotation": [
+          [
+            0.9662618858302446,
+            0.0053130408852852095,
+            0.2575067758105236
+          ],
+          [
+            -0.0002514322332320285,
+            0.9998061968692676,
+            -0.019685158969240155
+          ],
+          [
+            -0.2575614582456235,
+            0.01895627332477172,
+            0.966075957121398
+          ]
+        ]
+      },
+      {
+        "is_object": true,
+        "name": "line_5_container_h01_near_container_h01_col_left",
+        "size": [
+          0.007,
+          0.2,
+          0.125
+        ],
+        "type": 6,
+        "world_position": [
+          6.766056531345865,
+          4.62001242753069,
+          1.4052777315816551
+        ],
+        "world_rotation": [
+          [
+            0.9662618858302446,
+            0.0053130408852852095,
+            0.2575067758105236
+          ],
+          [
+            -0.0002514322332320285,
+            0.9998061968692676,
+            -0.019685158969240155
+          ],
+          [
+            -0.2575614582456235,
+            0.01895627332477172,
+            0.966075957121398
+          ]
+        ]
+      },
+      {
+        "is_object": true,
+        "name": "line_5_container_h01_near_container_h01_col_right",
+        "size": [
+          0.007,
+          0.2,
+          0.125
+        ],
+        "type": 6,
+        "world_position": [
+          7.332285996442388,
+          4.619865088242016,
+          1.25434671704972
+        ],
+        "world_rotation": [
+          [
+            0.9662618858302446,
+            0.0053130408852852095,
+            0.2575067758105236
+          ],
+          [
+            -0.0002514322332320285,
+            0.9998061968692676,
+            -0.019685158969240155
+          ],
+          [
+            -0.2575614582456235,
+            0.01895627332477172,
+            0.966075957121398
+          ]
+        ]
+      }
+    ],
+    "object_position": [
+      7.049171263894126,
+      4.619938757886353,
+      1.3298122243156876
+    ]
+  },
+  "post_grasp_object_z": 1.3298122243156876,
+  "pre_grasp_object_z": 1.1254781521965824,
+  "seed": 0,
+  "support_contact_steps": 0,
+  "trajectory": "/home/user/jciiot-2026/results/l1-cradle-20260728a/recenter-140-trajectory.json"
+}
