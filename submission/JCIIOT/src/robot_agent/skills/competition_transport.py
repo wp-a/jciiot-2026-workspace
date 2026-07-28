@@ -30,6 +30,9 @@ class PhysicalCarryConfig:
         height_recovery_trigger: float = 0.01,
         height_recovery_steps: int = 80,
         height_recovery_max_action: float = 0.65,
+        height_recenter_steps: int = 5,
+        height_recenter_tolerance: float = 0.002,
+        height_recenter_max_delta: float = 0.015,
         descent_step: float = 0.001,
         max_descent: float = 0.12,
         minimum_descent_before_support: float = 0.008,
@@ -56,6 +59,9 @@ class PhysicalCarryConfig:
         self.height_recovery_trigger = float(height_recovery_trigger)
         self.height_recovery_steps = int(height_recovery_steps)
         self.height_recovery_max_action = float(height_recovery_max_action)
+        self.height_recenter_steps = int(height_recenter_steps)
+        self.height_recenter_tolerance = float(height_recenter_tolerance)
+        self.height_recenter_max_delta = float(height_recenter_max_delta)
         self.descent_step = float(descent_step)
         self.max_descent = float(max_descent)
         self.minimum_descent_before_support = float(
@@ -265,6 +271,11 @@ def run_physical_transport(
     hold_targets = driver.capture_hold_targets(backend)
     observation = driver.observe(backend, object_name)
     target_object_z = float(minimum_object_z) + config.object_drop_tolerance
+    gripper_z_offsets = {
+        arm: float(observation["gripper_positions"][arm][2])
+        - float(observation["object_pos"][2])
+        for arm in ("right", "left")
+    }
     minimum_observed_z = float(observation["object_pos"][2])
     previous_command = np.zeros(3, dtype=float)
     waypoint_index = 0
@@ -303,6 +314,98 @@ def run_physical_transport(
             break
         height_error = target_object_z - float(observation["object_pos"][2])
         if height_error >= config.height_recovery_trigger:
+            driver.record_event(
+                backend,
+                "physical_height_recenter_start",
+                object_name=object_name,
+            )
+            recentered = False
+            for _ in range(config.height_recenter_steps):
+                observation = driver.observe(backend, object_name)
+                recenter_deltas = {
+                    arm: (
+                        float(observation["object_pos"][2])
+                        + gripper_z_offsets[arm]
+                        - float(observation["gripper_positions"][arm][2])
+                    )
+                    for arm in ("right", "left")
+                }
+                if max(abs(value) for value in recenter_deltas.values()) <= (
+                    config.height_recenter_tolerance
+                ):
+                    recentered = True
+                    break
+                if steps >= config.max_steps:
+                    break
+                arm_world_deltas = {
+                    arm: np.array(
+                        [
+                            0.0,
+                            0.0,
+                            float(
+                                np.clip(
+                                    recenter_deltas[arm],
+                                    -config.height_recenter_max_delta,
+                                    config.height_recenter_max_delta,
+                                )
+                            ),
+                        ],
+                        dtype=float,
+                    )
+                    for arm in ("right", "left")
+                }
+                step_info = driver.step(
+                    backend,
+                    object_name=object_name,
+                    base_command=np.zeros(3, dtype=float),
+                    hold_targets=hold_targets,
+                    arm_world_deltas=arm_world_deltas,
+                    base_control_dt=config.base_control_dt,
+                )
+                steps += 1
+                observation = driver.observe(backend, object_name)
+                minimum_observed_z = min(
+                    minimum_observed_z,
+                    float(observation["object_pos"][2]),
+                )
+                if bool(step_info.get("collision", False)):
+                    failure_stage = "collision"
+                    break
+                if next_contact_stability(observation["contacts"], 0) == 0:
+                    failure_stage = "contact"
+                    break
+                if float(observation["object_pos"][2]) < float(minimum_object_z):
+                    failure_stage = "object_drop"
+                    break
+            else:
+                observation = driver.observe(backend, object_name)
+
+            if failure_stage != "timeout":
+                break
+            if not recentered:
+                recenter_deltas = {
+                    arm: (
+                        float(observation["object_pos"][2])
+                        + gripper_z_offsets[arm]
+                        - float(observation["gripper_positions"][arm][2])
+                    )
+                    for arm in ("right", "left")
+                }
+                recentered = max(
+                    abs(value) for value in recenter_deltas.values()
+                ) <= config.height_recenter_tolerance
+            driver.record_event(
+                backend,
+                "physical_height_recenter_end",
+                object_name=object_name,
+                success=recentered,
+            )
+            if not recentered:
+                failure_stage = "height_recenter"
+                break
+
+            observation = driver.observe(backend, object_name)
+            height_error = target_object_z - float(observation["object_pos"][2])
             driver.record_event(
                 backend,
                 "physical_height_recovery_start",
@@ -488,6 +591,7 @@ class OfficialPhysicalCarryDriver:
     @staticmethod
     def observe(backend, object_name: str) -> dict:
         from robosuite.environments.factory_sorting.lift_after_grasp import (
+            gripper_end_center_pos,
             object_center_pos,
         )
         from robosuite.environments.factory_sorting.load_factory_sorting_evalization import (
@@ -505,6 +609,13 @@ class OfficialPhysicalCarryDriver:
                 dtype=float,
             ).copy(),
             "contacts": dict(grasp_status(raw_env, robot, object_name)),
+            "gripper_positions": {
+                arm: np.asarray(
+                    gripper_end_center_pos(raw_env, robot, arm),
+                    dtype=float,
+                ).copy()
+                for arm in ("right", "left")
+            },
         }
 
     @staticmethod

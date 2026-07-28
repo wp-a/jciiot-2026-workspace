@@ -7,3 +7,4 @@ iteration	commit	physical_grasp	transport_stage	collision_frames	official_score	
 6	50f7394	no	grasp	0	0	13.927869	44.524643	discard	A 20 mm inward insertion exceeded the feasible grasp envelope and prevented bilateral grasp formation.
 7	a75379f	yes	contact	0	0	13.752922	50.013084	discard	A 10 mm insertion restored grasp formation but did not materially improve carry lifetime, so insertion tuning was abandoned.
 8	6011920	yes	height_recovery	0	0	13.885632	53.115934	discard	Recovery lifted the box 4.8 mm with bilateral contact and returned it inside the 10 mm safety band, but the stricter helper boolean rejected it.
+9	4e52a99	yes	height_recovery	0	0	13.833571	62.170536	discard	Measured acceptance allowed two recoveries; the third lowered the box because accumulated gripper-to-object Z offset was not reset before lifting.

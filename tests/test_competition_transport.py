@@ -158,6 +158,7 @@ class FakePhysicalTransportDriver:
         self.recovered_height_result = recovered_height_result
         self.recovered_height = None
         self.recover_calls = []
+        self.gripper_z = {"right": 1.01, "left": 1.01}
         self.steps = []
 
     def capture_hold_targets(self, _backend):
@@ -179,6 +180,13 @@ class FakePhysicalTransportDriver:
                 dtype=float,
             ),
             "contacts": dict(self.contacts[index]),
+            "gripper_positions": {
+                arm: np.array(
+                    [self.base_xy[0] + 0.5, self.base_xy[1], self.gripper_z[arm]],
+                    dtype=float,
+                )
+                for arm in ("right", "left")
+            },
         }
 
     def step(
@@ -206,6 +214,9 @@ class FakePhysicalTransportDriver:
         if self.advance:
             self.base_xy += command[:2]
             self.yaw += command[2]
+        if arm_world_deltas:
+            for arm in ("right", "left"):
+                self.gripper_z[arm] += float(arm_world_deltas[arm][2])
         return {"collision": self.collision_step == len(self.steps)}
 
     def record_event(self, _backend, event, **payload):
@@ -372,6 +383,13 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertEqual(len(driver.recover_calls), 1)
         self.assertGreater(driver.recover_calls[0]["lift_height"], 0.0)
+        self.assertTrue(
+            any(
+                step["arm_world_deltas"]["right"][2] < 0.0
+                and step["arm_world_deltas"]["left"][2] < 0.0
+                for step in driver.steps
+            )
+        )
 
     def test_failed_height_recovery_stops_transport_without_fallback(self):
         driver = FakePhysicalTransportDriver(
