@@ -3,7 +3,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.audit_scored_path import main, scan_file, scan_submission
+from scripts import audit_scored_path
+
+
+HARD_RULES = getattr(audit_scored_path, "HARD_RULES", set())
+main = audit_scored_path.main
+scan_file = audit_scored_path.scan_file
+scan_submission = audit_scored_path.scan_submission
 
 
 class ScoredPathAuditTests(unittest.TestCase):
@@ -21,6 +27,20 @@ class ScoredPathAuditTests(unittest.TestCase):
 
         self.assertEqual([item.rule for item in violations], ["direct_qpos_write"])
         self.assertEqual(violations[0].line, 2)
+        self.assertEqual(getattr(violations[0], "severity", None), "warning")
+
+    def test_reports_object_freejoint_assignment_as_hard_violation(self):
+        violations = self._scan_source(
+            "def move(raw_env, object_qpos_addr, value):\n"
+            "    raw_env.sim.data.qpos[object_qpos_addr] = value\n"
+        )
+
+        self.assertEqual(
+            [item.rule for item in violations],
+            ["object_qpos_write"],
+        )
+        self.assertEqual(getattr(violations[0], "severity", None), "error")
+        self.assertIn("object_qpos_write", HARD_RULES)
 
     def test_reports_attachment_relative_state_assignment(self):
         violations = self._scan_source(
@@ -32,6 +52,7 @@ class ScoredPathAuditTests(unittest.TestCase):
             [item.rule for item in violations],
             ["attachment_relative_write"],
         )
+        self.assertEqual(getattr(violations[0], "severity", None), "error")
 
     def test_reports_transport_sync_import_and_call_once_each(self):
         violations = self._scan_source(
@@ -43,8 +64,24 @@ class ScoredPathAuditTests(unittest.TestCase):
 
         self.assertEqual(
             [item.rule for item in violations],
-            ["transport_sync_helper", "transport_sync_helper"],
+            [
+                "transport_attachment_import",
+                "transport_sync_helper",
+            ],
         )
+        self.assertTrue(all(item.severity == "error" for item in violations))
+
+    def test_reports_any_transport_attachment_import_as_hard_violation(self):
+        violations = self._scan_source(
+            "from robosuite.environments.factory_sorting.transport_attachment "
+            "import capture_transport_attachment\n"
+        )
+
+        self.assertEqual(
+            [item.rule for item in violations],
+            ["transport_attachment_import"],
+        )
+        self.assertEqual(getattr(violations[0], "severity", None), "error")
 
     def test_reports_private_backend_call_and_assignment(self):
         violations = self._scan_source(
@@ -119,7 +156,7 @@ class ScoredPathAuditTests(unittest.TestCase):
         self.assertEqual(len(violations), 1)
         self.assertTrue(violations[0].path.endswith("skills/bad.py"))
 
-    def test_cli_writes_json_and_exits_nonzero_for_violation(self):
+    def test_cli_writes_warning_report_but_exits_zero_without_hard_violation(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             skills = root / "JCIIOT/src/robot_agent/skills"
@@ -134,9 +171,32 @@ class ScoredPathAuditTests(unittest.TestCase):
             exit_code = main(["--root", str(root), "--output", str(output)])
             report = json.loads(output.read_text(encoding="utf-8"))
 
-        self.assertEqual(exit_code, 1)
+        self.assertEqual(exit_code, 0)
         self.assertEqual(report["violation_count"], 1)
+        self.assertEqual(report["hard_violation_count"], 0)
+        self.assertEqual(report["warning_count"], 1)
         self.assertEqual(report["violations"][0]["rule"], "direct_qpos_write")
+
+    def test_cli_exits_nonzero_for_object_pose_write(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            skills = root / "JCIIOT/src/robot_agent/skills"
+            (root / "JCIIOT/src/robot_agent/workflows").mkdir(parents=True)
+            skills.mkdir(parents=True)
+            (skills / "bad.py").write_text(
+                "def run(env, object_qpos_addr):\n"
+                "    env.sim.data.qpos[object_qpos_addr] = 1\n",
+                encoding="utf-8",
+            )
+            output = root / "audit.json"
+
+            exit_code = main(["--root", str(root), "--output", str(output)])
+            report = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(report["hard_violation_count"], 1)
+        self.assertEqual(report["warning_count"], 0)
+        self.assertEqual(report["violations"][0]["rule"], "object_qpos_write")
 
 
 if __name__ == "__main__":

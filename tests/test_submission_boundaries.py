@@ -4,6 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from scripts.audit_scored_path import HARD_RULES, scan_submission
+
 
 WORKSPACE = Path(__file__).resolve().parents[1]
 OVERLAY = WORKSPACE / "submission"
@@ -159,6 +161,32 @@ class SubmissionBoundaryTests(unittest.TestCase):
         )
         commit = lock["repository"]["commit"]
         self.assertRegex(commit, r"^[0-9a-f]{40}$")
+
+    def test_scored_submission_has_no_object_pose_or_attachment_shortcut(self):
+        violations = scan_submission(OVERLAY)
+        hard_violations = [
+            item for item in violations if item.rule in HARD_RULES
+        ]
+
+        self.assertEqual(
+            [(item.path, item.line, item.rule) for item in hard_violations],
+            [],
+        )
+        source = "\n".join(
+            path.read_text(encoding="utf-8")
+            for directory in (
+                OVERLAY / "JCIIOT/src/robot_agent/skills",
+                OVERLAY / "JCIIOT/src/robot_agent/workflows",
+            )
+            for path in sorted(directory.rglob("*.py"))
+        )
+        for forbidden in (
+            "transport_attachment",
+            "sync_transport_attachment",
+            "capture_transport_attachment",
+            "clear_transport_attachment",
+        ):
+            self.assertNotIn(forbidden, source)
 
 
 if __name__ == "__main__":

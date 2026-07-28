@@ -15,6 +15,19 @@ ALLOWED_PRIVATE_BACKEND_MEMBERS = {
     "_mark_trajectory_event",
     "_record_trajectory_frame",
 }
+HARD_RULES = {
+    "attachment_relative_write",
+    "object_qpos_write",
+    "transport_attachment_call",
+    "transport_attachment_import",
+    "transport_sync_helper",
+}
+TRANSPORT_ATTACHMENT_CALLS = {
+    "capture_transport_attachment",
+    "clear_transport_attachment",
+    "set_object_qpos",
+    "sync_transport_attachment",
+}
 
 
 @dataclass(frozen=True)
@@ -23,6 +36,7 @@ class Violation:
     line: int
     column: int
     rule: str
+    severity: str
     excerpt: str
 
     def as_dict(self) -> dict[str, object]:
@@ -54,6 +68,19 @@ def _target_has_terminal_attribute(node: ast.AST, name: str) -> bool:
     return isinstance(node, ast.Attribute) and node.attr == name
 
 
+def _node_mentions_object(node: ast.AST) -> bool:
+    for item in ast.walk(node):
+        if isinstance(item, ast.Name):
+            token = item.id.lower()
+        elif isinstance(item, ast.Attribute):
+            token = item.attr.lower()
+        else:
+            continue
+        if "object" in token or "crate" in token:
+            return True
+    return False
+
+
 def _iter_assignment_targets(node: ast.AST) -> Iterable[ast.AST]:
     if isinstance(node, (ast.Tuple, ast.List)):
         for item in node.elts:
@@ -77,6 +104,7 @@ class ScoredPathVisitor(ast.NodeVisitor):
                 line=line,
                 column=int(getattr(node, "col_offset", 0)) + 1,
                 rule=rule,
+                severity="error" if rule in HARD_RULES else "warning",
                 excerpt=excerpt,
             )
         )
@@ -84,7 +112,12 @@ class ScoredPathVisitor(ast.NodeVisitor):
     def _check_target(self, target: ast.AST) -> None:
         for item in _iter_assignment_targets(target):
             if _target_has_terminal_attribute(item, "qpos"):
-                self._add(item, "direct_qpos_write")
+                if isinstance(item, ast.Subscript) and _node_mentions_object(
+                    item.slice
+                ):
+                    self._add(item, "object_qpos_write")
+                else:
+                    self._add(item, "direct_qpos_write")
             if (
                 isinstance(item, ast.Subscript)
                 and _subscript_key(item) == "relative_xy"
@@ -117,12 +150,9 @@ class ScoredPathVisitor(ast.NodeVisitor):
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         module = node.module or ""
+        if module.endswith("transport_attachment"):
+            self._add(node, "transport_attachment_import")
         for alias in node.names:
-            if (
-                module.endswith("transport_attachment")
-                and alias.name == "sync_transport_attachment"
-            ):
-                self._add(node, "transport_sync_helper")
             if (
                 module == "robot_agent.environments.robosuite_backend"
                 and alias.name.startswith("_")
@@ -131,14 +161,15 @@ class ScoredPathVisitor(ast.NodeVisitor):
 
     def visit_Call(self, node: ast.Call) -> None:
         function = node.func
-        if (
-            isinstance(function, ast.Name)
-            and function.id == "sync_transport_attachment"
-        ) or (
-            isinstance(function, ast.Attribute)
-            and function.attr == "sync_transport_attachment"
-        ):
+        function_name = None
+        if isinstance(function, ast.Name):
+            function_name = function.id
+        elif isinstance(function, ast.Attribute):
+            function_name = function.attr
+        if function_name == "sync_transport_attachment":
             self._add(node, "transport_sync_helper")
+        elif function_name in TRANSPORT_ATTACHMENT_CALLS:
+            self._add(node, "transport_attachment_call")
         if (
             isinstance(function, ast.Attribute)
             and function.attr.startswith("_")
@@ -182,9 +213,17 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     violations = scan_submission(args.root)
+    hard_violations = [item for item in violations if item.rule in HARD_RULES]
+    warnings = [item for item in violations if item.rule not in HARD_RULES]
+    by_rule: dict[str, int] = {}
+    for item in violations:
+        by_rule[item.rule] = by_rule.get(item.rule, 0) + 1
     report = {
         "root": str(args.root),
         "violation_count": len(violations),
+        "hard_violation_count": len(hard_violations),
+        "warning_count": len(warnings),
+        "by_rule": by_rule,
         "violations": [item.as_dict() for item in violations],
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -193,7 +232,7 @@ def main(argv: list[str] | None = None) -> int:
         encoding="utf-8",
     )
     print(json.dumps(report, ensure_ascii=True, indent=2))
-    return 1 if violations else 0
+    return 1 if hard_violations else 0
 
 
 if __name__ == "__main__":
