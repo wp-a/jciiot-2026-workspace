@@ -528,6 +528,14 @@ class CradleTransferTests(unittest.TestCase):
         self.assertTrue(self.module.is_cradle_supported(supported))
         self.assertFalse(self.module.is_cradle_supported(table_contact_only))
 
+    def test_fingerpad_only_contact_is_not_cradle_support(self):
+        fingerpads = self.observation(
+            right_support=("gripper0_right_right_fingerpad_collision",),
+            left_support=("gripper0_left_left_fingerpad_collision",),
+        )
+
+        self.assertFalse(self.module.is_cradle_supported(fingerpads))
+
     def test_cradle_stability_resets_on_contact_or_height_loss(self):
         stable = self.module.next_cradle_stability(self.observation(), 4)
         contact_loss = self.module.next_cradle_stability(
