@@ -2,6 +2,7 @@ import importlib.util
 import math
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -88,6 +89,190 @@ class PhysicalTransportGeometryTests(unittest.TestCase):
             ),
             0,
         )
+
+
+class FakePhysicalTransportDriver:
+    def __init__(
+        self,
+        *,
+        contacts=None,
+        object_heights=None,
+        collision_step=None,
+        advance=True,
+    ):
+        self.base_xy = np.zeros(2, dtype=float)
+        self.yaw = 0.0
+        self.contacts = list(contacts or [{"right": True, "left": True}])
+        self.object_heights = list(object_heights or [1.0])
+        self.collision_step = collision_step
+        self.advance = bool(advance)
+        self.steps = []
+
+    def capture_hold_targets(self, _backend):
+        return {"torso": np.array([0.3]), "head": np.array([0.1, -0.1])}
+
+    def observe(self, _backend, _object_name):
+        index = min(len(self.steps), len(self.contacts) - 1)
+        height_index = min(len(self.steps), len(self.object_heights) - 1)
+        return {
+            "base_xy": self.base_xy.copy(),
+            "base_yaw": self.yaw,
+            "object_pos": np.array(
+                [self.base_xy[0] + 0.5, self.base_xy[1], self.object_heights[height_index]],
+                dtype=float,
+            ),
+            "contacts": dict(self.contacts[index]),
+        }
+
+    def step(self, _backend, *, object_name, base_command, hold_targets):
+        command = np.asarray(base_command, dtype=float).copy()
+        self.steps.append(
+            {
+                "object_name": object_name,
+                "base_command": command,
+                "hold_targets": hold_targets,
+            }
+        )
+        if self.advance:
+            self.base_xy += command[:2]
+            self.yaw += command[2]
+        return {"collision": self.collision_step == len(self.steps)}
+
+    def record_event(self, _backend, event, **payload):
+        return (event, payload)
+
+
+class PhysicalTransportRunnerTests(unittest.TestCase):
+    def setUp(self):
+        self.module = load_module()
+        self.config = self.module.PhysicalCarryConfig(
+            waypoint_tolerance=0.02,
+            max_steps=20,
+            k_linear=1.0,
+            k_angular=1.0,
+            max_linear=0.10,
+            max_angular=0.05,
+            max_linear_delta=0.10,
+            max_angular_delta=0.05,
+            object_drop_tolerance=0.02,
+        )
+
+    def run_transport(self, driver, *, path=None, config=None):
+        self.assertTrue(hasattr(self.module, "run_physical_transport"))
+        return self.module.run_physical_transport(
+            object(),
+            path=path or [np.array([0.18, 0.0])],
+            object_name="box",
+            hold_yaw=0.0,
+            minimum_object_z=0.98,
+            config=config or self.config,
+            driver=driver,
+        )
+
+    def test_success_reaches_path_with_only_physics_steps(self):
+        driver = FakePhysicalTransportDriver()
+
+        result = self.run_transport(driver)
+
+        self.assertTrue(result["success"])
+        self.assertIsNone(result["failure_stage"])
+        self.assertGreaterEqual(len(driver.steps), 2)
+        self.assertLess(float(result["final_distance"]), 0.02)
+
+    def test_single_gripper_contact_loss_fails_immediately(self):
+        driver = FakePhysicalTransportDriver(
+            contacts=[
+                {"right": True, "left": True},
+                {"right": True, "left": False},
+            ]
+        )
+
+        result = self.run_transport(driver)
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["failure_stage"], "contact")
+        self.assertEqual(len(driver.steps), 1)
+
+    def test_object_drop_fails_immediately(self):
+        driver = FakePhysicalTransportDriver(object_heights=[1.0, 0.97])
+
+        result = self.run_transport(driver)
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["failure_stage"], "object_drop")
+        self.assertEqual(len(driver.steps), 1)
+
+    def test_collision_fails_immediately(self):
+        driver = FakePhysicalTransportDriver(collision_step=1)
+
+        result = self.run_transport(driver)
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["failure_stage"], "collision")
+        self.assertEqual(len(driver.steps), 1)
+
+    def test_step_budget_exhaustion_has_no_fallback(self):
+        driver = FakePhysicalTransportDriver(advance=False)
+        config = self.module.PhysicalCarryConfig(
+            waypoint_tolerance=0.02,
+            max_steps=3,
+            max_linear_delta=0.10,
+            max_angular_delta=0.05,
+        )
+
+        result = self.run_transport(driver, config=config)
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["failure_stage"], "timeout")
+        self.assertEqual(len(driver.steps), 3)
+
+    def test_physical_action_contains_every_controlled_part(self):
+        self.assertTrue(hasattr(self.module, "physical_action_parts"))
+        robot = SimpleNamespace(
+            composite_controller=SimpleNamespace(
+                _action_split_indexes={
+                    "right": (0, 6),
+                    "right_gripper": (6, 7),
+                    "left": (7, 13),
+                    "left_gripper": (13, 14),
+                    "torso": (14, 15),
+                    "head": (15, 17),
+                    "base": (17, 20),
+                }
+            ),
+            gripper={
+                "right": SimpleNamespace(dof=1),
+                "left": SimpleNamespace(dof=1),
+            },
+        )
+
+        action = self.module.physical_action_parts(
+            robot,
+            base_command=np.array([0.1, -0.2, 0.03]),
+            gripper_value=1.0,
+            hold_targets={
+                "torso": np.array([0.25]),
+                "head": np.array([0.1, -0.1]),
+            },
+        )
+
+        self.assertEqual(
+            set(action),
+            {
+                "right",
+                "right_gripper",
+                "left",
+                "left_gripper",
+                "torso",
+                "head",
+                "base",
+            },
+        )
+        np.testing.assert_allclose(action["right"], np.zeros(6))
+        np.testing.assert_allclose(action["left"], np.zeros(6))
+        np.testing.assert_allclose(action["base"], [0.1, -0.2, 0.03])
+        np.testing.assert_allclose(action["right_gripper"], [1.0])
+        np.testing.assert_allclose(action["left_gripper"], [1.0])
 
 
 if __name__ == "__main__":
