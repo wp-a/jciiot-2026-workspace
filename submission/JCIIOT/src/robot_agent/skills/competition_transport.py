@@ -25,6 +25,7 @@ class PhysicalCarryConfig:
         object_drop_tolerance: float = 0.025,
         descent_step: float = 0.001,
         max_descent: float = 0.12,
+        minimum_descent_before_support: float = 0.008,
         support_stability_steps: int = 8,
         support_motion_tolerance: float = 0.0002,
         release_steps: int = 40,
@@ -43,6 +44,9 @@ class PhysicalCarryConfig:
         self.object_drop_tolerance = float(object_drop_tolerance)
         self.descent_step = float(descent_step)
         self.max_descent = float(max_descent)
+        self.minimum_descent_before_support = float(
+            minimum_descent_before_support
+        )
         self.support_stability_steps = int(support_stability_steps)
         self.support_motion_tolerance = float(support_motion_tolerance)
         self.release_steps = int(release_steps)
@@ -381,15 +385,42 @@ class OfficialPhysicalCarryDriver:
         object_name: str,
         base_command,
         hold_targets,
+        arm_world_deltas=None,
+        gripper_value: float = 1.0,
     ) -> dict:
         del object_name
+        from robosuite.environments.factory_sorting.lift_after_grasp import (
+            arm_delta_to_normalized_action,
+            world_delta_to_controller_frame,
+        )
+
         raw_env = backend.env
         robot = raw_env.robots[0]
+        arm_actions = {}
+        if arm_world_deltas:
+            robot.composite_controller.update_state()
+            for arm in ("right", "left"):
+                world_delta = np.asarray(
+                    arm_world_deltas.get(arm, np.zeros(3)),
+                    dtype=float,
+                )
+                controller_delta = world_delta_to_controller_frame(
+                    robot,
+                    arm,
+                    world_delta,
+                )
+                arm_actions[arm] = arm_delta_to_normalized_action(
+                    robot,
+                    arm,
+                    controller_delta,
+                    max_action=0.30,
+                )
         action_parts = physical_action_parts(
             robot,
             base_command=base_command,
-            gripper_value=1.0,
+            gripper_value=gripper_value,
             hold_targets=hold_targets,
+            arm_actions=arm_actions,
         )
         action = robot.create_action_vector(action_parts)
         result = raw_env.step(action)
@@ -406,3 +437,185 @@ class OfficialPhysicalCarryDriver:
         marker = getattr(backend, "_mark_trajectory_event", None)
         if callable(marker):
             marker(event, **payload)
+
+
+def _place_result(
+    *,
+    success: bool,
+    failure_stage: str | None,
+    observation,
+    start_z: float,
+    support_detected: bool,
+    final_distance: float,
+    steps: int,
+) -> dict:
+    current_z = float(observation["object_pos"][2])
+    return {
+        "success": bool(success),
+        "failure_stage": failure_stage,
+        "support_detected": bool(support_detected),
+        "descent": max(0.0, float(start_z) - current_z),
+        "final_distance": float(final_distance),
+        "steps": int(steps),
+        "contacts": {
+            "right": bool(observation["contacts"].get("right", False)),
+            "left": bool(observation["contacts"].get("left", False)),
+        },
+    }
+
+
+def run_physical_place(
+    backend,
+    *,
+    object_name: str,
+    target_xy,
+    config: PhysicalCarryConfig | None = None,
+    driver=None,
+) -> dict:
+    """Lower a held object onto support, release, and measure its final pose."""
+    config = config or PhysicalCarryConfig()
+    driver = driver or OfficialPhysicalCarryDriver()
+    target_xy = np.asarray(target_xy, dtype=float).reshape(2)
+    hold_targets = driver.capture_hold_targets(backend)
+    observation = driver.observe(backend, object_name)
+    start_z = float(observation["object_pos"][2])
+    previous_z = start_z
+    final_distance = float(
+        np.linalg.norm(np.asarray(observation["object_pos"][:2]) - target_xy)
+    )
+    steps = 0
+    support_steps = 0
+    support_detected = False
+    driver.record_event(
+        backend,
+        "physical_place_start",
+        object_name=object_name,
+        target_xy=target_xy.tolist(),
+    )
+
+    if next_contact_stability(observation["contacts"], 0) == 0:
+        return _place_result(
+            success=False,
+            failure_stage="contact",
+            observation=observation,
+            start_z=start_z,
+            support_detected=False,
+            final_distance=final_distance,
+            steps=steps,
+        )
+
+    descent_steps = max(
+        1,
+        int(math.ceil(config.max_descent / max(config.descent_step, 1e-12))),
+    )
+    downward = {
+        arm: np.array([0.0, 0.0, -config.descent_step], dtype=float)
+        for arm in ("right", "left")
+    }
+    failure_stage = None
+    for _ in range(descent_steps):
+        step_info = driver.step(
+            backend,
+            object_name=object_name,
+            base_command=np.zeros(3, dtype=float),
+            hold_targets=hold_targets,
+            arm_world_deltas=downward,
+            gripper_value=1.0,
+        )
+        steps += 1
+        observation = driver.observe(backend, object_name)
+        current_z = float(observation["object_pos"][2])
+        if bool(step_info.get("collision", False)):
+            failure_stage = "collision"
+            break
+        if next_contact_stability(observation["contacts"], 0) == 0:
+            failure_stage = "contact"
+            break
+
+        descent = max(0.0, start_z - current_z)
+        vertical_motion = abs(current_z - previous_z)
+        if (
+            descent >= config.minimum_descent_before_support
+            and vertical_motion <= config.support_motion_tolerance
+        ):
+            support_steps += 1
+        else:
+            support_steps = 0
+        previous_z = current_z
+        if support_steps >= config.support_stability_steps:
+            support_detected = True
+            break
+
+    if failure_stage is None and not support_detected:
+        failure_stage = "support"
+
+    if failure_stage is not None:
+        final_distance = float(
+            np.linalg.norm(np.asarray(observation["object_pos"][:2]) - target_xy)
+        )
+        driver.record_event(
+            backend,
+            "physical_place_end",
+            object_name=object_name,
+            success=False,
+            failure_stage=failure_stage,
+            support_detected=support_detected,
+        )
+        return _place_result(
+            success=False,
+            failure_stage=failure_stage,
+            observation=observation,
+            start_z=start_z,
+            support_detected=support_detected,
+            final_distance=final_distance,
+            steps=steps,
+        )
+
+    zero_arms = {
+        arm: np.zeros(3, dtype=float)
+        for arm in ("right", "left")
+    }
+    for _ in range(config.release_steps + config.settle_steps):
+        step_info = driver.step(
+            backend,
+            object_name=object_name,
+            base_command=np.zeros(3, dtype=float),
+            hold_targets=hold_targets,
+            arm_world_deltas=zero_arms,
+            gripper_value=-1.0,
+        )
+        steps += 1
+        observation = driver.observe(backend, object_name)
+        if bool(step_info.get("collision", False)):
+            failure_stage = "collision"
+            break
+
+    final_distance = float(
+        np.linalg.norm(np.asarray(observation["object_pos"][:2]) - target_xy)
+    )
+    if failure_stage is None and final_distance >= 0.8:
+        failure_stage = "target_distance"
+    if failure_stage is None and all(
+        bool(observation["contacts"].get(arm, False))
+        for arm in ("right", "left")
+    ):
+        failure_stage = "release"
+    success = failure_stage is None
+    driver.record_event(
+        backend,
+        "physical_place_end",
+        object_name=object_name,
+        success=success,
+        failure_stage=failure_stage,
+        support_detected=support_detected,
+        final_distance=final_distance,
+    )
+    return _place_result(
+        success=success,
+        failure_stage=failure_stage,
+        observation=observation,
+        start_z=start_z,
+        support_detected=support_detected,
+        final_distance=final_distance,
+        steps=steps,
+    )

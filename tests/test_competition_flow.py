@@ -476,6 +476,39 @@ class CompetitionFlowTests(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertEqual(driver._physical_hold, hold)
 
+    def test_place_routes_through_physical_descent_and_clears_hold_on_success(self):
+        captured = {}
+        driver = object.__new__(self.module.OfficialCompetitionDriver)
+        driver.backend = object()
+        driver.scene_context = SimpleNamespace(
+            output_ports={
+                "output_5": SimpleNamespace(center=np.array([4.0, -7.0]))
+            }
+        )
+        driver._physical_hold = {"object_z": 1.1}
+        transport_module = types.ModuleType(
+            "robot_agent.skills.competition_transport"
+        )
+
+        def run_physical_place(_backend, **kwargs):
+            captured.update(kwargs)
+            return {"success": True, "failure_stage": None}
+
+        transport_module.run_physical_place = run_physical_place
+        modules = {
+            "robot_agent": types.ModuleType("robot_agent"),
+            "robot_agent.skills": types.ModuleType("robot_agent.skills"),
+            "robot_agent.skills.competition_transport": transport_module,
+        }
+
+        with patch.dict(sys.modules, modules):
+            success = driver.place("output_5", "blue_tote")
+
+        self.assertTrue(success)
+        self.assertEqual(captured["object_name"], "blue_tote")
+        np.testing.assert_allclose(captured["target_xy"], [4.0, -7.0])
+        self.assertIsNone(driver._physical_hold)
+
     def test_workflow_source_has_no_transport_attachment(self):
         source = MODULE_PATH.read_text(encoding="utf-8")
 

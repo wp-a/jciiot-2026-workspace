@@ -275,5 +275,154 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
         np.testing.assert_allclose(action["left_gripper"], [1.0])
 
 
+class FakePhysicalPlacementDriver:
+    def __init__(
+        self,
+        *,
+        object_heights,
+        contacts=None,
+        object_xy=(0.1, 0.1),
+        collision_step=None,
+    ):
+        self.object_heights = list(object_heights)
+        self.contacts = list(contacts or [{"right": True, "left": True}])
+        self.object_xy = np.asarray(object_xy, dtype=float)
+        self.collision_step = collision_step
+        self.steps = []
+
+    def capture_hold_targets(self, _backend):
+        return {"torso": np.array([0.3]), "head": np.array([0.0, 0.0])}
+
+    def observe(self, _backend, _object_name):
+        index = min(len(self.steps), len(self.object_heights) - 1)
+        contact_index = min(len(self.steps), len(self.contacts) - 1)
+        contacts = dict(self.contacts[contact_index])
+        if self.steps and self.steps[-1]["gripper_value"] < 0.0:
+            contacts = {"right": False, "left": False}
+        return {
+            "base_xy": np.zeros(2, dtype=float),
+            "base_yaw": 0.0,
+            "object_pos": np.array(
+                [self.object_xy[0], self.object_xy[1], self.object_heights[index]],
+                dtype=float,
+            ),
+            "contacts": contacts,
+        }
+
+    def step(
+        self,
+        _backend,
+        *,
+        object_name,
+        base_command,
+        hold_targets,
+        arm_world_deltas=None,
+        gripper_value=1.0,
+    ):
+        self.steps.append(
+            {
+                "object_name": object_name,
+                "base_command": np.asarray(base_command, dtype=float).copy(),
+                "hold_targets": hold_targets,
+                "arm_world_deltas": arm_world_deltas,
+                "gripper_value": float(gripper_value),
+            }
+        )
+        return {"collision": self.collision_step == len(self.steps)}
+
+    def record_event(self, _backend, event, **payload):
+        return (event, payload)
+
+
+class PhysicalPlacementRunnerTests(unittest.TestCase):
+    def setUp(self):
+        self.module = load_module()
+        self.config = self.module.PhysicalCarryConfig(
+            descent_step=0.002,
+            max_descent=0.03,
+            support_stability_steps=2,
+            support_motion_tolerance=0.0002,
+            release_steps=2,
+            settle_steps=2,
+        )
+        self.config.minimum_descent_before_support = 0.008
+
+    def run_place(self, driver, *, target_xy=(0.0, 0.0), config=None):
+        self.assertTrue(hasattr(self.module, "run_physical_place"))
+        return self.module.run_physical_place(
+            object(),
+            object_name="box",
+            target_xy=np.asarray(target_xy, dtype=float),
+            config=config or self.config,
+            driver=driver,
+        )
+
+    def test_release_occurs_only_after_measured_descent_and_support_plateau(self):
+        driver = FakePhysicalPlacementDriver(
+            object_heights=[1.0, 0.995, 0.990, 0.990, 0.990, 0.990, 0.990]
+        )
+
+        result = self.run_place(driver)
+
+        self.assertTrue(result["success"])
+        gripper_commands = [step["gripper_value"] for step in driver.steps]
+        first_release = gripper_commands.index(-1.0)
+        self.assertGreaterEqual(first_release, 4)
+        self.assertTrue(all(value == 1.0 for value in gripper_commands[:first_release]))
+        self.assertTrue(all(value == -1.0 for value in gripper_commands[first_release:]))
+        self.assertGreaterEqual(result["descent"], 0.008)
+        self.assertTrue(result["support_detected"])
+
+    def test_contact_loss_during_descent_fails_without_release(self):
+        driver = FakePhysicalPlacementDriver(
+            object_heights=[1.0, 0.995, 0.990],
+            contacts=[
+                {"right": True, "left": True},
+                {"right": True, "left": False},
+            ],
+        )
+
+        result = self.run_place(driver)
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["failure_stage"], "contact")
+        self.assertNotIn(-1.0, [step["gripper_value"] for step in driver.steps])
+
+    def test_descent_without_support_fails_without_release(self):
+        driver = FakePhysicalPlacementDriver(
+            object_heights=[1.0 - 0.002 * step for step in range(20)]
+        )
+
+        result = self.run_place(driver)
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["failure_stage"], "support")
+        self.assertNotIn(-1.0, [step["gripper_value"] for step in driver.steps])
+
+    def test_collision_during_descent_fails_without_release(self):
+        driver = FakePhysicalPlacementDriver(
+            object_heights=[1.0, 0.995, 0.990],
+            collision_step=1,
+        )
+
+        result = self.run_place(driver)
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["failure_stage"], "collision")
+        self.assertNotIn(-1.0, [step["gripper_value"] for step in driver.steps])
+
+    def test_final_target_distance_is_measured_after_release(self):
+        driver = FakePhysicalPlacementDriver(
+            object_heights=[1.0, 0.990, 0.990, 0.990, 0.990, 0.990],
+            object_xy=(1.0, 0.0),
+        )
+
+        result = self.run_place(driver)
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["failure_stage"], "target_distance")
+        self.assertAlmostEqual(result["final_distance"], 1.0)
+
+
 if __name__ == "__main__":
     unittest.main()
