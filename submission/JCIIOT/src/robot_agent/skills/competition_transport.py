@@ -25,13 +25,17 @@ class CradleObservation:
 
 def _is_allowed_cradle_geom(geom_name: str, arm: str) -> bool:
     name = str(geom_name).lower()
-    if arm not in name:
-        return False
     if "finger" in name:
         return False
-    if any(token in name for token in ("wrist", "palm", "gripper")):
-        return True
-    return any(f"arm_{arm}_{index}" in name for index in (4, 5, 6))
+    if any(token in name for token in ("wrist", "palm", "hand_collision")):
+        return arm in name
+    if arm == "left":
+        return any(f"arm_{index}_left_collision" in name for index in (4, 5, 6))
+    if arm == "right":
+        return "_left_" not in name and any(
+            f"arm_{index}_collision" in name for index in (4, 5, 6)
+        )
+    return False
 
 
 def is_cradle_supported(observation: CradleObservation) -> bool:

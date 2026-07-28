@@ -1,0 +1,203 @@
+import unittest
+
+import numpy as np
+
+from scripts.run_l1_cradle_gate import (
+    cradle_gate_accepted,
+    cradle_gate_failures,
+    has_bilateral_object_contact,
+    opposed_wall_clearance_targets,
+    opposed_wall_squeeze_targets,
+    push_gate_accepted,
+    push_gate_failures,
+)
+
+
+VALID_RECORD = {
+    "physical_grasp": True,
+    "lift_m": 0.131,
+    "support_contact_steps": 20,
+    "base_translation_m": 0.50,
+    "attachment_calls": 0,
+    "object_pose_writes": 0,
+    "collision_frames": 0,
+    "dropped": False,
+    "infrastructure_error": None,
+}
+
+VALID_PUSH_RECORD = {
+    "physical_contact_steps": 20,
+    "object_translation_m": 0.50,
+    "base_translation_m": 0.30,
+    "attachment_calls": 0,
+    "object_pose_writes": 0,
+    "collision_frames": 0,
+    "infrastructure_error": None,
+}
+
+
+class L1CradleGateTests(unittest.TestCase):
+    def test_gate_accepts_only_complete_physical_evidence(self):
+        self.assertTrue(cradle_gate_accepted(VALID_RECORD))
+        self.assertEqual(cradle_gate_failures(VALID_RECORD), [])
+
+    def test_each_hard_condition_rejects_the_record(self):
+        invalid_values = {
+            "physical_grasp": False,
+            "lift_m": 0.129,
+            "support_contact_steps": 19,
+            "base_translation_m": 0.299,
+            "attachment_calls": 1,
+            "object_pose_writes": 1,
+            "collision_frames": 1,
+            "dropped": True,
+            "infrastructure_error": "simulator failed",
+        }
+        for key, value in invalid_values.items():
+            with self.subTest(key=key):
+                record = dict(VALID_RECORD)
+                record[key] = value
+                self.assertFalse(cradle_gate_accepted(record))
+                self.assertIn(key, cradle_gate_failures(record))
+
+    def test_missing_evidence_is_rejected(self):
+        for key in VALID_RECORD:
+            with self.subTest(key=key):
+                record = dict(VALID_RECORD)
+                del record[key]
+                self.assertFalse(cradle_gate_accepted(record))
+                self.assertIn(key, cradle_gate_failures(record))
+
+    def test_non_finite_numeric_evidence_is_rejected(self):
+        for key in (
+            "lift_m",
+            "support_contact_steps",
+            "base_translation_m",
+            "attachment_calls",
+            "object_pose_writes",
+            "collision_frames",
+        ):
+            with self.subTest(key=key):
+                record = dict(VALID_RECORD)
+                record[key] = float("nan")
+                self.assertFalse(cradle_gate_accepted(record))
+                self.assertIn(key, cradle_gate_failures(record))
+
+
+class L1PhysicalPushGateTests(unittest.TestCase):
+    def test_gate_accepts_complete_physical_push_evidence(self):
+        self.assertTrue(push_gate_accepted(VALID_PUSH_RECORD))
+        self.assertEqual(push_gate_failures(VALID_PUSH_RECORD), [])
+
+    def test_each_hard_condition_rejects_the_record(self):
+        invalid_values = {
+            "physical_contact_steps": 19,
+            "object_translation_m": 0.499,
+            "base_translation_m": 0.299,
+            "attachment_calls": 1,
+            "object_pose_writes": 1,
+            "collision_frames": 1,
+            "infrastructure_error": "simulator failed",
+        }
+        for key, value in invalid_values.items():
+            with self.subTest(key=key):
+                record = dict(VALID_PUSH_RECORD)
+                record[key] = value
+                self.assertFalse(push_gate_accepted(record))
+                self.assertIn(key, push_gate_failures(record))
+
+
+class OpposedWallRegraspTests(unittest.TestCase):
+    def test_bilateral_contact_accepts_any_real_contact_from_each_arm(self):
+        self.assertTrue(
+            has_bilateral_object_contact(
+                {
+                    "right": ("gripper0_right_left_fingertip_collision",),
+                    "left": ("gripper0_left_left_fingertip_collision",),
+                }
+            )
+        )
+        self.assertFalse(
+            has_bilateral_object_contact(
+                {
+                    "right": ("gripper0_right_left_fingertip_collision",),
+                    "left": (),
+                }
+            )
+        )
+
+    def test_clearance_targets_move_both_arms_outside_the_long_walls(self):
+        current = {
+            "right": np.array([7.35, 4.73, 1.37]),
+            "left": np.array([7.35, 4.50, 1.37]),
+        }
+
+        targets = opposed_wall_clearance_targets(
+            current,
+            separation_axis=np.array([0.0, 1.0, 0.0]),
+            clearance_m=0.10,
+        )
+
+        np.testing.assert_allclose(targets["right"], [7.35, 4.83, 1.37])
+        np.testing.assert_allclose(targets["left"], [7.35, 4.40, 1.37])
+
+    def test_clearance_targets_orient_a_reversed_axis_from_left_to_right(self):
+        current = {
+            "right": np.array([7.35, 4.73, 1.37]),
+            "left": np.array([7.35, 4.50, 1.37]),
+        }
+
+        targets = opposed_wall_clearance_targets(
+            current,
+            separation_axis=np.array([0.0, -2.0, 0.0]),
+            clearance_m=0.10,
+        )
+
+        np.testing.assert_allclose(targets["right"], [7.35, 4.83, 1.37])
+        np.testing.assert_allclose(targets["left"], [7.35, 4.40, 1.37])
+
+    def test_clearance_rejects_invalid_distances_and_vertical_axes(self):
+        current = {
+            "right": np.array([7.35, 4.73, 1.37]),
+            "left": np.array([7.35, 4.50, 1.37]),
+        }
+        for distance in (-0.01, float("nan"), float("inf")):
+            with self.subTest(distance=distance):
+                with self.assertRaises(ValueError):
+                    opposed_wall_clearance_targets(
+                        current,
+                        separation_axis=np.array([0.0, 1.0, 0.0]),
+                        clearance_m=distance,
+                    )
+        with self.assertRaises(ValueError):
+            opposed_wall_clearance_targets(
+                current,
+                separation_axis=np.array([0.0, 0.0, 1.0]),
+                clearance_m=0.10,
+            )
+
+    def test_squeeze_targets_move_both_arms_toward_the_container(self):
+        current = {
+            "right": np.array([7.12, 4.82, 1.24]),
+            "left": np.array([7.12, 4.41, 1.24]),
+        }
+
+        targets = opposed_wall_squeeze_targets(
+            current,
+            separation_axis=np.array([0.0, 1.0, 0.0]),
+            squeeze_m=0.025,
+        )
+
+        np.testing.assert_allclose(targets["right"], [7.12, 4.795, 1.24])
+        np.testing.assert_allclose(targets["left"], [7.12, 4.435, 1.24])
+
+    def test_missing_evidence_is_rejected(self):
+        for key in VALID_PUSH_RECORD:
+            with self.subTest(key=key):
+                record = dict(VALID_PUSH_RECORD)
+                del record[key]
+                self.assertFalse(push_gate_accepted(record))
+                self.assertIn(key, push_gate_failures(record))
+
+if __name__ == "__main__":
+    unittest.main()

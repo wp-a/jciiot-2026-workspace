@@ -492,8 +492,8 @@ class CradleTransferTests(unittest.TestCase):
         base_xy=(0.0, 0.0),
         object_z=1.0,
         minimum_object_z=0.95,
-        right_support=("robot0_arm_right_6_collision",),
-        left_support=("robot0_arm_left_6_collision",),
+        right_support=("robot0_arm_6_collision",),
+        left_support=("robot0_arm_6_left_collision",),
         right_drift=0.01,
         left_drift=0.01,
         max_drift=0.04,
@@ -518,8 +518,8 @@ class CradleTransferTests(unittest.TestCase):
 
     def test_cradle_support_requires_real_wrist_or_forearm_contact(self):
         supported = self.observation(
-            right_support=("robot0_right_wrist_collision",),
-            left_support=("robot0_arm_left_5_collision",),
+            right_support=("gripper0_right_hand_collision",),
+            left_support=("robot0_arm_5_left_collision",),
         )
         table_contact_only = self.observation(
             right_support=("input_5_table_collision",),
@@ -527,6 +527,14 @@ class CradleTransferTests(unittest.TestCase):
 
         self.assertTrue(self.module.is_cradle_supported(supported))
         self.assertFalse(self.module.is_cradle_supported(table_contact_only))
+
+    def test_cradle_support_does_not_assign_a_link_to_the_wrong_arm(self):
+        swapped = self.observation(
+            right_support=("robot0_arm_6_left_collision",),
+            left_support=("robot0_arm_6_collision",),
+        )
+
+        self.assertFalse(self.module.is_cradle_supported(swapped))
 
     def test_fingerpad_only_contact_is_not_cradle_support(self):
         fingerpads = self.observation(
