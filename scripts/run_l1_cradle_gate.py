@@ -319,6 +319,65 @@ def orientation_alignment_failures(record: Mapping[str, object]) -> list[str]:
     return list(dict.fromkeys(failures))
 
 
+def next_orientation_alignment_state(
+    previous: Mapping[str, object],
+    *,
+    right_error_deg: float,
+    left_error_deg: float,
+    position_drift_m: float,
+    collision: bool,
+    tolerance_deg: float = ORIENTATION_ALIGNMENT_THRESHOLDS["error_deg"],
+    required_stable_steps: int = ORIENTATION_ALIGNMENT_THRESHOLDS["stable_steps"],
+    max_position_drift_m: float = ORIENTATION_ALIGNMENT_THRESHOLDS[
+        "max_position_drift_m"
+    ],
+) -> dict[str, object]:
+    """Advance the collision-aware high-clearance orientation gate state."""
+    measurements = {
+        "right_error_deg": float(right_error_deg),
+        "left_error_deg": float(left_error_deg),
+        "position_drift_m": float(position_drift_m),
+        "tolerance_deg": float(tolerance_deg),
+        "max_position_drift_m": float(max_position_drift_m),
+    }
+    if not all(np.isfinite(value) and value >= 0.0 for value in measurements.values()):
+        raise ValueError("alignment measurements and limits must be finite and non-negative")
+    if not isinstance(collision, (bool, np.bool_)):
+        raise ValueError("collision must be boolean")
+    stable_steps = previous.get("stable_steps", 0)
+    previous_drift = previous.get("max_position_drift_m", 0.0)
+    if isinstance(stable_steps, bool) or int(stable_steps) != stable_steps:
+        raise ValueError("stable_steps must be a non-negative integer")
+    stable_steps = int(stable_steps)
+    previous_drift = float(previous_drift)
+    if stable_steps < 0 or not np.isfinite(previous_drift) or previous_drift < 0.0:
+        raise ValueError("previous alignment state is invalid")
+    required = int(required_stable_steps)
+    if isinstance(required_stable_steps, bool) or required != required_stable_steps or required < 1:
+        raise ValueError("required_stable_steps must be a positive integer")
+
+    maximum_drift = max(previous_drift, measurements["position_drift_m"])
+    failure = None
+    if bool(collision):
+        failure = "collision"
+    elif maximum_drift > measurements["max_position_drift_m"]:
+        failure = "position_drift"
+    within_tolerance = (
+        measurements["right_error_deg"] <= measurements["tolerance_deg"]
+        and measurements["left_error_deg"] <= measurements["tolerance_deg"]
+    )
+    stable_steps = stable_steps + 1 if within_tolerance and failure is None else 0
+    return {
+        "stable_steps": stable_steps,
+        "max_position_drift_m": maximum_drift,
+        "right_error_deg": measurements["right_error_deg"],
+        "left_error_deg": measurements["left_error_deg"],
+        "aligned": stable_steps >= required and failure is None,
+        "terminate": failure is not None,
+        "failure": failure,
+    }
+
+
 def has_bilateral_object_contact(
     contacts: Mapping[str, tuple[str, ...]],
 ) -> bool:
@@ -971,6 +1030,12 @@ def _center_regrasp_probe(
     wall_clearance_m: float,
     wall_squeeze_m: float,
     hold_steps: int,
+    align_closure_axes: bool,
+    orientation_max_action: float,
+    orientation_tolerance_deg: float,
+    orientation_stable_steps: int,
+    orientation_max_steps: int,
+    orientation_max_position_drift_m: float,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import (
         OfficialScriptedGraspDriver,
@@ -988,6 +1053,7 @@ def _center_regrasp_probe(
     stable_support_steps = 0
     maximum_support_steps = 0
     collision_steps = 0
+    orientation_alignment = None
 
     def eef_positions() -> dict[str, np.ndarray]:
         return {
@@ -997,6 +1063,189 @@ def _center_regrasp_probe(
             )
             for arm in ("right", "left")
         }
+
+    def eef_orientations() -> dict[str, np.ndarray]:
+        return {
+            arm: np.asarray(
+                raw_env.sim.data.site_xmat[robot.eef_site_id[arm]],
+                dtype=float,
+            ).reshape(3, 3)
+            for arm in ("right", "left")
+        }
+
+    def controller_origin_rotation(arm: str) -> np.ndarray:
+        controller = robot.part_controllers[arm]
+        if controller.name != "OSC_POSE" or controller.input_type != "delta":
+            raise RuntimeError(
+                f"orientation alignment requires {arm} OSC_POSE delta control"
+            )
+        input_ref_frame = getattr(controller, "input_ref_frame", "world")
+        if input_ref_frame == "world":
+            return np.eye(3)
+        if input_ref_frame != "base":
+            raise RuntimeError(
+                f"unsupported orientation reference frame for {arm}: "
+                f"{input_ref_frame}"
+            )
+        origin = controller.origin_ori
+        if origin is None:
+            _, origin = robot.composite_controller.get_controller_base_pose(
+                controller_name=arm
+            )
+        return _validated_rotation_matrix(
+            origin,
+            name=f"{arm} controller origin rotation",
+        )
+
+    def execute_orientation_alignment(target_axis: np.ndarray) -> dict[str, object]:
+        nonlocal collision_steps
+        if int(orientation_max_steps) < 1:
+            raise ValueError("orientation_max_steps must be positive")
+        hold_positions = eef_positions()
+        state: dict[str, object] = {
+            "stable_steps": 0,
+            "max_position_drift_m": 0.0,
+        }
+        alignment_collision_frames = 0
+        for local_step in range(int(orientation_max_steps)):
+            robot.composite_controller.update_state()
+            current_positions = eef_positions()
+            current_orientations = eef_orientations()
+            arm_actions = {}
+            orientation_actions = {}
+            for arm in ("right", "left"):
+                controller = robot.part_controllers[arm]
+                controller_delta = helpers["world_delta"](
+                    robot,
+                    arm,
+                    hold_positions[arm] - current_positions[arm],
+                )
+                arm_action = helpers["arm_action"](
+                    robot,
+                    arm,
+                    controller_delta,
+                    0.30,
+                )
+                closure_axis = current_orientations[arm][:, 0]
+                world_rotation_delta = minimum_undirected_axis_rotation(
+                    closure_axis,
+                    target_axis,
+                )
+                orientation_action = normalized_osc_orientation_command(
+                    world_rotation_delta=world_rotation_delta,
+                    controller_origin_rotation=controller_origin_rotation(arm),
+                    output_min=controller.output_min,
+                    output_max=controller.output_max,
+                    max_action=orientation_max_action,
+                )
+                arm_action[3:6] = orientation_action
+                arm_actions[arm] = arm_action
+                orientation_actions[arm] = orientation_action
+            action = helpers["build_action"](
+                robot,
+                arm_actions=arm_actions,
+                gripper_value=-1.0,
+                hold_targets=hold_targets,
+            )
+            _, _, _, info = raw_env.step(action)
+            recorder = getattr(backend, "_record_trajectory_frame", None)
+            if callable(recorder):
+                recorder(_env=raw_env)
+
+            measured_positions = eef_positions()
+            measured_orientations = eef_orientations()
+            position_drift = max(
+                float(
+                    np.linalg.norm(
+                        measured_positions[arm] - hold_positions[arm]
+                    )
+                )
+                for arm in ("right", "left")
+            )
+            errors = {
+                arm: closure_axis_error_degrees(
+                    measured_orientations[arm][:, 0],
+                    target_axis,
+                )
+                for arm in ("right", "left")
+            }
+            collision = bool((info or {}).get("has_judge_collision", False))
+            collision_steps += int(collision)
+            alignment_collision_frames += int(collision)
+            state = next_orientation_alignment_state(
+                state,
+                right_error_deg=errors["right"],
+                left_error_deg=errors["left"],
+                position_drift_m=position_drift,
+                collision=collision,
+                tolerance_deg=orientation_tolerance_deg,
+                required_stable_steps=orientation_stable_steps,
+                max_position_drift_m=orientation_max_position_drift_m,
+            )
+            observations.append(
+                {
+                    "stage": "align_closure_axes_high",
+                    "step": local_step + 1,
+                    "object_position": np.asarray(
+                        raw_env.sim.data.body_xpos[body_id],
+                        dtype=float,
+                    ).tolist(),
+                    "eef_positions": {
+                        arm: measured_positions[arm].tolist()
+                        for arm in ("right", "left")
+                    },
+                    "eef_orientations": {
+                        arm: measured_orientations[arm].tolist()
+                        for arm in ("right", "left")
+                    },
+                    "closure_axes": {
+                        arm: measured_orientations[arm][:, 0].tolist()
+                        for arm in ("right", "left")
+                    },
+                    "target_closure_axis": np.asarray(
+                        target_axis,
+                        dtype=float,
+                    ).tolist(),
+                    "orientation_actions": {
+                        arm: orientation_actions[arm].tolist()
+                        for arm in ("right", "left")
+                    },
+                    "orientation_errors_deg": errors,
+                    "position_drift_m": position_drift,
+                    "orientation_stable_steps": int(state["stable_steps"]),
+                    "judge_collision": collision,
+                }
+            )
+            if bool(state["aligned"]) or bool(state["terminate"]):
+                break
+
+        summary = {
+            "success": bool(state.get("aligned", False)),
+            "failure": state.get("failure")
+            or (None if state.get("aligned") else "timeout"),
+            "right_error_deg": float(state.get("right_error_deg", float("inf"))),
+            "left_error_deg": float(state.get("left_error_deg", float("inf"))),
+            "stable_steps": int(state.get("stable_steps", 0)),
+            "max_position_drift_m": float(state["max_position_drift_m"]),
+            "collision_frames": alignment_collision_frames,
+            "steps": sum(
+                1
+                for item in observations
+                if item["stage"] == "align_closure_axes_high"
+            ),
+        }
+        stage_results.append(
+            {
+                "stage": "align_closure_axes_high",
+                **summary,
+                "collision": bool(alignment_collision_frames),
+                "final_object_position": np.asarray(
+                    raw_env.sim.data.body_xpos[body_id],
+                    dtype=float,
+                ).tolist(),
+            }
+        )
+        return summary
 
     def execute_stage(
         name: str,
@@ -1270,6 +1519,18 @@ def _center_regrasp_probe(
                 "stages": stage_results,
                 "observations": observations,
             }
+        if align_closure_axes:
+            orientation_alignment = execute_orientation_alignment(separation_axis)
+            if not orientation_alignment["success"]:
+                return {
+                    "success": False,
+                    "failure_stage": "align_closure_axes_high",
+                    "support_contact_steps": maximum_support_steps,
+                    "collision_steps": collision_steps,
+                    "orientation_alignment": orientation_alignment,
+                    "stages": stage_results,
+                    "observations": observations,
+                }
         current = eef_positions()
         retreat_targets = opposed_wall_clearance_targets(
             current,
@@ -1382,6 +1643,7 @@ def _center_regrasp_probe(
         "lift_m": final_object_z - float(table_object_z),
         "support_contact_steps": maximum_support_steps,
         "collision_steps": collision_steps,
+        "orientation_alignment": orientation_alignment,
         "stages": stage_results,
         "observations": observations,
         "final_geometry": geometry_snapshot(raw_env, object_name),
@@ -1483,10 +1745,39 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                         wall_clearance_m=args.regrasp_wall_clearance_m,
                         wall_squeeze_m=args.regrasp_wall_squeeze_m,
                         hold_steps=args.hold_steps,
+                        align_closure_axes=args.align_closure_axes,
+                        orientation_max_action=args.orientation_max_action,
+                        orientation_tolerance_deg=args.orientation_tolerance_deg,
+                        orientation_stable_steps=args.orientation_stable_steps,
+                        orientation_max_steps=args.orientation_max_steps,
+                        orientation_max_position_drift_m=(
+                            args.orientation_max_position_drift_m
+                        ),
                     )
                     record["mode"] = "table_assisted_center_regrasp"
                     record["physical_grasp"] = bool(probe.get("success", False))
                     record["lift_m"] = float(probe.get("lift_m", 0.0))
+                    alignment = probe.get("orientation_alignment")
+                    if isinstance(alignment, Mapping):
+                        record.update(
+                            {
+                                "orientation_right_error_deg": alignment.get(
+                                    "right_error_deg"
+                                ),
+                                "orientation_left_error_deg": alignment.get(
+                                    "left_error_deg"
+                                ),
+                                "orientation_stable_steps": alignment.get(
+                                    "stable_steps"
+                                ),
+                                "orientation_max_position_drift_m": alignment.get(
+                                    "max_position_drift_m"
+                                ),
+                                "orientation_collision_frames": alignment.get(
+                                    "collision_frames"
+                                ),
+                            }
+                        )
                 elif args.inward_probe_m > 0.0:
                     probe = _inward_support_probe(
                         backend,
@@ -1536,6 +1827,9 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
     else:
         record["gate_failures"] = cradle_gate_failures(record)
     record["accepted"] = not record["gate_failures"]
+    if args.center_regrasp and args.align_closure_axes:
+        record["orientation_gate_failures"] = orientation_alignment_failures(record)
+        record["orientation_accepted"] = not record["orientation_gate_failures"]
     _atomic_json(args.output.resolve(), record)
     return record
 
@@ -1554,6 +1848,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--regrasp-center-shift-m", type=float, default=0.24)
     parser.add_argument("--regrasp-wall-clearance-m", type=float, default=0.10)
     parser.add_argument("--regrasp-wall-squeeze-m", type=float, default=0.025)
+    parser.add_argument("--align-closure-axes", action="store_true")
+    parser.add_argument("--orientation-max-action", type=float, default=0.30)
+    parser.add_argument("--orientation-tolerance-deg", type=float, default=5.0)
+    parser.add_argument("--orientation-stable-steps", type=int, default=5)
+    parser.add_argument("--orientation-max-steps", type=int, default=160)
+    parser.add_argument(
+        "--orientation-max-position-drift-m",
+        type=float,
+        default=0.03,
+    )
     parser.add_argument("--physical-push", action="store_true")
     parser.add_argument("--push-distance-m", type=float, default=0.50)
     parser.add_argument("--max-push-steps", type=int, default=400)

@@ -8,6 +8,7 @@ from scripts.run_l1_cradle_gate import (
     cradle_gate_failures,
     has_bilateral_object_contact,
     minimum_undirected_axis_rotation,
+    next_orientation_alignment_state,
     normalized_osc_orientation_command,
     opposed_wall_clearance_targets,
     opposed_wall_squeeze_targets,
@@ -200,6 +201,75 @@ class OrientationAlignmentGateTests(unittest.TestCase):
                 record[key] = float("nan")
                 self.assertIn(key, orientation_alignment_failures(record))
 
+
+class OrientationAlignmentStateTests(unittest.TestCase):
+    def test_state_requires_consecutive_bounded_steps(self):
+        state = {"stable_steps": 0, "max_position_drift_m": 0.0}
+        for expected in range(1, 5):
+            state = next_orientation_alignment_state(
+                state,
+                right_error_deg=4.0,
+                left_error_deg=3.0,
+                position_drift_m=0.02,
+                collision=False,
+            )
+            self.assertEqual(state["stable_steps"], expected)
+            self.assertFalse(state["aligned"])
+
+        state = next_orientation_alignment_state(
+            state,
+            right_error_deg=4.0,
+            left_error_deg=3.0,
+            position_drift_m=0.02,
+            collision=False,
+        )
+
+        self.assertEqual(state["stable_steps"], 5)
+        self.assertTrue(state["aligned"])
+        self.assertFalse(state["terminate"])
+
+    def test_state_resets_stability_on_angular_error(self):
+        state = {"stable_steps": 4, "max_position_drift_m": 0.01}
+
+        state = next_orientation_alignment_state(
+            state,
+            right_error_deg=5.01,
+            left_error_deg=3.0,
+            position_drift_m=0.02,
+            collision=False,
+        )
+
+        self.assertEqual(state["stable_steps"], 0)
+        self.assertFalse(state["aligned"])
+        self.assertFalse(state["terminate"])
+
+    def test_state_terminates_on_collision_or_excessive_drift(self):
+        for collision, drift, reason in (
+            (True, 0.01, "collision"),
+            (False, 0.0301, "position_drift"),
+        ):
+            with self.subTest(reason=reason):
+                state = next_orientation_alignment_state(
+                    {"stable_steps": 2, "max_position_drift_m": 0.01},
+                    right_error_deg=3.0,
+                    left_error_deg=3.0,
+                    position_drift_m=drift,
+                    collision=collision,
+                )
+                self.assertTrue(state["terminate"])
+                self.assertEqual(state["failure"], reason)
+                self.assertFalse(state["aligned"])
+                self.assertEqual(state["stable_steps"], 0)
+
+    def test_state_rejects_non_finite_measurements(self):
+        with self.assertRaises(ValueError):
+            next_orientation_alignment_state(
+                {"stable_steps": 0, "max_position_drift_m": 0.0},
+                right_error_deg=float("nan"),
+                left_error_deg=3.0,
+                position_drift_m=0.0,
+                collision=False,
+            )
 
 class OpposedWallRegraspTests(unittest.TestCase):
     def test_axis_rotation_maps_tilted_closure_axis_to_wall_normal(self):
