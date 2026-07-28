@@ -22,6 +22,12 @@ CRADLE_GATE_THRESHOLDS = {
     "base_translation_m": 0.50,
 }
 
+ORIENTATION_ALIGNMENT_THRESHOLDS = {
+    "error_deg": 5.0,
+    "stable_steps": 5,
+    "max_position_drift_m": 0.03,
+}
+
 _REQUIRED_FIELDS = (
     "physical_grasp",
     "lift_m",
@@ -180,6 +186,137 @@ def closure_axis_error_degrees(source_axis: object, target_axis: object) -> floa
     target = _normalized_axis(target_axis, name="target_axis")
     cosine = float(np.clip(abs(np.dot(source, target)), 0.0, 1.0))
     return float(np.degrees(np.arccos(cosine)))
+
+
+def _validated_rotation_matrix(value: object, *, name: str) -> np.ndarray:
+    rotation = np.asarray(value, dtype=float)
+    if rotation.shape != (3, 3) or not np.all(np.isfinite(rotation)):
+        raise ValueError(f"{name} must be a finite 3x3 matrix")
+    if not np.allclose(rotation.T @ rotation, np.eye(3), atol=1e-6):
+        raise ValueError(f"{name} must be orthonormal")
+    if not np.isclose(np.linalg.det(rotation), 1.0, atol=1e-6):
+        raise ValueError(f"{name} must be a proper rotation")
+    return rotation
+
+
+def _rotation_matrix_to_axis_angle(rotation: np.ndarray) -> np.ndarray:
+    cosine = float(np.clip((np.trace(rotation) - 1.0) / 2.0, -1.0, 1.0))
+    angle = float(np.arccos(cosine))
+    if angle <= 1e-12:
+        return np.zeros(3)
+    sine = float(np.sin(angle))
+    if abs(sine) <= 1e-8:
+        diagonal = np.maximum((np.diag(rotation) + 1.0) / 2.0, 0.0)
+        axis = np.sqrt(diagonal)
+        axis[0] = np.copysign(axis[0], rotation[2, 1] - rotation[1, 2])
+        axis[1] = np.copysign(axis[1], rotation[0, 2] - rotation[2, 0])
+        axis = _normalized_axis(axis, name="rotation axis")
+    else:
+        axis = np.array(
+            [
+                rotation[2, 1] - rotation[1, 2],
+                rotation[0, 2] - rotation[2, 0],
+                rotation[1, 0] - rotation[0, 1],
+            ]
+        ) / (2.0 * sine)
+    return axis * angle
+
+
+def normalized_osc_orientation_command(
+    *,
+    world_rotation_delta: object,
+    controller_origin_rotation: object,
+    output_min: object,
+    output_max: object,
+    max_action: float,
+) -> np.ndarray:
+    """Convert a world-frame rotation delta into a bounded OSC command."""
+    world_delta = _validated_rotation_matrix(
+        world_rotation_delta,
+        name="world_rotation_delta",
+    )
+    origin = _validated_rotation_matrix(
+        controller_origin_rotation,
+        name="controller_origin_rotation",
+    )
+    minimum = np.asarray(output_min, dtype=float)
+    maximum = np.asarray(output_max, dtype=float)
+    if (
+        minimum.ndim != 1
+        or maximum.shape != minimum.shape
+        or minimum.size < 6
+        or not np.all(np.isfinite(minimum))
+        or not np.all(np.isfinite(maximum))
+    ):
+        raise ValueError("controller output bounds must be finite matching vectors")
+    orientation_scale = np.maximum(
+        np.abs(minimum[3:6]),
+        np.abs(maximum[3:6]),
+    )
+    if np.any(orientation_scale <= 0.0):
+        raise ValueError("controller orientation output scale must be positive")
+    limit = float(max_action)
+    if not np.isfinite(limit) or limit <= 0.0 or limit > 1.0:
+        raise ValueError("max_action must be finite and in (0, 1]")
+
+    local_delta = origin.T @ world_delta @ origin
+    rotation_vector = _rotation_matrix_to_axis_angle(local_delta)
+    return np.clip(rotation_vector / orientation_scale, -limit, limit)
+
+
+_ORIENTATION_REQUIRED_FIELDS = (
+    "orientation_right_error_deg",
+    "orientation_left_error_deg",
+    "orientation_stable_steps",
+    "orientation_max_position_drift_m",
+    "orientation_collision_frames",
+    "infrastructure_error",
+)
+
+
+def orientation_alignment_failures(record: Mapping[str, object]) -> list[str]:
+    """Return failed evidence fields for the high-clearance alignment gate."""
+    failures = [key for key in _ORIENTATION_REQUIRED_FIELDS if key not in record]
+
+    def numeric(key: str) -> float | None:
+        if key not in record or isinstance(record[key], bool):
+            return None
+        try:
+            value = float(record[key])
+        except (TypeError, ValueError):
+            return None
+        return value if np.isfinite(value) else None
+
+    limits = {
+        "orientation_right_error_deg": (
+            "maximum",
+            ORIENTATION_ALIGNMENT_THRESHOLDS["error_deg"],
+        ),
+        "orientation_left_error_deg": (
+            "maximum",
+            ORIENTATION_ALIGNMENT_THRESHOLDS["error_deg"],
+        ),
+        "orientation_stable_steps": (
+            "minimum",
+            ORIENTATION_ALIGNMENT_THRESHOLDS["stable_steps"],
+        ),
+        "orientation_max_position_drift_m": (
+            "maximum",
+            ORIENTATION_ALIGNMENT_THRESHOLDS["max_position_drift_m"],
+        ),
+        "orientation_collision_frames": ("maximum", 0.0),
+    }
+    for key, (kind, threshold) in limits.items():
+        value = numeric(key)
+        if value is None:
+            failures.append(key)
+        elif kind == "minimum" and value < threshold:
+            failures.append(key)
+        elif kind == "maximum" and value > threshold:
+            failures.append(key)
+    if record.get("infrastructure_error") is not None:
+        failures.append("infrastructure_error")
+    return list(dict.fromkeys(failures))
 
 
 def has_bilateral_object_contact(

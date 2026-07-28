@@ -8,8 +8,10 @@ from scripts.run_l1_cradle_gate import (
     cradle_gate_failures,
     has_bilateral_object_contact,
     minimum_undirected_axis_rotation,
+    normalized_osc_orientation_command,
     opposed_wall_clearance_targets,
     opposed_wall_squeeze_targets,
+    orientation_alignment_failures,
     push_gate_accepted,
     push_gate_failures,
 )
@@ -34,6 +36,15 @@ VALID_PUSH_RECORD = {
     "attachment_calls": 0,
     "object_pose_writes": 0,
     "collision_frames": 0,
+    "infrastructure_error": None,
+}
+
+VALID_ORIENTATION_RECORD = {
+    "orientation_right_error_deg": 4.0,
+    "orientation_left_error_deg": 3.5,
+    "orientation_stable_steps": 5,
+    "orientation_max_position_drift_m": 0.03,
+    "orientation_collision_frames": 0,
     "infrastructure_error": None,
 }
 
@@ -107,6 +118,87 @@ class L1PhysicalPushGateTests(unittest.TestCase):
                 record[key] = value
                 self.assertFalse(push_gate_accepted(record))
                 self.assertIn(key, push_gate_failures(record))
+
+
+class OrientationCommandTests(unittest.TestCase):
+    @staticmethod
+    def rotation_z(angle: float) -> np.ndarray:
+        cosine = np.cos(angle)
+        sine = np.sin(angle)
+        return np.array(
+            [[cosine, -sine, 0.0], [sine, cosine, 0.0], [0.0, 0.0, 1.0]]
+        )
+
+    def test_osc_orientation_command_transforms_and_clips_rotation(self):
+        command = normalized_osc_orientation_command(
+            world_rotation_delta=self.rotation_z(np.pi / 2.0),
+            controller_origin_rotation=self.rotation_z(np.pi),
+            output_min=np.array([-0.05] * 3 + [-0.5] * 3),
+            output_max=np.array([0.05] * 3 + [0.5] * 3),
+            max_action=0.30,
+        )
+
+        np.testing.assert_allclose(command, [0.0, 0.0, 0.30], atol=1e-8)
+
+    def test_osc_orientation_command_returns_zero_for_no_rotation(self):
+        command = normalized_osc_orientation_command(
+            world_rotation_delta=np.eye(3),
+            controller_origin_rotation=np.eye(3),
+            output_min=np.array([-0.05] * 3 + [-0.5] * 3),
+            output_max=np.array([0.05] * 3 + [0.5] * 3),
+            max_action=0.30,
+        )
+
+        np.testing.assert_allclose(command, np.zeros(3), atol=1e-12)
+
+    def test_osc_orientation_command_rejects_invalid_scaling(self):
+        common = {
+            "world_rotation_delta": np.eye(3),
+            "controller_origin_rotation": np.eye(3),
+            "output_min": np.zeros(6),
+            "output_max": np.zeros(6),
+            "max_action": 0.30,
+        }
+        with self.assertRaises(ValueError):
+            normalized_osc_orientation_command(**common)
+        common["output_min"] = np.array([-0.05] * 3 + [-0.5] * 3)
+        common["output_max"] = np.array([0.05] * 3 + [0.5] * 3)
+        common["world_rotation_delta"] = np.full((3, 3), float("nan"))
+        with self.assertRaises(ValueError):
+            normalized_osc_orientation_command(**common)
+
+
+class OrientationAlignmentGateTests(unittest.TestCase):
+    def test_gate_accepts_complete_bounded_alignment_evidence(self):
+        self.assertEqual(orientation_alignment_failures(VALID_ORIENTATION_RECORD), [])
+
+    def test_gate_rejects_each_failed_alignment_condition(self):
+        invalid_values = {
+            "orientation_right_error_deg": 5.01,
+            "orientation_left_error_deg": 5.01,
+            "orientation_stable_steps": 4,
+            "orientation_max_position_drift_m": 0.0301,
+            "orientation_collision_frames": 1,
+            "infrastructure_error": "simulator failed",
+        }
+        for key, value in invalid_values.items():
+            with self.subTest(key=key):
+                record = dict(VALID_ORIENTATION_RECORD)
+                record[key] = value
+                self.assertIn(key, orientation_alignment_failures(record))
+
+    def test_gate_rejects_missing_and_non_finite_alignment_evidence(self):
+        numeric_fields = tuple(VALID_ORIENTATION_RECORD)[:-1]
+        for key in VALID_ORIENTATION_RECORD:
+            with self.subTest(missing=key):
+                record = dict(VALID_ORIENTATION_RECORD)
+                del record[key]
+                self.assertIn(key, orientation_alignment_failures(record))
+        for key in numeric_fields:
+            with self.subTest(non_finite=key):
+                record = dict(VALID_ORIENTATION_RECORD)
+                record[key] = float("nan")
+                self.assertIn(key, orientation_alignment_failures(record))
 
 
 class OpposedWallRegraspTests(unittest.TestCase):
