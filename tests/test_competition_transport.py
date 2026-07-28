@@ -1,5 +1,6 @@
 import importlib.util
 import math
+import sys
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -22,6 +23,7 @@ def load_module():
     spec = importlib.util.spec_from_file_location("competition_transport", MODULE_PATH)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -478,6 +480,153 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
         np.testing.assert_allclose(action["base"], [0.1, -0.2, 0.03])
         np.testing.assert_allclose(action["right_gripper"], [1.0])
         np.testing.assert_allclose(action["left_gripper"], [1.0])
+
+
+class CradleTransferTests(unittest.TestCase):
+    def setUp(self):
+        self.module = load_module()
+
+    def observation(
+        self,
+        *,
+        base_xy=(0.0, 0.0),
+        object_z=1.0,
+        minimum_object_z=0.95,
+        right_support=("robot0_arm_right_6_collision",),
+        left_support=("robot0_arm_left_6_collision",),
+        right_drift=0.01,
+        left_drift=0.01,
+        max_drift=0.04,
+        collision=False,
+    ):
+        return self.module.CradleObservation(
+            base_xy=base_xy,
+            object_z=object_z,
+            minimum_object_z=minimum_object_z,
+            gripper_contacts={"right": True, "left": True},
+            support_contacts={
+                "right": tuple(right_support),
+                "left": tuple(left_support),
+            },
+            object_to_wrist_drift_m={
+                "right": right_drift,
+                "left": left_drift,
+            },
+            max_drift_m=max_drift,
+            judge_collision=collision,
+        )
+
+    def test_cradle_support_requires_real_wrist_or_forearm_contact(self):
+        supported = self.observation(
+            right_support=("robot0_right_wrist_collision",),
+            left_support=("robot0_arm_left_5_collision",),
+        )
+        table_contact_only = self.observation(
+            right_support=("input_5_table_collision",),
+        )
+
+        self.assertTrue(self.module.is_cradle_supported(supported))
+        self.assertFalse(self.module.is_cradle_supported(table_contact_only))
+
+    def test_cradle_stability_resets_on_contact_or_height_loss(self):
+        stable = self.module.next_cradle_stability(self.observation(), 4)
+        contact_loss = self.module.next_cradle_stability(
+            self.observation(left_support=()),
+            stable,
+        )
+        height_loss = self.module.next_cradle_stability(
+            self.observation(object_z=0.94),
+            stable,
+        )
+
+        self.assertEqual(stable, 5)
+        self.assertEqual(contact_loss, 0)
+        self.assertEqual(height_loss, 0)
+
+    def test_cradle_delta_is_bounded_and_symmetric(self):
+        deltas = self.module.bounded_symmetric_cradle_deltas(
+            center_delta=np.zeros(3),
+            separation_axis=np.array([0.0, 1.0, 0.0]),
+            inward_delta=0.03,
+            max_delta=0.012,
+        )
+
+        np.testing.assert_allclose(deltas["right"], -deltas["left"])
+        self.assertLessEqual(np.linalg.norm(deltas["right"]), 0.012 + 1e-12)
+        self.assertLessEqual(np.linalg.norm(deltas["left"]), 0.012 + 1e-12)
+
+    def test_cradle_transfer_stops_on_judge_collision(self):
+        driver = FakeCradleDriver([self.observation(collision=True)])
+
+        result = self.module.run_physical_cradle_transfer(
+            object(),
+            object_name="box",
+            travel_direction=np.array([1.0, 0.0]),
+            travel_distance=0.5,
+            required_stable_steps=2,
+            driver=driver,
+        )
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["failure_stage"], "collision")
+        self.assertEqual(driver.steps, [])
+
+    def test_cradle_transfer_never_calls_attachment_or_object_pose_helpers(self):
+        driver = FakeCradleDriver([self.observation()])
+
+        result = self.module.run_physical_cradle_transfer(
+            object(),
+            object_name="box",
+            travel_direction=np.array([1.0, 0.0]),
+            travel_distance=0.0,
+            required_stable_steps=1,
+            driver=driver,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(driver.forbidden_calls, 0)
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        self.assertNotIn("transport_attachment", source)
+        self.assertNotIn("set_object_pose", source)
+
+
+class FakeCradleDriver:
+    def __init__(self, observations):
+        self.observations = list(observations)
+        self.steps = []
+        self.forbidden_calls = 0
+
+    def observe_cradle(self, _backend, _object_name):
+        index = min(len(self.steps), len(self.observations) - 1)
+        return self.observations[index]
+
+    def step_cradle(
+        self,
+        _backend,
+        *,
+        object_name,
+        base_world_delta,
+        arm_world_deltas,
+    ):
+        self.steps.append(
+            {
+                "object_name": object_name,
+                "base_world_delta": np.asarray(base_world_delta, dtype=float),
+                "arm_world_deltas": arm_world_deltas,
+            }
+        )
+        return {"collision": False}
+
+    def record_event(self, _backend, _event, **_payload):
+        return None
+
+    def capture_transport_attachment(self, *_args, **_kwargs):
+        self.forbidden_calls += 1
+        raise AssertionError("attachment helper must not be called")
+
+    def set_object_pose(self, *_args, **_kwargs):
+        self.forbidden_calls += 1
+        raise AssertionError("object pose helper must not be called")
 
 
 class FakePhysicalPlacementDriver:

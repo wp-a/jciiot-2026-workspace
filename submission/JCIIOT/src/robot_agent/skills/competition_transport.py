@@ -3,8 +3,230 @@
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
+from typing import Mapping
 
 import numpy as np
+
+
+@dataclass(frozen=True)
+class CradleObservation:
+    """Read-only evidence used to validate bilateral robot-link support."""
+
+    base_xy: tuple[float, float]
+    object_z: float
+    minimum_object_z: float
+    gripper_contacts: Mapping[str, bool]
+    support_contacts: Mapping[str, tuple[str, ...]]
+    object_to_wrist_drift_m: Mapping[str, float]
+    max_drift_m: float
+    judge_collision: bool = False
+
+
+def _is_allowed_cradle_geom(geom_name: str, arm: str) -> bool:
+    name = str(geom_name).lower()
+    if arm not in name:
+        return False
+    if any(token in name for token in ("wrist", "palm", "gripper")):
+        return True
+    return any(f"arm_{arm}_{index}" in name for index in (4, 5, 6))
+
+
+def is_cradle_supported(observation: CradleObservation) -> bool:
+    """Require safe, bilateral contact with load-bearing robot links."""
+    if observation.judge_collision:
+        return False
+    if float(observation.object_z) < float(observation.minimum_object_z):
+        return False
+    for arm in ("right", "left"):
+        if float(observation.object_to_wrist_drift_m.get(arm, math.inf)) > float(
+            observation.max_drift_m
+        ):
+            return False
+        contacts = observation.support_contacts.get(arm, ())
+        if not any(_is_allowed_cradle_geom(name, arm) for name in contacts):
+            return False
+    return True
+
+
+def next_cradle_stability(
+    observation: CradleObservation,
+    stable_steps: int,
+) -> int:
+    """Count only consecutive bilateral, height-safe cradle observations."""
+    return int(stable_steps) + 1 if is_cradle_supported(observation) else 0
+
+
+def _bounded_vector(vector, max_norm: float) -> np.ndarray:
+    vector = np.asarray(vector, dtype=float).reshape(3)
+    norm = float(np.linalg.norm(vector))
+    if norm <= float(max_norm) or norm == 0.0:
+        return vector
+    return vector * (float(max_norm) / norm)
+
+
+def bounded_symmetric_cradle_deltas(
+    *,
+    center_delta,
+    separation_axis,
+    inward_delta: float,
+    max_delta: float,
+) -> dict[str, np.ndarray]:
+    """Build mirrored arm deltas and bound each arm by Euclidean norm."""
+    if float(max_delta) < 0.0:
+        raise ValueError("max_delta must be non-negative")
+    center = np.asarray(center_delta, dtype=float).reshape(3)
+    axis = np.asarray(separation_axis, dtype=float).reshape(3)
+    axis_norm = float(np.linalg.norm(axis))
+    if axis_norm == 0.0:
+        raise ValueError("separation_axis must be non-zero")
+    axis = axis / axis_norm
+    separation = axis * float(inward_delta)
+    return {
+        "right": _bounded_vector(center - separation, max_delta),
+        "left": _bounded_vector(center + separation, max_delta),
+    }
+
+
+def _cradle_result(
+    *,
+    success: bool,
+    failure_stage: str | None,
+    steps: int,
+    stable_steps: int,
+    base_translation_m: float,
+) -> dict:
+    return {
+        "success": bool(success),
+        "failure_stage": failure_stage,
+        "steps": int(steps),
+        "support_contact_steps": int(stable_steps),
+        "base_translation_m": float(base_translation_m),
+        "collision": failure_stage == "collision",
+        "dropped": failure_stage == "height_loss",
+    }
+
+
+def run_physical_cradle_transfer(
+    backend,
+    *,
+    object_name: str,
+    travel_direction,
+    travel_distance: float,
+    required_stable_steps: int = 20,
+    max_steps: int = 500,
+    step_m: float = 0.002,
+    max_arm_delta: float = 0.004,
+    driver=None,
+) -> dict:
+    """Move only while measured bilateral robot-link support stays valid."""
+    if driver is None:
+        raise ValueError("a physical cradle driver is required")
+    if float(travel_distance) < 0.0:
+        raise ValueError("travel_distance must be non-negative")
+    if int(required_stable_steps) < 1:
+        raise ValueError("required_stable_steps must be positive")
+    direction = np.asarray(travel_direction, dtype=float).reshape(2)
+    direction_norm = float(np.linalg.norm(direction))
+    if direction_norm == 0.0 and float(travel_distance) > 0.0:
+        raise ValueError("travel_direction must be non-zero")
+    if direction_norm > 0.0:
+        direction = direction / direction_norm
+
+    observation = driver.observe_cradle(backend, object_name)
+    start_xy = np.asarray(observation.base_xy, dtype=float).reshape(2)
+    stable_steps = 0
+    maximum_stable_steps = 0
+    had_bilateral_support = False
+    steps = 0
+    failure_stage = "timeout"
+    success = False
+    base_translation = 0.0
+    driver.record_event(
+        backend,
+        "physical_cradle_start",
+        object_name=object_name,
+        travel_distance=float(travel_distance),
+    )
+
+    while steps <= int(max_steps):
+        observation = driver.observe_cradle(backend, object_name)
+        base_translation = float(
+            np.linalg.norm(
+                np.asarray(observation.base_xy, dtype=float).reshape(2) - start_xy
+            )
+        )
+        if observation.judge_collision:
+            failure_stage = "collision"
+            break
+        if float(observation.object_z) < float(observation.minimum_object_z):
+            failure_stage = "height_loss"
+            break
+        if any(
+            float(observation.object_to_wrist_drift_m.get(arm, math.inf))
+            > float(observation.max_drift_m)
+            for arm in ("right", "left")
+        ):
+            failure_stage = "drift"
+            break
+
+        supported = is_cradle_supported(observation)
+        stable_steps = next_cradle_stability(observation, stable_steps)
+        maximum_stable_steps = max(maximum_stable_steps, stable_steps)
+        if supported:
+            had_bilateral_support = True
+        elif had_bilateral_support:
+            failure_stage = "support_loss"
+            break
+        if (
+            base_translation >= float(travel_distance)
+            and stable_steps >= int(required_stable_steps)
+        ):
+            success = True
+            failure_stage = None
+            break
+        if steps >= int(max_steps):
+            break
+
+        remaining = max(0.0, float(travel_distance) - base_translation)
+        base_delta = direction * min(float(step_m), remaining)
+        center_delta = np.array([base_delta[0], base_delta[1], 0.0])
+        separation_axis = np.array([-direction[1], direction[0], 0.0])
+        if direction_norm == 0.0:
+            separation_axis = np.array([0.0, 1.0, 0.0])
+        arm_deltas = bounded_symmetric_cradle_deltas(
+            center_delta=center_delta,
+            separation_axis=separation_axis,
+            inward_delta=0.0,
+            max_delta=float(max_arm_delta),
+        )
+        step_info = driver.step_cradle(
+            backend,
+            object_name=object_name,
+            base_world_delta=base_delta,
+            arm_world_deltas=arm_deltas,
+        )
+        steps += 1
+        if bool((step_info or {}).get("collision", False)):
+            failure_stage = "collision"
+            break
+
+    driver.record_event(
+        backend,
+        "physical_cradle_end",
+        object_name=object_name,
+        success=success,
+        failure_stage=failure_stage,
+        support_contact_steps=maximum_stable_steps,
+        base_translation_m=base_translation,
+    )
+    return _cradle_result(
+        success=success,
+        failure_stage=failure_stage,
+        steps=steps,
+        stable_steps=maximum_stable_steps,
+        base_translation_m=base_translation,
+    )
 
 
 class PhysicalCarryConfig:
