@@ -17,6 +17,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
+try:
+    from scripts.perturbation_protocol import (
+        PerturbationSample,
+        sample_perturbation,
+    )
+except ModuleNotFoundError as exc:
+    if exc.name != "scripts":
+        raise
+    from perturbation_protocol import (
+        PerturbationSample,
+        sample_perturbation,
+    )
+
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -75,6 +90,8 @@ def audit_trajectory(
     elapsed_s: float,
     execution_result: dict[str, Any],
     source_center_xy: list[float] | None = None,
+    perturbation: dict[str, Any] | None = None,
+    perturbation_application: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     candidates_value = task.get("object", [])
     if isinstance(candidates_value, str):
@@ -153,6 +170,12 @@ def audit_trajectory(
         "execution_result": _json_safe(execution_result),
         "finished_at": _utc_now(),
     }
+    if perturbation is not None:
+        manifest["perturbation"] = _json_safe(perturbation)
+    if perturbation_application is not None:
+        manifest["perturbation_application"] = _json_safe(
+            perturbation_application
+        )
     return manifest
 
 
@@ -259,6 +282,258 @@ def _primary_object_name(value: Any) -> str:
     return ""
 
 
+def resolve_scored_object(
+    task: dict[str, Any],
+    requested_name: str | None = None,
+) -> str:
+    value = task.get("object", [])
+    if isinstance(value, str):
+        candidates = [value]
+    else:
+        candidates = [str(item) for item in value if item]
+    if not candidates:
+        raise ValueError("task contains no scored object candidates")
+    if requested_name is None:
+        return candidates[0]
+    requested = str(requested_name)
+    if requested not in candidates:
+        raise ValueError(
+            f"perturbation object is not a scored candidate: {requested}"
+        )
+    return requested
+
+
+def _wrap_angle(angle: float) -> float:
+    return (float(angle) + math.pi) % (2.0 * math.pi) - math.pi
+
+
+def _yaw_from_quat_wxyz(quat) -> float:
+    w, x, y, z = np.asarray(quat, dtype=float).reshape(4)
+    return math.atan2(
+        2.0 * (w * z + x * y),
+        1.0 - 2.0 * (y * y + z * z),
+    )
+
+
+def _yaw_quat_wxyz(yaw: float) -> np.ndarray:
+    return np.array(
+        [math.cos(float(yaw) / 2.0), 0.0, 0.0, math.sin(float(yaw) / 2.0)],
+        dtype=float,
+    )
+
+
+def _quat_multiply_wxyz(left, right) -> np.ndarray:
+    w1, x1, y1, z1 = np.asarray(left, dtype=float).reshape(4)
+    w0, x0, y0, z0 = np.asarray(right, dtype=float).reshape(4)
+    value = np.array(
+        [
+            w1 * w0 - x1 * x0 - y1 * y0 - z1 * z0,
+            w1 * x0 + x1 * w0 + y1 * z0 - z1 * y0,
+            w1 * y0 - x1 * z0 + y1 * w0 + z1 * x0,
+            w1 * z0 + x1 * y0 - y1 * x0 + z1 * w0,
+        ],
+        dtype=float,
+    )
+    norm = float(np.linalg.norm(value))
+    if norm <= 1e-12:
+        raise ValueError("invalid zero-norm object quaternion")
+    return value / norm
+
+
+def _descendant_body_ids(model, root_body_id: int) -> list[int]:
+    parents = np.asarray(model.body_parentid, dtype=int).reshape(-1)
+    selected = {int(root_body_id)}
+    changed = True
+    while changed:
+        changed = False
+        for body_id, parent_id in enumerate(parents):
+            if body_id not in selected and int(parent_id) in selected:
+                selected.add(body_id)
+                changed = True
+    return sorted(selected)
+
+
+def _object_joint_name(raw_env, object_name: str) -> str:
+    metadata = getattr(raw_env, "material_metadata", {}).get(object_name, {})
+    return str(metadata.get("joint_name") or f"{object_name}_free")
+
+
+def _set_base_pose_for_research(backend, target_xy, target_yaw: float) -> None:
+    from robot_agent.environments.robosuite_backend import (
+        _set_base_world_yaw_direct,
+        _set_base_xy_direct,
+    )
+
+    raw_env = backend.env
+    robot = raw_env.robots[0]
+    _set_base_world_yaw_direct(raw_env, robot, float(target_yaw))
+    _set_base_xy_direct(raw_env, robot, np.asarray(target_xy, dtype=float))
+
+    for joint_name in robot.robot_model.base_joints:
+        try:
+            address = raw_env.sim.model.get_joint_qvel_addr(joint_name)
+        except Exception:
+            continue
+        if isinstance(address, tuple):
+            raw_env.sim.data.qvel[address[0]:address[1]] = 0.0
+        else:
+            raw_env.sim.data.qvel[address] = 0.0
+    raw_env.sim.forward()
+
+
+def apply_perturbation(
+    backend,
+    task: dict[str, Any],
+    sample: PerturbationSample,
+    *,
+    base_pose_setter=None,
+) -> dict[str, Any]:
+    """Apply and measure one research-only initial-state perturbation."""
+    object_name = resolve_scored_object(task, sample.object_name)
+    raw_env = backend.env
+    sim = raw_env.sim
+    model = sim.model
+    data = sim.data
+
+    try:
+        body_id = int(raw_env.obj_body_id[object_name])
+    except (AttributeError, KeyError) as exc:
+        raise ValueError(f"object body is not registered: {object_name}") from exc
+    joint_name = _object_joint_name(raw_env, object_name)
+    before_qpos = np.asarray(data.get_joint_qpos(joint_name), dtype=float).copy()
+    if before_qpos.shape != (7,):
+        raise ValueError(
+            f"expected 7D free-joint qpos for {object_name}, got {before_qpos.shape}"
+        )
+
+    before_base_xy, before_base_yaw = backend.get_base_pose()
+    before_base_xy = np.asarray(before_base_xy, dtype=float).reshape(2)
+    before_base_yaw = float(before_base_yaw)
+
+    body_ids = _descendant_body_ids(model, body_id)
+    geom_ids = [
+        int(geom_id)
+        for geom_id, geom_body_id in enumerate(
+            np.asarray(model.geom_bodyid, dtype=int).reshape(-1)
+        )
+        if int(geom_body_id) in body_ids
+    ]
+    before_masses = np.asarray(model.body_mass[body_ids], dtype=float).copy()
+    before_friction = np.asarray(model.geom_friction[geom_ids], dtype=float).copy()
+
+    nominal_noop = all(
+        abs(float(value)) <= 1e-15
+        for value in (
+            sample.object_dx_m,
+            sample.object_dy_m,
+            sample.object_dyaw_rad,
+            sample.base_dx_m,
+            sample.base_dy_m,
+            sample.base_dyaw_rad,
+            sample.mass_scale - 1.0,
+            sample.friction_scale - 1.0,
+        )
+    )
+
+    if not nominal_noop:
+        target_qpos = before_qpos.copy()
+        target_qpos[0] += float(sample.object_dx_m)
+        target_qpos[1] += float(sample.object_dy_m)
+        target_qpos[3:7] = _quat_multiply_wxyz(
+            _yaw_quat_wxyz(sample.object_dyaw_rad),
+            before_qpos[3:7],
+        )
+        data.set_joint_qpos(joint_name, target_qpos)
+        data.set_joint_qvel(joint_name, np.zeros(6, dtype=float))
+        model.body_mass[body_ids] = before_masses * float(sample.mass_scale)
+        if geom_ids:
+            model.geom_friction[geom_ids] = (
+                before_friction * float(sample.friction_scale)
+            )
+
+        setter = base_pose_setter or _set_base_pose_for_research
+        setter(
+            backend,
+            before_base_xy
+            + np.array([sample.base_dx_m, sample.base_dy_m], dtype=float),
+            before_base_yaw + float(sample.base_dyaw_rad),
+        )
+        sim.forward()
+
+    after_qpos = np.asarray(data.get_joint_qpos(joint_name), dtype=float).copy()
+    after_base_xy, after_base_yaw = backend.get_base_pose()
+    after_base_xy = np.asarray(after_base_xy, dtype=float).reshape(2)
+    after_base_yaw = float(after_base_yaw)
+
+    measured_object_delta = after_qpos[:2] - before_qpos[:2]
+    measured_object_dyaw = _wrap_angle(
+        _yaw_from_quat_wxyz(after_qpos[3:7])
+        - _yaw_from_quat_wxyz(before_qpos[3:7])
+    )
+    measured_base_delta = after_base_xy - before_base_xy
+    measured_base_dyaw = _wrap_angle(after_base_yaw - before_base_yaw)
+
+    object_xy_error = measured_object_delta - np.array(
+        [sample.object_dx_m, sample.object_dy_m],
+        dtype=float,
+    )
+    base_xy_error = measured_base_delta - np.array(
+        [sample.base_dx_m, sample.base_dy_m],
+        dtype=float,
+    )
+    object_yaw_error = _wrap_angle(
+        measured_object_dyaw - float(sample.object_dyaw_rad)
+    )
+    base_yaw_error = _wrap_angle(
+        measured_base_dyaw - float(sample.base_dyaw_rad)
+    )
+    position_tolerance_m = 0.001
+    yaw_tolerance_rad = math.radians(0.1)
+    valid = bool(
+        float(np.linalg.norm(object_xy_error)) <= position_tolerance_m
+        and float(np.linalg.norm(base_xy_error)) <= position_tolerance_m
+        and abs(object_yaw_error) <= yaw_tolerance_rad
+        and abs(base_yaw_error) <= yaw_tolerance_rad
+    )
+    if not valid:
+        raise RuntimeError(
+            "measured perturbation differs from request: "
+            f"object_xy_error={object_xy_error.tolist()}, "
+            f"object_yaw_error={object_yaw_error}, "
+            f"base_xy_error={base_xy_error.tolist()}, "
+            f"base_yaw_error={base_yaw_error}"
+        )
+
+    return {
+        "valid": valid,
+        "nominal_noop": nominal_noop,
+        "object_name": object_name,
+        "joint_name": joint_name,
+        "body_ids": body_ids,
+        "geom_ids": geom_ids,
+        "before_object_xy": before_qpos[:2].tolist(),
+        "after_object_xy": after_qpos[:2].tolist(),
+        "measured_object_dx_m": float(measured_object_delta[0]),
+        "measured_object_dy_m": float(measured_object_delta[1]),
+        "measured_object_dyaw_rad": measured_object_dyaw,
+        "before_base_xy": before_base_xy.tolist(),
+        "after_base_xy": after_base_xy.tolist(),
+        "measured_base_dx_m": float(measured_base_delta[0]),
+        "measured_base_dy_m": float(measured_base_delta[1]),
+        "measured_base_dyaw_rad": measured_base_dyaw,
+        "before_body_mass": before_masses.tolist(),
+        "after_body_mass": np.asarray(
+            model.body_mass[body_ids], dtype=float
+        ).tolist(),
+        "before_geom_friction": before_friction.tolist(),
+        "after_geom_friction": np.asarray(
+            model.geom_friction[geom_ids], dtype=float
+        ).tolist(),
+        "position_tolerance_m": position_tolerance_m,
+        "yaw_tolerance_rad": yaw_tolerance_rad,
+    }
+
+
 def execute_task(
     *,
     execution_mode: str,
@@ -327,10 +602,24 @@ def run_experiment(args: argparse.Namespace) -> dict[str, Any]:
     tasks = task_config.get("tasks", [])
     task = dict(tasks[args.task_index])
     backend = None
+    perturbation = None
+    perturbation_application = None
     started = time.perf_counter()
     trajectory_path = args.trajectory.resolve()
     try:
         backend, scene_context, grid = _load_scene(app_dir, task, args.seed)
+        perturbation_object = resolve_scored_object(
+            task,
+            requested_name=args.perturbation_object,
+        )
+        sample = sample_perturbation(
+            tier=args.perturbation_tier,
+            seed=args.seed,
+            task_index=args.task_index,
+            object_name=perturbation_object,
+        )
+        perturbation = sample.as_dict()
+        perturbation_application = apply_perturbation(backend, task, sample)
         backend.start_recording()
         backend._record_trajectory_frame()
 
@@ -362,6 +651,8 @@ def run_experiment(args: argparse.Namespace) -> dict[str, Any]:
             seed=args.seed,
             elapsed_s=time.perf_counter() - started,
             execution_result=execution_result,
+            perturbation=perturbation,
+            perturbation_application=perturbation_application,
         )
     except Exception as exc:
         if backend is not None:
@@ -379,6 +670,8 @@ def run_experiment(args: argparse.Namespace) -> dict[str, Any]:
             "official_score": 0,
             "collision_frames": None,
             "successful_grasp_events": 0,
+            "perturbation": _json_safe(perturbation),
+            "perturbation_application": _json_safe(perturbation_application),
             "elapsed_s": round(time.perf_counter() - started, 6),
             "error": f"{type(exc).__name__}: {exc}",
             "traceback": traceback.format_exc(),
@@ -405,6 +698,12 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("flow", "agent"),
         default="flow",
     )
+    parser.add_argument(
+        "--perturbation-tier",
+        choices=("nominal", "small", "medium", "stress"),
+        default="nominal",
+    )
+    parser.add_argument("--perturbation-object")
     return parser
 
 
