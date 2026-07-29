@@ -79,3 +79,19 @@ suite and allowed-file audit run before a candidate is copied to the pinned
 official environment. Simulator iterations change one physical parameter at a
 time: clearance lift, descent, inward inset, then arm order. Only measured
 improvements are retained.
+
+## Experiment 1 Revision
+
+The first valid pinned-simulator run falsified the assumption that the
+stationary arm can carry the object while the moving gripper opens. The
+clearance lift succeeded and added 0.094 m of object height, but opening the
+right gripper caused the left official grasp to fail after four lowering steps.
+The run had zero collision, pose-write, and attachment events and stopped above
+the height gate.
+
+The next single-variable experiment therefore keeps the moving gripper closed
+during both descent and inset. This lets the existing bilateral pinch retain
+the load while the moving hand changes position. The stage is accepted only if
+the final contact set includes an allowed hand, wrist, or distal-arm geometry;
+finger-only contact still does not count. Opening is deferred until measured
+support exists.
