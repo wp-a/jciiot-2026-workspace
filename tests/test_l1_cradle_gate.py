@@ -104,11 +104,22 @@ class L1CradleGateTests(unittest.TestCase):
 
 
 class CenterRegraspSequenceTests(unittest.TestCase):
+    def test_high_precenter_precedes_wall_approach_and_close(self):
+        source = inspect.getsource(_center_regrasp_probe)
+
+        squeeze_index = source.index('"squeeze_center_walls"')
+        approach_index = source.index('"approach_center_walls"')
+        close_index = source.index('"close_center_grasp"')
+        self.assertLess(squeeze_index, approach_index)
+        self.assertLess(approach_index, close_index)
+
     def test_complete_wall_approach_does_not_stop_on_first_contact(self):
         source = inspect.getsource(_center_regrasp_probe)
 
+        stage_index = source.index('"approach_center_walls"')
+        call_index = source.rfind("if not execute_stage(", 0, stage_index)
         approach_call = source[
-            source.index('if not execute_stage(\n                    "approach_center_walls"') :
+            call_index:
             source.index('failure_stage = "approach_center_walls"')
         ]
         self.assertNotIn("stop_bilateral_contact_steps", approach_call)
@@ -116,8 +127,10 @@ class CenterRegraspSequenceTests(unittest.TestCase):
     def test_complete_wall_squeeze_does_not_stop_on_first_contact(self):
         source = inspect.getsource(_center_regrasp_probe)
 
+        stage_index = source.index('"squeeze_center_walls"')
+        call_index = source.rfind("if not execute_stage(", 0, stage_index)
         squeeze_call = source[
-            source.index('if not execute_stage(\n                        "squeeze_center_walls"') :
+            call_index:
             source.index('failure_stage = "squeeze_center_walls"')
         ]
         self.assertNotIn("stop_bilateral_contact_steps", squeeze_call)

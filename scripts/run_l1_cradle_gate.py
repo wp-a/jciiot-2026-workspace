@@ -2655,38 +2655,38 @@ def _center_regrasp_probe(
             ):
                 failure_stage = "translate_to_center"
             else:
-                current = eef_positions()
-                approach_targets = {
-                    arm: np.array(
-                        [
-                            position[0],
-                            position[1],
-                            float(table_object_z) + 0.115,
-                        ],
-                        dtype=float,
-                    )
-                    for arm, position in current.items()
-                }
+                squeeze_targets = opposed_wall_squeeze_targets(
+                    eef_positions(),
+                    separation_axis=separation_axis,
+                    squeeze_m=wall_squeeze_m,
+                )
                 if not execute_stage(
-                    "approach_center_walls",
-                    approach_targets,
-                    max_steps=220,
+                    "squeeze_center_walls",
+                    squeeze_targets,
+                    max_steps=120,
                     gripper_value=-1.0,
                 ):
-                    failure_stage = "approach_center_walls"
+                    failure_stage = "squeeze_center_walls"
                 else:
-                    squeeze_targets = opposed_wall_squeeze_targets(
-                        eef_positions(),
-                        separation_axis=separation_axis,
-                        squeeze_m=wall_squeeze_m,
-                    )
+                    current = eef_positions()
+                    approach_targets = {
+                        arm: np.array(
+                            [
+                                position[0],
+                                position[1],
+                                float(table_object_z) + 0.115,
+                            ],
+                            dtype=float,
+                        )
+                        for arm, position in current.items()
+                    }
                     if not execute_stage(
-                        "squeeze_center_walls",
-                        squeeze_targets,
-                        max_steps=120,
+                        "approach_center_walls",
+                        approach_targets,
+                        max_steps=220,
                         gripper_value=-1.0,
                     ):
-                        failure_stage = "squeeze_center_walls"
+                        failure_stage = "approach_center_walls"
                     else:
                         if not execute_stage(
                             "close_center_grasp",
