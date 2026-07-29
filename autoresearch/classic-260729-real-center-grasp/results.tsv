@@ -1,0 +1,4 @@
+iteration	variant	seed	orientation_entry_tolerance_deg	joint_seed_accepted	orientation_runtime_success	right_orientation_error_deg	left_orientation_error_deg	orientation_collision_frames	last_completed_stage	bilateral_wall_contact	grasp_contact_steps	lift_m	hold_contact_steps	collision_frames	accepted	failure_stage	elapsed_s	status
+1	arm-only-tolerance10	0	10.0	true	true	6.364780	9.653907	0	retreat_from_walls	false	0	0.0	0	0	false	translate_to_center	64.833970	keep
+2	base-advance010	0	10.0	true	true	6.364780	9.653907	0	squeeze_center_walls	true	0	0.0	0	0	false	close_center_grasp	70.247186	keep
+3	near-wall-center-shift000	0	10.0	true	true	6.364780	9.653907	0	squeeze_center_walls	true	0	0.0	0	0	false	close_center_grasp	67.713247	keep
