@@ -28,6 +28,7 @@ from scripts.run_l1_cradle_gate import (
     next_joint_seed_path_state,
     next_orientation_alignment_state,
     normalized_osc_orientation_command,
+    open_fork_target_orientation,
     opposed_wall_clearance_targets,
     opposed_wall_squeeze_targets,
     orientation_alignment_failures,
@@ -35,6 +36,7 @@ from scripts.run_l1_cradle_gate import (
     push_gate_accepted,
     push_gate_failures,
     projected_planar_motion,
+    rotation_error_degrees,
     scheduled_orientation_action_limit,
     table_edge_undercut_targets,
     trailing_corner_seat_targets,
@@ -711,6 +713,33 @@ class L1PhysicalPushGateTests(unittest.TestCase):
 
 
 class L1TableEdgeUndercutTests(unittest.TestCase):
+    def test_open_fork_orientation_points_tool_inward_and_opening_across_box(self):
+        target = open_fork_target_orientation(
+            inward_axis=np.array([0.0, -1.0, 0.0]),
+            closure_axis=np.array([1.0, 0.0, 0.0]),
+        )
+
+        np.testing.assert_allclose(target[:, 0], [1.0, 0.0, 0.0])
+        np.testing.assert_allclose(target[:, 2], [0.0, -1.0, 0.0])
+        np.testing.assert_allclose(target.T @ target, np.eye(3), atol=1e-12)
+        self.assertAlmostEqual(np.linalg.det(target), 1.0)
+
+    def test_open_fork_orientation_rejects_nonorthogonal_axes(self):
+        with self.assertRaises(ValueError):
+            open_fork_target_orientation(
+                inward_axis=np.array([0.0, -1.0, 0.0]),
+                closure_axis=np.array([0.0, -1.0, 0.0]),
+            )
+
+    def test_rotation_error_reports_full_frame_difference(self):
+        target = open_fork_target_orientation(
+            inward_axis=np.array([0.0, -1.0, 0.0]),
+            closure_axis=np.array([1.0, 0.0, 0.0]),
+        )
+
+        self.assertAlmostEqual(rotation_error_degrees(target, target), 0.0)
+        self.assertAlmostEqual(rotation_error_degrees(np.eye(3), target), 90.0)
+
     def test_targets_descend_outside_then_inset_above_the_table_edge(self):
         targets = table_edge_undercut_targets(
             object_center=np.array([7.035, 4.620, 1.125]),
@@ -779,6 +808,16 @@ class L1TableEdgeUndercutTests(unittest.TestCase):
         advance_index = source.index("success = execute_base_advance()")
         capture_index = source.index("initial_eef = right_eef_position()")
         self.assertLess(advance_index, capture_index)
+
+    def test_horizontal_fork_rotates_after_descent_and_skips_deep_inset(self):
+        source = inspect.getsource(gate_module._table_edge_undercut_probe)
+
+        descent_index = source.index('"descend_open_outside"')
+        orientation_index = source.index('"orient_open_fork_inward"')
+        raise_index = source.index('"raise_open_into_support"')
+        self.assertLess(descent_index, orientation_index)
+        self.assertLess(orientation_index, raise_index)
+        self.assertIn("if success and horizontal_fork", source)
 
 
 class JointSeedMathTests(unittest.TestCase):
@@ -1070,6 +1109,11 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertIsNone(args.undercut_torso_target_m)
         self.assertAlmostEqual(args.undercut_below_bottom_clearance_m, 0.05)
         self.assertAlmostEqual(args.undercut_raise_above_bottom_m, 0.12)
+        self.assertFalse(args.undercut_horizontal_fork)
+        self.assertAlmostEqual(args.undercut_orientation_max_action, 0.08)
+        self.assertAlmostEqual(args.undercut_orientation_tolerance_deg, 3.0)
+        self.assertEqual(args.undercut_orientation_stable_steps, 5)
+        self.assertEqual(args.undercut_orientation_max_steps, 240)
 
     def test_center_carry_speed_can_be_overridden_for_single_variable_probe(self):
         args = parse_args(
@@ -1133,6 +1177,15 @@ class JointSeedParserTests(unittest.TestCase):
                 "0.03",
                 "--undercut-raise-above-bottom-m",
                 "0.14",
+                "--undercut-horizontal-fork",
+                "--undercut-orientation-max-action",
+                "0.06",
+                "--undercut-orientation-tolerance-deg",
+                "2.0",
+                "--undercut-orientation-stable-steps",
+                "7",
+                "--undercut-orientation-max-steps",
+                "300",
             ]
         )
 
@@ -1164,6 +1217,11 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.undercut_torso_target_m, 0.15)
         self.assertAlmostEqual(args.undercut_below_bottom_clearance_m, 0.03)
         self.assertAlmostEqual(args.undercut_raise_above_bottom_m, 0.14)
+        self.assertTrue(args.undercut_horizontal_fork)
+        self.assertAlmostEqual(args.undercut_orientation_max_action, 0.06)
+        self.assertAlmostEqual(args.undercut_orientation_tolerance_deg, 2.0)
+        self.assertEqual(args.undercut_orientation_stable_steps, 7)
+        self.assertEqual(args.undercut_orientation_max_steps, 300)
 
 
 class OrientationCommandTests(unittest.TestCase):

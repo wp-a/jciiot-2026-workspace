@@ -753,6 +753,41 @@ def _validated_rotation_matrix(value: object, *, name: str) -> np.ndarray:
     return rotation
 
 
+def open_fork_target_orientation(
+    *,
+    inward_axis: object,
+    closure_axis: object,
+) -> np.ndarray:
+    """Build a tool frame for an open horizontal fork under the object."""
+    tool_z = _normalized_axis(inward_axis, name="inward_axis")
+    tool_x = _normalized_axis(closure_axis, name="closure_axis")
+    if abs(float(np.dot(tool_x, tool_z))) > 1e-8:
+        raise ValueError("closure_axis must be orthogonal to inward_axis")
+    tool_y = _normalized_axis(
+        np.cross(tool_z, tool_x),
+        name="open fork vertical axis",
+    )
+    return _validated_rotation_matrix(
+        np.column_stack((tool_x, tool_y, tool_z)),
+        name="open fork target orientation",
+    )
+
+
+def rotation_error_degrees(current: object, target: object) -> float:
+    """Return the geodesic angle between two complete tool frames."""
+    current_rotation = _validated_rotation_matrix(
+        current,
+        name="current rotation",
+    )
+    target_rotation = _validated_rotation_matrix(
+        target,
+        name="target rotation",
+    )
+    delta = target_rotation @ current_rotation.T
+    cosine = float(np.clip((np.trace(delta) - 1.0) / 2.0, -1.0, 1.0))
+    return float(np.degrees(np.arccos(cosine)))
+
+
 def _rotation_matrix_to_axis_angle(rotation: np.ndarray) -> np.ndarray:
     cosine = float(np.clip((np.trace(rotation) - 1.0) / 2.0, -1.0, 1.0))
     angle = float(np.arccos(cosine))
@@ -1898,6 +1933,11 @@ def _table_edge_undercut_probe(
     torso_target_m: float | None,
     below_bottom_clearance_m: float,
     raise_above_bottom_m: float,
+    horizontal_fork: bool,
+    orientation_max_action: float,
+    orientation_tolerance_deg: float,
+    orientation_stable_steps: int,
+    orientation_max_steps: int,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import OfficialScriptedGraspDriver
     from robot_agent.skills.competition_transport import (
@@ -1968,6 +2008,9 @@ def _table_edge_undercut_probe(
             helpers["gripper_position"](raw_env, robot, "right"),
             dtype=float,
         )
+
+    def right_eef_pose() -> tuple[np.ndarray, np.ndarray]:
+        return eef_site_pose(raw_env, robot, "right")
 
     def torso_position() -> float:
         return float(raw_env.sim.data.qpos[torso_qpos_addr])
@@ -2195,6 +2238,183 @@ def _table_edge_undercut_probe(
         )
         return success
 
+    def execute_orientation_stage(
+        stage: str,
+        target_orientation: np.ndarray,
+        *,
+        max_position_drift_m: float = 0.04,
+    ) -> bool:
+        nonlocal collision_steps, maximum_support_steps
+        if not np.isfinite(float(orientation_max_action)) or not (
+            0.0 < float(orientation_max_action) <= 1.0
+        ):
+            raise ValueError("orientation_max_action must be in (0, 1]")
+        if not np.isfinite(float(orientation_tolerance_deg)) or float(
+            orientation_tolerance_deg
+        ) < 0.0:
+            raise ValueError("orientation_tolerance_deg must be non-negative")
+        if int(orientation_stable_steps) < 1 or int(orientation_max_steps) < 1:
+            raise ValueError("orientation step limits must be positive")
+        target_rotation = _validated_rotation_matrix(
+            target_orientation,
+            name="open fork target orientation",
+        )
+        hold_position, start_orientation = right_eef_pose()
+        controller = robot.part_controllers["right"]
+        if controller.name != "OSC_POSE" or controller.input_type != "delta":
+            raise RuntimeError("open fork orientation requires OSC_POSE delta control")
+        input_ref_frame = getattr(controller, "input_ref_frame", "world")
+        if input_ref_frame == "world":
+            origin_rotation = np.eye(3)
+        elif input_ref_frame == "base":
+            origin_rotation = controller.origin_ori
+            if origin_rotation is None:
+                _, origin_rotation = robot.composite_controller.get_controller_base_pose(
+                    controller_name="right"
+                )
+        else:
+            raise RuntimeError(
+                f"unsupported orientation reference frame for right: {input_ref_frame}"
+            )
+        origin_rotation = _validated_rotation_matrix(
+            origin_rotation,
+            name="right controller origin rotation",
+        )
+        stable_steps = 0
+        max_drift = 0.0
+        safety_failure = None
+        success = False
+        for local_step in range(int(orientation_max_steps)):
+            robot.composite_controller.update_state()
+            current_position, current_orientation = right_eef_pose()
+            controller_delta = helpers["world_delta"](
+                robot,
+                "right",
+                hold_position - current_position,
+            )
+            arm_action = helpers["arm_action"](
+                robot,
+                "right",
+                controller_delta,
+                0.12,
+            )
+            world_rotation_delta = target_rotation @ current_orientation.T
+            orientation_action = normalized_osc_orientation_command(
+                world_rotation_delta=world_rotation_delta,
+                controller_origin_rotation=origin_rotation,
+                output_min=controller.output_min,
+                output_max=controller.output_max,
+                max_action=float(orientation_max_action),
+            )
+            arm_action[3:6] = orientation_action
+            action = helpers["build_action"](
+                robot,
+                arm_actions={"right": arm_action},
+                gripper_value=-1.0,
+                hold_targets=hold_targets,
+            )
+            _, _, _, info = raw_env.step(action)
+            recorder = getattr(backend, "_record_trajectory_frame", None)
+            if callable(recorder):
+                recorder(_env=raw_env)
+            measured_position, measured_orientation = right_eef_pose()
+            object_position = np.asarray(
+                raw_env.sim.data.body_xpos[body_id], dtype=float
+            )
+            contacts = object_robot_contacts(raw_env, object_name)
+            right_support = any(
+                _is_allowed_cradle_geom(geom, "right")
+                for geom in contacts["right"]
+            )
+            object_lift_m = float(object_position[2] - start_object[2])
+            support_steps = (
+                1 + int(observations[-1].get("stable_support_steps", 0))
+                if observations
+                and observations[-1].get("stage") == stage
+                and right_support
+                and object_lift_m >= 0.02
+                else int(right_support and object_lift_m >= 0.02)
+            )
+            maximum_support_steps = max(maximum_support_steps, support_steps)
+            error_deg = rotation_error_degrees(
+                measured_orientation,
+                target_rotation,
+            )
+            drift_m = float(np.linalg.norm(measured_position - hold_position))
+            max_drift = max(max_drift, drift_m)
+            collision = bool((info or {}).get("has_judge_collision", False))
+            collision_steps += int(collision)
+            stable_steps = (
+                stable_steps + 1
+                if error_deg <= float(orientation_tolerance_deg)
+                and drift_m <= float(max_position_drift_m)
+                else 0
+            )
+            observations.append(
+                {
+                    "stage": stage,
+                    "step": local_step + 1,
+                    "target_eef_position": hold_position.tolist(),
+                    "eef_position": measured_position.tolist(),
+                    "start_eef_orientation": start_orientation.tolist(),
+                    "target_eef_orientation": target_rotation.tolist(),
+                    "eef_orientation": measured_orientation.tolist(),
+                    "orientation_action": orientation_action.tolist(),
+                    "orientation_error_deg": error_deg,
+                    "orientation_stable_steps": stable_steps,
+                    "position_drift_m": drift_m,
+                    "object_position": object_position.tolist(),
+                    "object_lift_m": object_lift_m,
+                    "contacts": {
+                        arm: list(names) for arm, names in contacts.items()
+                    },
+                    "right_support": right_support,
+                    "stable_support_steps": support_steps,
+                    "judge_collision": collision,
+                }
+            )
+            if collision:
+                safety_failure = "collision"
+                break
+            if drift_m > float(max_position_drift_m):
+                safety_failure = "position_drift"
+                break
+            if stable_steps >= int(orientation_stable_steps):
+                success = True
+                break
+        if not success and safety_failure is None:
+            safety_failure = "timeout"
+        final_position, final_orientation = right_eef_pose()
+        stages.append(
+            {
+                "stage": stage,
+                "success": success,
+                "steps": sum(
+                    1 for item in observations if item.get("stage") == stage
+                ),
+                "safety_failure": safety_failure,
+                "orientation_error_deg": rotation_error_degrees(
+                    final_orientation,
+                    target_rotation,
+                ),
+                "orientation_stable_steps": stable_steps,
+                "max_position_drift_m": max_drift,
+                "final_eef_position": final_position.tolist(),
+                "final_eef_orientation": final_orientation.tolist(),
+                "target_eef_orientation": target_rotation.tolist(),
+                "final_object_position": np.asarray(
+                    raw_env.sim.data.body_xpos[body_id], dtype=float
+                ).tolist(),
+                "final_contacts": {
+                    arm: list(names)
+                    for arm, names in object_robot_contacts(
+                        raw_env, object_name
+                    ).items()
+                },
+            }
+        )
+        return success
+
     success = execute_base_advance()
     failure_stage = None if success else "advance_base_for_undercut"
     if success:
@@ -2212,8 +2432,6 @@ def _table_edge_undercut_probe(
             ),
             ("move_open_outside", targets["outside"], False, False),
             ("descend_open_outside", targets["below"], False, False),
-            ("inset_open_under_overhang", targets["undercut"], False, False),
-            ("raise_open_into_support", targets["raise"], True, True),
         )
         for stage, target, allow_contact, require_support in sequence:
             if stage == "descend_open_outside" and torso_target_m is not None:
@@ -2229,6 +2447,44 @@ def _table_edge_undercut_probe(
                 success = False
                 failure_stage = stage
                 break
+        if success and horizontal_fork:
+            fork_orientation = open_fork_target_orientation(
+                inward_axis=np.array([0.0, -1.0, 0.0]),
+                closure_axis=np.array([1.0, 0.0, 0.0]),
+            )
+            if not execute_orientation_stage(
+                "orient_open_fork_inward",
+                fork_orientation,
+            ):
+                success = False
+                failure_stage = "orient_open_fork_inward"
+            else:
+                fork_raise_target = np.asarray(targets["below"], dtype=float).copy()
+                fork_raise_target[2] = float(targets["raise"][2])
+                if not execute_stage(
+                    "raise_open_into_support",
+                    fork_raise_target,
+                    allow_object_contact=True,
+                    require_support=True,
+                ):
+                    success = False
+                    failure_stage = "raise_open_into_support"
+        elif success:
+            if not execute_stage(
+                "inset_open_under_overhang",
+                targets["undercut"],
+                allow_object_contact=False,
+            ):
+                success = False
+                failure_stage = "inset_open_under_overhang"
+            elif not execute_stage(
+                "raise_open_into_support",
+                targets["raise"],
+                allow_object_contact=True,
+                require_support=True,
+            ):
+                success = False
+                failure_stage = "raise_open_into_support"
     final_object = np.asarray(
         raw_env.sim.data.body_xpos[body_id], dtype=float
     ).copy()
@@ -2243,6 +2499,7 @@ def _table_edge_undercut_probe(
             np.linalg.norm(np.asarray(backend.get_base_pose()[0]) - start_base_xy)
         ),
         "torso_target_m": torso_target_m,
+        "horizontal_fork": bool(horizontal_fork),
         "final_torso_position": torso_position(),
         "start_object_position": start_object.tolist(),
         "final_object_position": final_object.tolist(),
@@ -4598,6 +4855,19 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                     raise_above_bottom_m=(
                         args.undercut_raise_above_bottom_m
                     ),
+                    horizontal_fork=args.undercut_horizontal_fork,
+                    orientation_max_action=(
+                        args.undercut_orientation_max_action
+                    ),
+                    orientation_tolerance_deg=(
+                        args.undercut_orientation_tolerance_deg
+                    ),
+                    orientation_stable_steps=(
+                        args.undercut_orientation_stable_steps
+                    ),
+                    orientation_max_steps=(
+                        args.undercut_orientation_max_steps
+                    ),
                 )
                 record["mode"] = "table_edge_undercut_probe"
                 record["open_gripper"] = bool(probe.get("open_gripper", False))
@@ -4981,6 +5251,27 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--undercut-raise-above-bottom-m",
         type=float,
         default=0.12,
+    )
+    parser.add_argument("--undercut-horizontal-fork", action="store_true")
+    parser.add_argument(
+        "--undercut-orientation-max-action",
+        type=float,
+        default=0.08,
+    )
+    parser.add_argument(
+        "--undercut-orientation-tolerance-deg",
+        type=float,
+        default=3.0,
+    )
+    parser.add_argument(
+        "--undercut-orientation-stable-steps",
+        type=int,
+        default=5,
+    )
+    parser.add_argument(
+        "--undercut-orientation-max-steps",
+        type=int,
+        default=240,
     )
     parser.add_argument("--align-closure-axes", action="store_true")
     parser.add_argument("--orientation-max-action", type=float, default=0.30)
