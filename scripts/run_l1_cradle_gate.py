@@ -1821,6 +1821,7 @@ def _center_regrasp_probe(
     center_support_clearance_lift_m: float = 0.08,
     center_support_descent_m: float = 0.12,
     center_support_inset_m: float = 0.04,
+    center_support_keep_moving_gripper_closed: bool = False,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import (
         OfficialScriptedGraspDriver,
@@ -3284,8 +3285,13 @@ def _center_regrasp_probe(
                                         lower_reached = False
                                         inset_reached = False
                                         if clearance_safe:
+                                            moving_gripper_value = (
+                                                1.0
+                                                if center_support_keep_moving_gripper_closed
+                                                else -1.0
+                                            )
                                             gripper_commands = {
-                                                center_support_moving_arm: -1.0,
+                                                center_support_moving_arm: moving_gripper_value,
                                                 stationary_arm: 1.0,
                                             }
                                             lower_targets = (
@@ -3374,6 +3380,9 @@ def _center_regrasp_probe(
                                             "success": transition_success,
                                             "moving_arm": center_support_moving_arm,
                                             "stationary_arm": stationary_arm,
+                                            "moving_gripper_closed": bool(
+                                                center_support_keep_moving_gripper_closed
+                                            ),
                                             "clearance_success": clearance_safe,
                                             "lower_success": lower_reached,
                                             "inset_success": inset_reached,
@@ -4155,6 +4164,9 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                             args.center_support_descent_m
                         ),
                         center_support_inset_m=args.center_support_inset_m,
+                        center_support_keep_moving_gripper_closed=(
+                            args.center_support_keep_moving_gripper_closed
+                        ),
                     )
                     if args.center_support_moving_arm != "none":
                         record["mode"] = "single_arm_under_support_probe"
@@ -4357,6 +4369,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--center-support-inset-m",
         type=float,
         default=0.04,
+    )
+    parser.add_argument(
+        "--center-support-keep-moving-gripper-closed",
+        action="store_true",
     )
     parser.add_argument("--align-closure-axes", action="store_true")
     parser.add_argument("--orientation-max-action", type=float, default=0.30)
