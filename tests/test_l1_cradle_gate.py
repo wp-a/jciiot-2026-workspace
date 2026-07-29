@@ -490,6 +490,12 @@ class CenterRegraspSequenceTests(unittest.TestCase):
         inchworm_index = source.index("run_inchworm_transport(")
         self.assertLess(hold_index, inchworm_index)
 
+    def test_inchworm_extraction_can_reverse_toward_the_robot_base(self):
+        source = inspect.getsource(_center_regrasp_probe)
+
+        self.assertIn("center_carry_inchworm_toward_base", source)
+        self.assertIn("inchworm_direction = -inchworm_direction", source)
+
     def test_contact_constrained_close_is_guarded_after_failed_approach(self):
         source = inspect.getsource(_center_regrasp_probe)
 
@@ -879,6 +885,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.center_carry_arm_stroke_lift_m, 0.0)
         self.assertAlmostEqual(args.center_carry_base_reset_m, 0.0)
         self.assertAlmostEqual(args.center_carry_inchworm_distance_m, 0.0)
+        self.assertFalse(args.center_carry_inchworm_toward_base)
 
     def test_center_carry_speed_can_be_overridden_for_single_variable_probe(self):
         args = parse_args(
@@ -903,6 +910,7 @@ class JointSeedParserTests(unittest.TestCase):
                 "0.07",
                 "--center-carry-inchworm-distance-m",
                 "0.06",
+                "--center-carry-inchworm-toward-base",
             ]
         )
 
@@ -912,6 +920,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.center_carry_arm_stroke_lift_m, 0.04)
         self.assertAlmostEqual(args.center_carry_base_reset_m, 0.07)
         self.assertAlmostEqual(args.center_carry_inchworm_distance_m, 0.06)
+        self.assertTrue(args.center_carry_inchworm_toward_base)
 
 
 class OrientationCommandTests(unittest.TestCase):
