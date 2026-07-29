@@ -773,6 +773,52 @@ def open_fork_target_orientation(
     )
 
 
+def open_fork_alignment_sufficient(
+    rotation: object,
+    *,
+    inward_axis: object,
+    min_inward_projection: float,
+    max_closure_vertical: float,
+) -> bool:
+    """Check whether the open fork is horizontal and points far enough inward."""
+    tool_rotation = _validated_rotation_matrix(
+        rotation,
+        name="open fork rotation",
+    )
+    inward = _normalized_axis(inward_axis, name="inward_axis")
+    minimum = float(min_inward_projection)
+    maximum_vertical = float(max_closure_vertical)
+    if not np.isfinite(minimum) or minimum < 0.0 or minimum > 1.0:
+        raise ValueError("min_inward_projection must be in [0, 1]")
+    if (
+        not np.isfinite(maximum_vertical)
+        or maximum_vertical < 0.0
+        or maximum_vertical > 1.0
+    ):
+        raise ValueError("max_closure_vertical must be in [0, 1]")
+    inward_projection = float(np.dot(tool_rotation[:, 2], inward))
+    closure_vertical = abs(float(tool_rotation[2, 0]))
+    return bool(
+        inward_projection >= minimum
+        and closure_vertical <= maximum_vertical
+    )
+
+
+def is_allowed_open_fork_support_geom(geom_name: str, arm: str) -> bool:
+    """Accept real load-bearing links of an open, non-clamping fork."""
+    name = str(geom_name).lower()
+    side = str(arm).lower()
+    if side not in ("right", "left") or "collision" not in name:
+        return False
+    if name.startswith(f"gripper0_{side}_"):
+        return "finger" in name or "hand_collision" in name
+    if side == "left":
+        return any(f"arm_{index}_left_collision" in name for index in (4, 5, 6))
+    return "_left_" not in name and any(
+        f"arm_{index}_collision" in name for index in (4, 5, 6)
+    )
+
+
 def rotation_error_degrees(current: object, target: object) -> float:
     """Return the geodesic angle between two complete tool frames."""
     current_rotation = _validated_rotation_matrix(
@@ -1939,6 +1985,9 @@ def _table_edge_undercut_probe(
     orientation_tolerance_deg: float,
     orientation_stable_steps: int,
     orientation_max_steps: int,
+    orientation_min_inward_projection: float,
+    orientation_max_closure_vertical: float,
+    horizontal_inset_m: float,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import OfficialScriptedGraspDriver
     from robot_agent.skills.competition_transport import (
@@ -2003,6 +2052,11 @@ def _table_edge_undercut_probe(
     stages: list[dict[str, Any]] = []
     collision_steps = 0
     maximum_support_steps = 0
+
+    def is_right_support(geom_name: str) -> bool:
+        if horizontal_fork:
+            return is_allowed_open_fork_support_geom(geom_name, "right")
+        return _is_allowed_cradle_geom(geom_name, "right")
 
     def right_eef_position() -> np.ndarray:
         return np.asarray(
@@ -2159,7 +2213,7 @@ def _table_edge_undercut_probe(
             )
             contacts = object_robot_contacts(raw_env, object_name)
             right_support = any(
-                _is_allowed_cradle_geom(geom, "right")
+                is_right_support(geom)
                 for geom in contacts["right"]
             )
             object_lift_m = float(object_position[2] - start_object[2])
@@ -2330,7 +2384,7 @@ def _table_edge_undercut_probe(
             )
             contacts = object_robot_contacts(raw_env, object_name)
             right_support = any(
-                _is_allowed_cradle_geom(geom, "right")
+                is_right_support(geom)
                 for geom in contacts["right"]
             )
             object_lift_m = float(object_position[2] - start_object[2])
@@ -2347,13 +2401,27 @@ def _table_edge_undercut_probe(
                 measured_orientation,
                 target_rotation,
             )
+            inward_axis = np.array([0.0, -1.0, 0.0])
+            inward_projection = float(
+                np.dot(measured_orientation[:, 2], inward_axis)
+            )
+            closure_vertical = abs(float(measured_orientation[2, 0]))
+            geometry_aligned = open_fork_alignment_sufficient(
+                measured_orientation,
+                inward_axis=inward_axis,
+                min_inward_projection=orientation_min_inward_projection,
+                max_closure_vertical=orientation_max_closure_vertical,
+            )
             drift_m = float(np.linalg.norm(measured_position - hold_position))
             max_drift = max(max_drift, drift_m)
             collision = bool((info or {}).get("has_judge_collision", False))
             collision_steps += int(collision)
             stable_steps = (
                 stable_steps + 1
-                if error_deg <= float(orientation_tolerance_deg)
+                if (
+                    error_deg <= float(orientation_tolerance_deg)
+                    or geometry_aligned
+                )
                 and drift_m <= float(max_position_drift_m)
                 else 0
             )
@@ -2368,6 +2436,9 @@ def _table_edge_undercut_probe(
                     "eef_orientation": measured_orientation.tolist(),
                     "orientation_action": orientation_action.tolist(),
                     "orientation_error_deg": error_deg,
+                    "inward_projection": inward_projection,
+                    "closure_vertical": closure_vertical,
+                    "geometry_aligned": geometry_aligned,
                     "orientation_stable_steps": stable_steps,
                     "position_drift_m": drift_m,
                     "object_position": object_position.tolist(),
@@ -2405,6 +2476,10 @@ def _table_edge_undercut_probe(
                     target_rotation,
                 ),
                 "orientation_stable_steps": stable_steps,
+                "inward_projection": float(
+                    np.dot(final_orientation[:, 2], [0.0, -1.0, 0.0])
+                ),
+                "closure_vertical": abs(float(final_orientation[2, 0])),
                 "max_position_drift_m": max_drift,
                 "final_eef_position": final_position.tolist(),
                 "final_eef_orientation": final_orientation.tolist(),
@@ -2466,16 +2541,29 @@ def _table_edge_undercut_probe(
                 success = False
                 failure_stage = "orient_open_fork_inward"
             else:
-                fork_raise_target = np.asarray(targets["below"], dtype=float).copy()
-                fork_raise_target[2] = float(targets["raise"][2])
+                inset_distance = float(horizontal_inset_m)
+                if not np.isfinite(inset_distance) or inset_distance <= 0.0:
+                    raise ValueError("horizontal_inset_m must be finite and positive")
+                fork_inset_target = np.asarray(targets["below"], dtype=float).copy()
+                fork_inset_target[1] = float(targets["outside"][1]) - inset_distance
                 if not execute_stage(
-                    "raise_open_into_support",
-                    fork_raise_target,
+                    "inset_horizontal_fork_under_overhang",
+                    fork_inset_target,
                     allow_object_contact=True,
-                    require_support=True,
                 ):
                     success = False
-                    failure_stage = "raise_open_into_support"
+                    failure_stage = "inset_horizontal_fork_under_overhang"
+                else:
+                    fork_raise_target = fork_inset_target.copy()
+                    fork_raise_target[2] = float(targets["raise"][2])
+                    if not execute_stage(
+                        "raise_open_into_support",
+                        fork_raise_target,
+                        allow_object_contact=True,
+                        require_support=True,
+                    ):
+                        success = False
+                        failure_stage = "raise_open_into_support"
         elif success:
             if not execute_stage(
                 "inset_open_under_overhang",
@@ -2507,6 +2595,7 @@ def _table_edge_undercut_probe(
         ),
         "torso_target_m": torso_target_m,
         "horizontal_fork": bool(horizontal_fork),
+        "horizontal_inset_m": float(horizontal_inset_m),
         "final_torso_position": torso_position(),
         "start_object_position": start_object.tolist(),
         "final_object_position": final_object.tolist(),
@@ -4878,6 +4967,13 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                     orientation_max_steps=(
                         args.undercut_orientation_max_steps
                     ),
+                    orientation_min_inward_projection=(
+                        args.undercut_orientation_min_inward_projection
+                    ),
+                    orientation_max_closure_vertical=(
+                        args.undercut_orientation_max_closure_vertical
+                    ),
+                    horizontal_inset_m=args.undercut_horizontal_inset_m,
                 )
                 record["mode"] = "table_edge_undercut_probe"
                 record["open_gripper"] = bool(probe.get("open_gripper", False))
@@ -5287,6 +5383,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--undercut-orientation-max-steps",
         type=int,
         default=240,
+    )
+    parser.add_argument(
+        "--undercut-orientation-min-inward-projection",
+        type=float,
+        default=0.80,
+    )
+    parser.add_argument(
+        "--undercut-orientation-max-closure-vertical",
+        type=float,
+        default=0.35,
+    )
+    parser.add_argument(
+        "--undercut-horizontal-inset-m",
+        type=float,
+        default=0.06,
     )
     parser.add_argument("--align-closure-axes", action="store_true")
     parser.add_argument("--orientation-max-action", type=float, default=0.30)
