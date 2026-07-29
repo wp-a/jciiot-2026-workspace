@@ -1652,6 +1652,7 @@ def _center_regrasp_probe(
     orientation_joint_seed_include_torso: bool = False,
     orientation_joint_seed_torso_margin_m: float = 0.005,
     center_carry_distance_m: float = 0.0,
+    center_carry_max_linear: float = 0.04,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import (
         OfficialScriptedGraspDriver,
@@ -2994,7 +2995,11 @@ def _center_regrasp_probe(
                                             distance_m=center_carry_distance_m,
                                         )
                                         control_dt = 0.05
-                                        max_linear = 0.04
+                                        max_linear = float(center_carry_max_linear)
+                                        if not np.isfinite(max_linear) or max_linear <= 0.0:
+                                            raise ValueError(
+                                                "center_carry_max_linear must be positive and finite"
+                                            )
                                         minimum_steps = int(
                                             np.ceil(
                                                 float(center_carry_distance_m)
@@ -3046,6 +3051,7 @@ def _center_regrasp_probe(
                                                 "requested_distance_m": float(
                                                     center_carry_distance_m
                                                 ),
+                                                "max_linear_m_s": max_linear,
                                                 "target_base_xy": carry_target.tolist(),
                                                 "base_translation_m": (
                                                     transport_base_translation
@@ -3234,6 +3240,7 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                             args.orientation_joint_seed_torso_margin_m
                         ),
                         center_carry_distance_m=args.center_carry_distance_m,
+                        center_carry_max_linear=args.center_carry_max_linear,
                     )
                     record["mode"] = (
                         "center_grasp_physical_transport"
@@ -3388,6 +3395,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--regrasp-wall-squeeze-m", type=float, default=0.025)
     parser.add_argument("--regrasp-base-advance-m", type=float, default=0.0)
     parser.add_argument("--center-carry-distance-m", type=float, default=0.0)
+    parser.add_argument("--center-carry-max-linear", type=float, default=0.04)
     parser.add_argument("--align-closure-axes", action="store_true")
     parser.add_argument("--orientation-max-action", type=float, default=0.30)
     parser.add_argument("--orientation-fine-max-action", type=float)

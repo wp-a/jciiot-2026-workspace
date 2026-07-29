@@ -760,6 +760,25 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.orientation_joint_seed_torso_margin_m, 0.005)
         self.assertAlmostEqual(args.regrasp_base_advance_m, 0.0)
         self.assertAlmostEqual(args.center_carry_distance_m, 0.0)
+        self.assertAlmostEqual(args.center_carry_max_linear, 0.04)
+
+    def test_center_carry_speed_can_be_overridden_for_single_variable_probe(self):
+        args = parse_args(
+            [
+                "--candidate-root",
+                "/tmp/candidate",
+                "--expected-official-commit",
+                "official-commit",
+                "--output",
+                "/tmp/result.json",
+                "--trajectory",
+                "/tmp/trajectory.json",
+                "--center-carry-max-linear",
+                "0.005",
+            ]
+        )
+
+        self.assertAlmostEqual(args.center_carry_max_linear, 0.005)
 
 
 class OrientationCommandTests(unittest.TestCase):
