@@ -149,6 +149,7 @@ class FakePhysicalTransportDriver:
         advance=True,
         recover_success=True,
         recovered_height_result=None,
+        planar_slip_per_step=0.0,
     ):
         self.base_xy = np.zeros(2, dtype=float)
         self.object_xy = np.array([0.5, 0.0], dtype=float)
@@ -159,6 +160,7 @@ class FakePhysicalTransportDriver:
         self.advance = bool(advance)
         self.recover_success = bool(recover_success)
         self.recovered_height_result = recovered_height_result
+        self.planar_slip_per_step = float(planar_slip_per_step)
         self.recovered_height = None
         self.recover_calls = []
         self.gripper_z = {"right": 1.01, "left": 1.01}
@@ -185,7 +187,12 @@ class FakePhysicalTransportDriver:
             "contacts": dict(self.contacts[index]),
             "gripper_positions": {
                 arm: np.array(
-                    [self.object_xy[0], self.object_xy[1], self.gripper_z[arm]],
+                    [
+                        self.object_xy[0]
+                        + len(self.steps) * self.planar_slip_per_step,
+                        self.object_xy[1],
+                        self.gripper_z[arm],
+                    ],
                     dtype=float,
                 )
                 for arm in ("right", "left")
@@ -311,6 +318,35 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
         self.assertFalse(result["success"])
         self.assertEqual(result["failure_stage"], "contact")
         self.assertEqual(len(driver.steps), 1)
+
+    def test_planar_grasp_drift_fails_even_while_contacts_remain_true(self):
+        driver = FakePhysicalTransportDriver(planar_slip_per_step=0.03)
+        config = self.module.PhysicalCarryConfig(
+            waypoint_tolerance=0.02,
+            max_steps=20,
+            k_linear=1.0,
+            max_linear=0.10,
+            max_linear_delta=0.10,
+            max_planar_grasp_drift=0.02,
+        )
+
+        result = self.run_transport(driver, config=config)
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["failure_stage"], "planar_grasp_drift")
+        self.assertGreater(result["max_planar_grasp_drift_m"], 0.02)
+        self.assertEqual(result["contacts"], {"right": True, "left": True})
+
+    def test_transport_result_records_start_and_final_physical_poses(self):
+        driver = FakePhysicalTransportDriver()
+
+        result = self.run_transport(driver)
+
+        self.assertEqual(result["start_object_pos"], [0.5, 0.0, 1.0])
+        self.assertEqual(result["final_object_pos"], [0.509, 0.0, 1.0])
+        self.assertEqual(sorted(result["start_gripper_positions"]), ["left", "right"])
+        self.assertEqual(sorted(result["final_gripper_positions"]), ["left", "right"])
+        self.assertAlmostEqual(result["max_planar_grasp_drift_m"], 0.0)
 
     def test_object_drop_fails_immediately(self):
         driver = FakePhysicalTransportDriver(object_heights=[1.0, 0.97])

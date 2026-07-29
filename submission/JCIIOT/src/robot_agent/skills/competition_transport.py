@@ -255,6 +255,7 @@ class PhysicalCarryConfig:
         vertical_hold_feedforward: float = 0.0,
         vertical_hold_gain: float = 0.0,
         max_vertical_hold_delta: float = 0.0,
+        max_planar_grasp_drift: float = 0.04,
         height_recovery_trigger: float = 0.01,
         height_recovery_steps: int = 80,
         height_recovery_max_action: float = 0.65,
@@ -284,6 +285,7 @@ class PhysicalCarryConfig:
         self.vertical_hold_feedforward = float(vertical_hold_feedforward)
         self.vertical_hold_gain = float(vertical_hold_gain)
         self.max_vertical_hold_delta = float(max_vertical_hold_delta)
+        self.max_planar_grasp_drift = float(max_planar_grasp_drift)
         self.height_recovery_trigger = float(height_recovery_trigger)
         self.height_recovery_steps = int(height_recovery_steps)
         self.height_recovery_max_action = float(height_recovery_max_action)
@@ -398,6 +400,26 @@ def next_contact_stability(contacts, stable_steps: int) -> int:
     return 0
 
 
+def planar_grasp_drift(start_observation, observation) -> float:
+    """Measure object-to-gripper planar offset change from transport start."""
+    start_object = np.asarray(start_observation["object_pos"], dtype=float)[:2]
+    object_xy = np.asarray(observation["object_pos"], dtype=float)[:2]
+    drifts = []
+    for arm in ("right", "left"):
+        start_gripper = np.asarray(
+            start_observation["gripper_positions"][arm],
+            dtype=float,
+        )[:2]
+        gripper_xy = np.asarray(
+            observation["gripper_positions"][arm],
+            dtype=float,
+        )[:2]
+        start_offset = start_gripper - start_object
+        current_offset = gripper_xy - object_xy
+        drifts.append(float(np.linalg.norm(current_offset - start_offset)))
+    return max(drifts)
+
+
 def physical_action_parts(
     robot,
     *,
@@ -464,6 +486,8 @@ def _transport_result(
     observation,
     final_distance: float,
     minimum_observed_z: float,
+    start_observation,
+    max_planar_grasp_drift_m: float,
 ) -> dict:
     return {
         "success": bool(success),
@@ -472,6 +496,25 @@ def _transport_result(
         "final_base_xy": np.asarray(observation["base_xy"], dtype=float).tolist(),
         "final_distance": float(final_distance),
         "minimum_object_z": float(minimum_observed_z),
+        "max_planar_grasp_drift_m": float(max_planar_grasp_drift_m),
+        "start_object_pos": np.asarray(
+            start_observation["object_pos"], dtype=float
+        ).tolist(),
+        "final_object_pos": np.asarray(
+            observation["object_pos"], dtype=float
+        ).tolist(),
+        "start_gripper_positions": {
+            arm: np.asarray(
+                start_observation["gripper_positions"][arm], dtype=float
+            ).tolist()
+            for arm in ("right", "left")
+        },
+        "final_gripper_positions": {
+            arm: np.asarray(
+                observation["gripper_positions"][arm], dtype=float
+            ).tolist()
+            for arm in ("right", "left")
+        },
         "contacts": {
             "right": bool(observation["contacts"].get("right", False)),
             "left": bool(observation["contacts"].get("left", False)),
@@ -498,6 +541,7 @@ def run_physical_transport(
 
     hold_targets = driver.capture_hold_targets(backend)
     observation = driver.observe(backend, object_name)
+    start_observation = observation
     target_object_z = float(minimum_object_z) + config.object_drop_tolerance
     gripper_z_offsets = {
         arm: float(observation["gripper_positions"][arm][2])
@@ -505,6 +549,7 @@ def run_physical_transport(
         for arm in ("right", "left")
     }
     minimum_observed_z = float(observation["object_pos"][2])
+    maximum_planar_grasp_drift = 0.0
     previous_command = np.zeros(3, dtype=float)
     waypoint_index = 0
     final_distance = math.inf
@@ -524,6 +569,8 @@ def run_physical_transport(
             observation=observation,
             final_distance=final_distance,
             minimum_observed_z=minimum_observed_z,
+            start_observation=start_observation,
+            max_planar_grasp_drift_m=maximum_planar_grasp_drift,
         )
 
     failure_stage = "timeout"
@@ -534,11 +581,18 @@ def run_physical_transport(
             minimum_observed_z,
             float(observation["object_pos"][2]),
         )
+        maximum_planar_grasp_drift = max(
+            maximum_planar_grasp_drift,
+            planar_grasp_drift(start_observation, observation),
+        )
         if next_contact_stability(observation["contacts"], 0) == 0:
             failure_stage = "contact"
             break
         if float(observation["object_pos"][2]) < float(minimum_object_z):
             failure_stage = "object_drop"
+            break
+        if maximum_planar_grasp_drift > config.max_planar_grasp_drift:
+            failure_stage = "planar_grasp_drift"
             break
         height_error = target_object_z - float(observation["object_pos"][2])
         if height_error >= config.height_recovery_trigger:
@@ -651,6 +705,10 @@ def run_physical_transport(
             minimum_observed_z = min(
                 minimum_observed_z,
                 float(observation["object_pos"][2]),
+            )
+            maximum_planar_grasp_drift = max(
+                maximum_planar_grasp_drift,
+                planar_grasp_drift(start_observation, observation),
             )
             recovered_height_error = (
                 target_object_z - float(observation["object_pos"][2])
@@ -772,6 +830,10 @@ def run_physical_transport(
                 failure_stage = "object_drop"
                 abort = True
                 break
+            if maximum_planar_grasp_drift > config.max_planar_grasp_drift:
+                failure_stage = "planar_grasp_drift"
+                abort = True
+                break
         previous_command = command
         if abort:
             break
@@ -802,6 +864,8 @@ def run_physical_transport(
         observation=observation,
         final_distance=final_distance,
         minimum_observed_z=minimum_observed_z,
+        start_observation=start_observation,
+        max_planar_grasp_drift_m=maximum_planar_grasp_drift,
     )
 
 
