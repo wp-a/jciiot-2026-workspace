@@ -103,6 +103,66 @@ def cradle_gate_accepted(record: Mapping[str, object]) -> bool:
     return not cradle_gate_failures(record)
 
 
+_CENTER_GRASP_TRANSPORT_REQUIRED_FIELDS = (
+    "physical_grasp",
+    "lift_m",
+    "hold_grasp_steps",
+    "transport_success",
+    "object_translation_m",
+    "attachment_calls",
+    "object_pose_writes",
+    "collision_frames",
+    "dropped",
+    "infrastructure_error",
+)
+
+
+def center_grasp_transport_failures(
+    record: Mapping[str, object],
+) -> list[str]:
+    """Return failed evidence fields for a physical center-grasp transport."""
+    failures = [
+        key for key in _CENTER_GRASP_TRANSPORT_REQUIRED_FIELDS if key not in record
+    ]
+
+    def numeric(key: str) -> float | None:
+        if key not in record or isinstance(record[key], bool):
+            return None
+        try:
+            value = float(record[key])
+        except (TypeError, ValueError):
+            return None
+        return value if np.isfinite(value) else None
+
+    if record.get("physical_grasp") is not True:
+        failures.append("physical_grasp")
+    lift = numeric("lift_m")
+    if lift is None or lift < CRADLE_GATE_THRESHOLDS["lift_m"]:
+        failures.append("lift_m")
+    hold_steps = numeric("hold_grasp_steps")
+    if hold_steps is None or hold_steps < 20.0:
+        failures.append("hold_grasp_steps")
+    if record.get("transport_success") is not True:
+        failures.append("transport_success")
+    object_translation = numeric("object_translation_m")
+    if object_translation is None or object_translation <= 1.0:
+        failures.append("object_translation_m")
+    for key in ("attachment_calls", "object_pose_writes", "collision_frames"):
+        value = numeric(key)
+        if value is None or value != 0.0:
+            failures.append(key)
+    if record.get("dropped") is not False:
+        failures.append("dropped")
+    if record.get("infrastructure_error") is not None:
+        failures.append("infrastructure_error")
+    return list(dict.fromkeys(failures))
+
+
+def center_grasp_transport_accepted(record: Mapping[str, object]) -> bool:
+    """Accept only complete, collision-free center-grasp transport evidence."""
+    return not center_grasp_transport_failures(record)
+
+
 _PUSH_REQUIRED_FIELDS = (
     "physical_contact_steps",
     "object_translation_m",
@@ -199,6 +259,29 @@ def bounded_base_advance_world_velocity(
         raise ValueError("base and object positions must differ")
     speed = min(max_speed, remaining / control_dt)
     return direction * (speed / distance)
+
+
+def forward_carry_target(
+    *,
+    base_xy: object,
+    object_xy: object,
+    distance_m: float,
+) -> np.ndarray:
+    """Return a base waypoint the requested distance toward the object."""
+    base = np.asarray(base_xy, dtype=float).reshape(2)
+    target = np.asarray(object_xy, dtype=float).reshape(2)
+    if not np.all(np.isfinite(base)) or not np.all(np.isfinite(target)):
+        raise ValueError("base_xy and object_xy must be finite planar vectors")
+    distance = float(distance_m)
+    if not np.isfinite(distance) or distance < 0.0:
+        raise ValueError("distance_m must be finite and non-negative")
+    if distance == 0.0:
+        return base.copy()
+    direction = target - base
+    direction_norm = float(np.linalg.norm(direction))
+    if direction_norm <= 1e-12:
+        raise ValueError("base and object positions must differ")
+    return base + direction * (distance / direction_norm)
 
 
 def allocate_segment_steps(*, total_steps: int, segment_count: int) -> tuple[int, ...]:
@@ -1568,6 +1651,7 @@ def _center_regrasp_probe(
     orientation_joint_seed_continuation_nodes: int = 1,
     orientation_joint_seed_include_torso: bool = False,
     orientation_joint_seed_torso_margin_m: float = 0.005,
+    center_carry_distance_m: float = 0.0,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import (
         OfficialScriptedGraspDriver,
@@ -1577,7 +1661,9 @@ def _center_regrasp_probe(
     )
     from robot_agent.skills.competition_transport import (
         OfficialPhysicalCarryDriver,
+        PhysicalCarryConfig,
         _is_allowed_cradle_geom,
+        run_physical_transport,
         world_velocity_to_base_frame,
     )
 
@@ -1593,6 +1679,11 @@ def _center_regrasp_probe(
     collision_steps = 0
     orientation_alignment = None
     joint_seed = None
+    physical_grasp = False
+    hold_grasp_steps = 0
+    transport_result = None
+    transport_object_translation = 0.0
+    transport_base_translation = 0.0
     if orientation_joint_seed and not align_closure_axes:
         raise ValueError("orientation_joint_seed requires align_closure_axes")
 
@@ -2862,23 +2953,132 @@ def _center_regrasp_probe(
                                 ):
                                     failure_stage = "hold_center_grasp"
                                 else:
+                                    consecutive_grasp_steps = 0
+                                    for item in observations:
+                                        if item.get("stage") != "hold_center_grasp":
+                                            continue
+                                        consecutive_grasp_steps = (
+                                            consecutive_grasp_steps + 1
+                                            if bool(item.get("bilateral_grasp", False))
+                                            else 0
+                                        )
+                                        hold_grasp_steps = max(
+                                            hold_grasp_steps,
+                                            consecutive_grasp_steps,
+                                        )
                                     final_contacts = object_robot_contacts(
                                         raw_env,
                                         object_name,
                                     )
-                                    failure_stage = (
-                                        None
-                                        if has_bilateral_object_contact(
-                                            final_contacts
-                                        )
-                                        else "final_contact"
+                                    physical_grasp = bool(
+                                        hold_grasp_steps >= 20
+                                        and has_bilateral_object_contact(final_contacts)
                                     )
+                                    if not physical_grasp:
+                                        failure_stage = "final_contact"
+                                    elif float(center_carry_distance_m) > 0.0:
+                                        transport_start_base_xy, hold_yaw = (
+                                            backend.get_base_pose()
+                                        )
+                                        transport_start_base_xy = np.asarray(
+                                            transport_start_base_xy,
+                                            dtype=float,
+                                        )
+                                        transport_start_object_xy = np.asarray(
+                                            raw_env.sim.data.body_xpos[body_id][:2],
+                                            dtype=float,
+                                        ).copy()
+                                        carry_target = forward_carry_target(
+                                            base_xy=transport_start_base_xy,
+                                            object_xy=transport_start_object_xy,
+                                            distance_m=center_carry_distance_m,
+                                        )
+                                        control_dt = 0.05
+                                        max_linear = 0.04
+                                        minimum_steps = int(
+                                            np.ceil(
+                                                float(center_carry_distance_m)
+                                                / (max_linear * control_dt)
+                                            )
+                                        )
+                                        transport_result = run_physical_transport(
+                                            backend,
+                                            path=[carry_target],
+                                            object_name=object_name,
+                                            hold_yaw=float(hold_yaw),
+                                            minimum_object_z=(
+                                                float(table_object_z) + 0.10
+                                            ),
+                                            config=PhysicalCarryConfig(
+                                                waypoint_tolerance=0.01,
+                                                max_steps=max(600, minimum_steps * 2),
+                                                max_linear=max_linear,
+                                                max_angular=0.04,
+                                                max_linear_delta=0.01,
+                                                max_angular_delta=0.01,
+                                                base_control_dt=control_dt,
+                                            ),
+                                        )
+                                        transport_end_base_xy = np.asarray(
+                                            backend.get_base_pose()[0],
+                                            dtype=float,
+                                        )
+                                        transport_end_object_xy = np.asarray(
+                                            raw_env.sim.data.body_xpos[body_id][:2],
+                                            dtype=float,
+                                        ).copy()
+                                        transport_base_translation = float(
+                                            np.linalg.norm(
+                                                transport_end_base_xy
+                                                - transport_start_base_xy
+                                            )
+                                        )
+                                        transport_object_translation = float(
+                                            np.linalg.norm(
+                                                transport_end_object_xy
+                                                - transport_start_object_xy
+                                            )
+                                        )
+                                        stage_results.append(
+                                            {
+                                                "stage": "transport_center_grasp",
+                                                **transport_result,
+                                                "requested_distance_m": float(
+                                                    center_carry_distance_m
+                                                ),
+                                                "target_base_xy": carry_target.tolist(),
+                                                "base_translation_m": (
+                                                    transport_base_translation
+                                                ),
+                                                "object_translation_m": (
+                                                    transport_object_translation
+                                                ),
+                                            }
+                                        )
+                                        failure_stage = (
+                                            None
+                                            if bool(transport_result.get("success"))
+                                            else "transport_center_grasp"
+                                        )
+                                    else:
+                                        failure_stage = None
 
     final_object_z = float(raw_env.sim.data.body_xpos[body_id][2])
     return {
         "success": failure_stage is None,
         "failure_stage": failure_stage,
+        "physical_grasp": physical_grasp,
         "lift_m": final_object_z - float(table_object_z),
+        "hold_grasp_steps": hold_grasp_steps,
+        "transport_success": (
+            bool(transport_result.get("success"))
+            if isinstance(transport_result, Mapping)
+            else False
+        ),
+        "requested_carry_distance_m": float(center_carry_distance_m),
+        "object_translation_m": transport_object_translation,
+        "transport_base_translation_m": transport_base_translation,
+        "transport": transport_result,
         "support_contact_steps": maximum_support_steps,
         "collision_steps": collision_steps,
         "joint_seed": joint_seed,
@@ -3033,10 +3233,32 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                         orientation_joint_seed_torso_margin_m=(
                             args.orientation_joint_seed_torso_margin_m
                         ),
+                        center_carry_distance_m=args.center_carry_distance_m,
                     )
-                    record["mode"] = "table_assisted_center_regrasp"
-                    record["physical_grasp"] = bool(probe.get("success", False))
+                    record["mode"] = (
+                        "center_grasp_physical_transport"
+                        if args.center_carry_distance_m > 0.0
+                        else "table_assisted_center_regrasp"
+                    )
+                    record["physical_grasp"] = bool(
+                        probe.get("physical_grasp", probe.get("success", False))
+                    )
                     record["lift_m"] = float(probe.get("lift_m", 0.0))
+                    record["hold_grasp_steps"] = int(
+                        probe.get("hold_grasp_steps", 0)
+                    )
+                    record["transport_success"] = bool(
+                        probe.get("transport_success", False)
+                    )
+                    record["requested_carry_distance_m"] = float(
+                        probe.get("requested_carry_distance_m", 0.0)
+                    )
+                    record["object_translation_m"] = float(
+                        probe.get("object_translation_m", 0.0)
+                    )
+                    record["transport_base_translation_m"] = float(
+                        probe.get("transport_base_translation_m", 0.0)
+                    )
                     alignment = probe.get("orientation_alignment")
                     if isinstance(alignment, Mapping):
                         record.update(
@@ -3135,6 +3357,8 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
     record["elapsed_s"] = round(time.perf_counter() - started, 6)
     if record.get("mode") == "physical_push_probe":
         record["gate_failures"] = push_gate_failures(record)
+    elif record.get("mode") == "center_grasp_physical_transport":
+        record["gate_failures"] = center_grasp_transport_failures(record)
     else:
         record["gate_failures"] = cradle_gate_failures(record)
     record["accepted"] = not record["gate_failures"]
@@ -3163,6 +3387,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--regrasp-wall-clearance-m", type=float, default=0.10)
     parser.add_argument("--regrasp-wall-squeeze-m", type=float, default=0.025)
     parser.add_argument("--regrasp-base-advance-m", type=float, default=0.0)
+    parser.add_argument("--center-carry-distance-m", type=float, default=0.0)
     parser.add_argument("--align-closure-axes", action="store_true")
     parser.add_argument("--orientation-max-action", type=float, default=0.30)
     parser.add_argument("--orientation-fine-max-action", type=float)

@@ -79,6 +79,19 @@ VALID_JOINT_SEED_RECORD = {
     "infrastructure_error": None,
 }
 
+VALID_CENTER_GRASP_TRANSPORT_RECORD = {
+    "physical_grasp": True,
+    "lift_m": 0.131,
+    "hold_grasp_steps": 20,
+    "transport_success": True,
+    "object_translation_m": 1.001,
+    "attachment_calls": 0,
+    "object_pose_writes": 0,
+    "collision_frames": 0,
+    "dropped": False,
+    "infrastructure_error": None,
+}
+
 
 class FingerpadBracketTests(unittest.TestCase):
     def test_reads_official_fingerpad_geom_positions(self):
@@ -238,6 +251,94 @@ class FingerpadBracketTests(unittest.TestCase):
             )
 
 
+class CenterGraspTransportTests(unittest.TestCase):
+    def test_complete_center_grasp_transport_record_is_accepted(self):
+        self.assertTrue(
+            hasattr(gate_module, "center_grasp_transport_failures")
+        )
+        self.assertTrue(
+            hasattr(gate_module, "center_grasp_transport_accepted")
+        )
+
+        self.assertEqual(
+            gate_module.center_grasp_transport_failures(
+                VALID_CENTER_GRASP_TRANSPORT_RECORD
+            ),
+            [],
+        )
+        self.assertTrue(
+            gate_module.center_grasp_transport_accepted(
+                VALID_CENTER_GRASP_TRANSPORT_RECORD
+            )
+        )
+
+    def test_each_center_grasp_transport_hard_condition_rejects_record(self):
+        invalid_values = {
+            "physical_grasp": False,
+            "lift_m": 0.129,
+            "hold_grasp_steps": 19,
+            "transport_success": False,
+            "object_translation_m": 1.0,
+            "attachment_calls": 1,
+            "object_pose_writes": 1,
+            "collision_frames": 1,
+            "dropped": True,
+            "infrastructure_error": "RuntimeError: failed",
+        }
+
+        for key, value in invalid_values.items():
+            with self.subTest(key=key):
+                record = dict(VALID_CENTER_GRASP_TRANSPORT_RECORD)
+                record[key] = value
+                self.assertIn(
+                    key,
+                    gate_module.center_grasp_transport_failures(record),
+                )
+                self.assertFalse(
+                    gate_module.center_grasp_transport_accepted(record)
+                )
+
+    def test_forward_carry_target_moves_toward_object_by_requested_distance(self):
+        self.assertTrue(hasattr(gate_module, "forward_carry_target"))
+
+        target = gate_module.forward_carry_target(
+            base_xy=np.array([8.0, 4.6]),
+            object_xy=np.array([7.0, 4.6]),
+            distance_m=0.2,
+        )
+
+        np.testing.assert_allclose(target, [7.8, 4.6])
+
+    def test_zero_carry_distance_keeps_current_base_position(self):
+        target = gate_module.forward_carry_target(
+            base_xy=np.array([8.0, 4.6]),
+            object_xy=np.array([8.0, 4.6]),
+            distance_m=0.0,
+        )
+
+        np.testing.assert_allclose(target, [8.0, 4.6])
+
+    def test_invalid_carry_distance_and_direction_are_rejected(self):
+        with self.assertRaisesRegex(ValueError, "distance_m"):
+            gate_module.forward_carry_target(
+                base_xy=np.array([8.0, 4.6]),
+                object_xy=np.array([7.0, 4.6]),
+                distance_m=-0.1,
+            )
+        with self.assertRaisesRegex(ValueError, "distance_m"):
+            gate_module.forward_carry_target(
+                base_xy=np.array([8.0, 4.6]),
+                object_xy=np.array([7.0, 4.6]),
+                distance_m=np.nan,
+            )
+        with self.assertRaisesRegex(ValueError, "must differ"):
+            gate_module.forward_carry_target(
+                base_xy=np.array([8.0, 4.6]),
+                object_xy=np.array([8.0, 4.6]),
+                distance_m=0.1,
+            )
+
+
 class L1CradleGateTests(unittest.TestCase):
     def test_geometry_snapshot_includes_all_gripper_geometries(self):
         source = inspect.getsource(geometry_snapshot)
@@ -269,6 +370,13 @@ class L1CradleGateTests(unittest.TestCase):
 
 
 class CenterRegraspSequenceTests(unittest.TestCase):
+    def test_physical_transport_runs_only_after_closed_hold(self):
+        source = inspect.getsource(_center_regrasp_probe)
+
+        hold_index = source.index('"hold_center_grasp"')
+        transport_index = source.index("run_physical_transport(")
+        self.assertLess(hold_index, transport_index)
+
     def test_contact_constrained_close_is_guarded_after_failed_approach(self):
         source = inspect.getsource(_center_regrasp_probe)
 
@@ -651,6 +759,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertFalse(args.orientation_joint_seed_include_torso)
         self.assertAlmostEqual(args.orientation_joint_seed_torso_margin_m, 0.005)
         self.assertAlmostEqual(args.regrasp_base_advance_m, 0.0)
+        self.assertAlmostEqual(args.center_carry_distance_m, 0.0)
 
 
 class OrientationCommandTests(unittest.TestCase):
