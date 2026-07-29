@@ -393,6 +393,25 @@ def compensated_base_reset_step(
     )
 
 
+def projected_planar_motion(
+    delta: object,
+    *,
+    direction: object,
+) -> tuple[float, float]:
+    """Split planar motion into signed progress and orthogonal drift."""
+    planar_delta = np.asarray(delta, dtype=float).reshape(2)
+    axis = np.asarray(direction, dtype=float).reshape(2)
+    if not np.all(np.isfinite(planar_delta)) or not np.all(np.isfinite(axis)):
+        raise ValueError("delta and direction must be finite")
+    norm = float(np.linalg.norm(axis))
+    if norm <= 1e-12:
+        raise ValueError("direction must be non-zero")
+    axis = axis / norm
+    progress = float(np.dot(planar_delta, axis))
+    lateral = float(np.linalg.norm(planar_delta - progress * axis))
+    return progress, lateral
+
+
 def allocate_segment_steps(*, total_steps: int, segment_count: int) -> tuple[int, ...]:
     """Distribute a fixed positive waypoint budget across path segments."""
     if (
@@ -1798,6 +1817,7 @@ def _center_regrasp_probe(
     transport_result = None
     transport_object_translation = 0.0
     transport_base_translation = 0.0
+    stroke_projected_progress = 0.0
     if orientation_joint_seed and not align_closure_axes:
         raise ValueError("orientation_joint_seed requires align_closure_axes")
 
@@ -3182,14 +3202,14 @@ def _center_regrasp_probe(
                                             stroke_end_object[:2]
                                             - stroke_start_object[:2]
                                         )
-                                        projected_progress = float(
-                                            np.dot(stroke_delta, stroke_direction)
-                                        )
-                                        lateral_drift = float(
-                                            np.linalg.norm(
-                                                stroke_delta
-                                                - projected_progress * stroke_direction
+                                        projected_progress, lateral_drift = (
+                                            projected_planar_motion(
+                                                stroke_delta,
+                                                direction=stroke_direction,
                                             )
+                                        )
+                                        stroke_projected_progress = (
+                                            projected_progress
                                         )
                                         stroke_stage.update(
                                             {
@@ -3347,12 +3367,15 @@ def _center_regrasp_probe(
                                                 reset_collision
                                                 or not reset_grasped
                                                 or not reset_height_safe
-                                                or maximum_object_drift > 0.03
                                                 or maximum_gripper_drift > 0.03
                                             ):
                                                 break
                                         reset_end_base = np.asarray(
                                             backend.get_base_pose()[0], dtype=float
+                                        )
+                                        reset_end_object = np.asarray(
+                                            raw_env.sim.data.body_xpos[body_id],
+                                            dtype=float,
                                         )
                                         reset_translation = float(
                                             np.dot(
@@ -3360,14 +3383,27 @@ def _center_regrasp_probe(
                                                 reset_direction,
                                             )
                                         )
+                                        (
+                                            reset_object_progress,
+                                            reset_object_lateral_drift,
+                                        ) = projected_planar_motion(
+                                            reset_end_object[:2]
+                                            - reset_start_object[:2],
+                                            direction=reset_direction,
+                                        )
+                                        macro_object_progress = float(
+                                            stroke_projected_progress
+                                            + reset_object_progress
+                                        )
                                         reset_success = bool(
                                             reset_translation
                                             >= float(center_carry_base_reset_m) - 1e-4
                                             and not reset_collision
                                             and reset_grasped
                                             and reset_height_safe
-                                            and maximum_object_drift <= 0.03
                                             and maximum_gripper_drift <= 0.03
+                                            and reset_object_lateral_drift <= 0.03
+                                            and macro_object_progress >= 0.02
                                         )
                                         stage_results.append(
                                             {
@@ -3381,6 +3417,15 @@ def _center_regrasp_probe(
                                                 ),
                                                 "maximum_object_drift_m": (
                                                     maximum_object_drift
+                                                ),
+                                                "reset_object_progress_m": (
+                                                    reset_object_progress
+                                                ),
+                                                "reset_object_lateral_drift_m": (
+                                                    reset_object_lateral_drift
+                                                ),
+                                                "macro_object_progress_m": (
+                                                    macro_object_progress
                                                 ),
                                                 "maximum_gripper_drift_m": (
                                                     maximum_gripper_drift

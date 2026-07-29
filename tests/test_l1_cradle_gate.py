@@ -34,6 +34,7 @@ from scripts.run_l1_cradle_gate import (
     parse_args,
     push_gate_accepted,
     push_gate_failures,
+    projected_planar_motion,
     scheduled_orientation_action_limit,
     trailing_corner_seat_targets,
 )
@@ -399,6 +400,22 @@ class CenterGraspTransportTests(unittest.TestCase):
         np.testing.assert_allclose(base_command, [0.04, 0.0, 0.0], atol=1e-9)
         np.testing.assert_allclose(arm_deltas["right"], [0.012, 0.0, 0.002])
         np.testing.assert_allclose(arm_deltas["left"], [0.010, 0.0, -0.001])
+
+    def test_macro_progress_accounts_for_reset_backslip(self):
+        stroke_progress, stroke_lateral = projected_planar_motion(
+            np.array([-0.086, 0.001]),
+            direction=np.array([-1.0, 0.0]),
+        )
+        reset_progress, reset_lateral = projected_planar_motion(
+            np.array([0.031, 0.004]),
+            direction=np.array([-1.0, 0.0]),
+        )
+
+        self.assertAlmostEqual(stroke_progress, 0.086)
+        self.assertAlmostEqual(reset_progress, -0.031)
+        self.assertAlmostEqual(stroke_progress + reset_progress, 0.055)
+        self.assertAlmostEqual(stroke_lateral, 0.001)
+        self.assertAlmostEqual(reset_lateral, 0.004)
 
 
 class L1CradleGateTests(unittest.TestCase):

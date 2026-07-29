@@ -1,3 +1,4 @@
 iteration	variant	arm_stroke_m	arm_lift_m	projected_object_progress_m	lateral_object_drift_m	base_reset_m	base_translation_m	max_object_reset_drift_m	max_gripper_reset_drift_m	bilateral_grasp	height_safe	collision_frames	status
 1	stroke-plus-uncompensated-drag	0.08	0.05	0.086006	0.000835	-	-	-	-	true	true	0	keep:arm-stroke; discard:ordinary-base-drag
 2	feedforward-base-reset	0.08	0.05	0.086006	0.000835	0.08	0.031999	0.002777	0.030708	true	true	0	discard:gripper-drift-threshold
+3	closed-loop-base-reset	0.08	0.05	0.086006	0.000835	0.08	0.055993	0.030965	0.020432	true	true	0	discard:absolute-object-drift-threshold; net macro progress remained positive
