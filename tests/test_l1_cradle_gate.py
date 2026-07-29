@@ -773,6 +773,13 @@ class L1TableEdgeUndercutTests(unittest.TestCase):
         self.assertIn("table_edge_undercut_no_grasp", source)
         self.assertIn("_table_edge_undercut_probe(", source)
 
+    def test_clearance_target_is_captured_after_optional_base_advance(self):
+        source = inspect.getsource(gate_module._table_edge_undercut_probe)
+
+        advance_index = source.index("success = execute_base_advance()")
+        capture_index = source.index("initial_eef = right_eef_position()")
+        self.assertLess(advance_index, capture_index)
+
 
 class JointSeedMathTests(unittest.TestCase):
     def test_joint_seed_joint_names_append_only_the_official_torso_joint(self):

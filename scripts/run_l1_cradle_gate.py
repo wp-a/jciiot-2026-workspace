@@ -2158,24 +2158,26 @@ def _table_edge_undercut_probe(
         )
         return success
 
-    initial_eef = right_eef_position()
-    clearance_target = initial_eef.copy()
-    clearance_target[2] = max(clearance_target[2], float(targets["outside"][2]))
-    sequence = (
-        (
-            "raise_open_clearance",
-            clearance_target,
-            False,
-            False,
-        ),
-        ("move_open_outside", targets["outside"], False, False),
-        ("descend_open_outside", targets["below"], False, False),
-        ("inset_open_under_overhang", targets["undercut"], False, False),
-        ("raise_open_into_support", targets["raise"], True, True),
-    )
     success = execute_base_advance()
     failure_stage = None if success else "advance_base_for_undercut"
     if success:
+        initial_eef = right_eef_position()
+        clearance_target = initial_eef.copy()
+        clearance_target[2] = max(
+            clearance_target[2], float(targets["outside"][2])
+        )
+        sequence = (
+            (
+                "raise_open_clearance",
+                clearance_target,
+                False,
+                False,
+            ),
+            ("move_open_outside", targets["outside"], False, False),
+            ("descend_open_outside", targets["below"], False, False),
+            ("inset_open_under_overhang", targets["undercut"], False, False),
+            ("raise_open_into_support", targets["raise"], True, True),
+        )
         for stage, target, allow_contact, require_support in sequence:
             if not execute_stage(
                 stage,
