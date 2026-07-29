@@ -576,7 +576,7 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
 
 
 class InchwormTransportRunnerTests(unittest.TestCase):
-    def test_one_macro_cycle_moves_object_then_resets_base(self):
+    def test_stops_after_arm_stroke_when_measured_object_progress_reaches_target(self):
         module = load_module()
         driver = FakeInchwormDriver()
         config = module.InchwormCarryConfig(
@@ -600,11 +600,11 @@ class InchwormTransportRunnerTests(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertEqual(result["cycle_count"], 1)
         self.assertGreaterEqual(result["object_progress_m"], 0.05)
-        self.assertAlmostEqual(result["base_translation_m"], 0.08, places=6)
+        self.assertAlmostEqual(result["base_translation_m"], 0.0, places=6)
         self.assertTrue(
             any(np.linalg.norm(step["base_step"]) == 0.0 for step in driver.steps)
         )
-        self.assertTrue(
+        self.assertFalse(
             any(np.linalg.norm(step["base_step"]) > 0.0 for step in driver.steps)
         )
 
@@ -633,6 +633,8 @@ class InchwormTransportRunnerTests(unittest.TestCase):
         self.assertEqual(result["cycle_count"], 2)
         self.assertGreaterEqual(result["object_progress_m"], 0.12)
         self.assertGreaterEqual(result["cycles"][1]["total_progress_m"], 0.12)
+        self.assertAlmostEqual(result["base_translation_m"], 0.08, places=6)
+        self.assertEqual(result["cycles"][1]["reset_steps"], 0)
 
 
 class CradleTransferTests(unittest.TestCase):

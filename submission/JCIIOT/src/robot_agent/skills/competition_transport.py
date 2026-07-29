@@ -1058,8 +1058,32 @@ def run_inchworm_transport(
             or arm_lateral > config.max_lateral_drift
         ):
             cycle_failure = "arm_progress"
+        total_arm_progress, total_arm_lateral = _inchworm_planar_motion(
+            np.asarray(arm_end["object_pos"], dtype=float)[:2] - start_object[:2],
+            direction,
+        )
+        if cycle_failure is None and total_arm_lateral > config.max_lateral_drift:
+            cycle_failure = "arm_progress"
         if cycle_failure is not None:
             failure_stage = cycle_failure
+            break
+        if total_arm_progress >= distance:
+            cycles.append(
+                {
+                    "cycle": cycle_index + 1,
+                    "arm_steps": arm_steps,
+                    "reset_steps": 0,
+                    "vertical_adjustment_m": vertical_adjustment,
+                    "arm_progress_m": arm_progress,
+                    "macro_progress_m": arm_progress,
+                    "total_progress_m": total_arm_progress,
+                    "macro_lateral_drift_m": arm_lateral,
+                    "max_gripper_reset_drift_m": 0.0,
+                    "base_reset_translation_m": 0.0,
+                }
+            )
+            success = True
+            failure_stage = None
             break
 
         reset_start = driver.observe(backend, object_name)
