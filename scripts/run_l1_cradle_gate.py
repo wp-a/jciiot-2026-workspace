@@ -2686,7 +2686,6 @@ def _center_regrasp_probe(
                         squeeze_targets,
                         max_steps=120,
                         gripper_value=-1.0,
-                        stop_bilateral_contact_steps=1,
                     ):
                         failure_stage = "squeeze_center_walls"
                     else:

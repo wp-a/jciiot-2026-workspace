@@ -104,6 +104,15 @@ class L1CradleGateTests(unittest.TestCase):
 
 
 class CenterRegraspSequenceTests(unittest.TestCase):
+    def test_complete_wall_squeeze_does_not_stop_on_first_contact(self):
+        source = inspect.getsource(_center_regrasp_probe)
+
+        squeeze_call = source[
+            source.index('if not execute_stage(\n                        "squeeze_center_walls"') :
+            source.index('failure_stage = "squeeze_center_walls"')
+        ]
+        self.assertNotIn("stop_bilateral_contact_steps", squeeze_call)
+
     def test_center_regrasp_imports_its_base_advance_dependencies(self):
         source = inspect.getsource(_center_regrasp_probe)
 
