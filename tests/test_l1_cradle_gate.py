@@ -967,6 +967,7 @@ class L1TableEdgeUndercutTests(unittest.TestCase):
         self.assertIn("arm_action[3:6] = orientation_action", source)
         self.assertIn('"orient_open_fork_at_clearance"', source)
         self.assertIn("orient_before_descent", source)
+        self.assertIn('"safe_unrotated_inset_plateau"', source)
 
 
 class JointSeedMathTests(unittest.TestCase):

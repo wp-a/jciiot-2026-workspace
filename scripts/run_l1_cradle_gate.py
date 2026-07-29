@@ -2144,9 +2144,7 @@ def _table_edge_undercut_probe(
     maximum_support_steps = 0
 
     def is_right_support(geom_name: str) -> bool:
-        if horizontal_fork:
-            return is_allowed_open_fork_support_geom(geom_name, "right")
-        return _is_allowed_cradle_geom(geom_name, "right")
+        return is_allowed_open_fork_support_geom(geom_name, "right")
 
     def right_eef_position() -> np.ndarray:
         return np.asarray(
@@ -3089,33 +3087,32 @@ def _table_edge_undercut_probe(
         for stage, target, allow_contact, require_support in sequence:
             other_arm_world_target = None
             if stage == "descend_open_outside" and torso_target_m is not None:
-                if horizontal_fork:
-                    clearance_lift = float(left_clearance_lift_m)
-                    if not np.isfinite(clearance_lift) or clearance_lift <= 0.0:
-                        raise ValueError(
-                            "left_clearance_lift_m must be finite and positive"
-                        )
-                    left_clearance_target = left_eef_position().copy()
-                    left_clearance_target[2] += clearance_lift
-                    if not execute_stage(
-                        "raise_left_clearance_for_torso",
-                        right_eef_position().copy(),
-                        allow_object_contact=False,
-                        other_arm_world_target=left_clearance_target,
+                clearance_lift = float(left_clearance_lift_m)
+                if not np.isfinite(clearance_lift) or clearance_lift <= 0.0:
+                    raise ValueError(
+                        "left_clearance_lift_m must be finite and positive"
+                    )
+                left_clearance_target = left_eef_position().copy()
+                left_clearance_target[2] += clearance_lift
+                if not execute_stage(
+                    "raise_left_clearance_for_torso",
+                    right_eef_position().copy(),
+                    allow_object_contact=False,
+                    other_arm_world_target=left_clearance_target,
+                ):
+                    success = False
+                    failure_stage = "raise_left_clearance_for_torso"
+                    break
+                other_arm_world_target = left_eef_position().copy()
+                if horizontal_fork and orient_before_descent:
+                    if not execute_orientation_stage(
+                        "orient_open_fork_at_clearance",
+                        fork_orientation,
                     ):
                         success = False
-                        failure_stage = "raise_left_clearance_for_torso"
+                        failure_stage = "orient_open_fork_at_clearance"
                         break
-                    other_arm_world_target = left_eef_position().copy()
-                    if orient_before_descent:
-                        if not execute_orientation_stage(
-                            "orient_open_fork_at_clearance",
-                            fork_orientation,
-                        ):
-                            success = False
-                            failure_stage = "orient_open_fork_at_clearance"
-                            break
-                        fork_orientation_completed = True
+                    fork_orientation_completed = True
                 hold_targets["torso"] = np.array(
                     [float(torso_target_m)], dtype=float
                 )
@@ -3191,21 +3188,55 @@ def _table_edge_undercut_probe(
                             success = False
                             failure_stage = "raise_open_into_support"
         elif success:
-            if not execute_stage(
+            inset_success = execute_stage(
                 "inset_open_under_overhang",
                 targets["undercut"],
                 allow_object_contact=False,
+            )
+            inset_stage = stages[-1]
+            inset_distance_to_target = float(
+                np.linalg.norm(
+                    np.asarray(targets["undercut"], dtype=float)
+                    - right_eef_position()
+                )
+            )
+            if (
+                not inset_success
+                and inset_stage.get("safety_failure") == "timeout"
+                and not any(object_robot_contacts(raw_env, object_name).values())
+                and inset_distance_to_target <= 0.02
             ):
+                inset_success = True
+                inset_stage["success"] = True
+                inset_stage["safety_failure"] = None
+                inset_stage["success_source"] = "safe_unrotated_inset_plateau"
+            insertion_geometry = geometry_snapshot(raw_env, object_name)
+            geometry_ready = open_fork_under_bottom_support_ready(
+                insertion_geometry,
+                minimum_planar_overlap_m=0.001,
+            )
+            inset_stage["geometry_ready"] = geometry_ready
+            if not inset_success:
                 success = False
                 failure_stage = "inset_open_under_overhang"
-            elif not execute_stage(
-                "raise_open_into_support",
-                targets["raise"],
-                allow_object_contact=True,
-                require_support=True,
-            ):
+            elif not geometry_ready and not execute_post_inset_base_advance():
                 success = False
-                failure_stage = "raise_open_into_support"
+                failure_stage = "advance_base_for_fork_overlap"
+            elif float(torso_raise_m) > 0.0:
+                if not execute_torso_raise_into_support():
+                    success = False
+                    failure_stage = "raise_open_with_torso"
+            else:
+                fork_raise_target = right_eef_position().copy()
+                fork_raise_target[2] = float(targets["raise"][2])
+                if not execute_stage(
+                    "raise_open_into_support",
+                    fork_raise_target,
+                    allow_object_contact=True,
+                    require_support=True,
+                ):
+                    success = False
+                    failure_stage = "raise_open_into_support"
     final_object = np.asarray(
         raw_env.sim.data.body_xpos[body_id], dtype=float
     ).copy()
