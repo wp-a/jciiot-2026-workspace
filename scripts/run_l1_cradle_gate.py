@@ -2268,15 +2268,29 @@ def _table_edge_undercut_probe(
         if target_torso <= start_torso + 1e-6:
             raise ValueError("torso_raise_m has no room inside the joint range")
         hold_targets["torso"] = np.array([target_torso], dtype=float)
+        fork_lift_target = right_eef_position().copy()
+        fork_lift_target[2] += requested_raise
         safety_failure = None
         stable_support_steps = 0
         target_reached_steps = 0
         success = False
         for local_step in range(240):
             robot.composite_controller.update_state()
+            current_eef = right_eef_position()
+            controller_delta = helpers["world_delta"](
+                robot,
+                "right",
+                fork_lift_target - current_eef,
+            )
+            arm_action = helpers["arm_action"](
+                robot,
+                "right",
+                controller_delta,
+                0.12,
+            )
             action = helpers["build_action"](
                 robot,
-                arm_actions={},
+                arm_actions={"right": arm_action},
                 gripper_value=-1.0,
                 hold_targets=hold_targets,
             )
@@ -2307,8 +2321,13 @@ def _table_edge_undercut_probe(
                 stable_support_steps,
             )
             torso_reached = abs(target_torso - measured_torso) <= 0.005
+            fork_reached = bool(
+                float(np.linalg.norm(fork_lift_target - measured_eef)) <= 0.012
+            )
             target_reached_steps = (
-                target_reached_steps + 1 if torso_reached else 0
+                target_reached_steps + 1
+                if torso_reached and fork_reached
+                else 0
             )
             collision = bool((info or {}).get("has_judge_collision", False))
             collision_steps += int(collision)
@@ -2319,6 +2338,7 @@ def _table_edge_undercut_probe(
                     "start_torso_position": start_torso,
                     "target_torso_position": target_torso,
                     "torso_position": measured_torso,
+                    "target_eef_position": fork_lift_target.tolist(),
                     "eef_position": measured_eef.tolist(),
                     "object_position": object_position.tolist(),
                     "object_lift_m": object_lift_m,

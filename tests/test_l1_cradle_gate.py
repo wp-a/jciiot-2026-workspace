@@ -959,6 +959,8 @@ class L1TableEdgeUndercutTests(unittest.TestCase):
         self.assertIn('"advance_base_for_fork_overlap"', source)
         self.assertIn("fork_raise_target = right_eef_position().copy()", source)
         self.assertIn('"raise_open_with_torso"', source)
+        self.assertIn("fork_lift_target = right_eef_position().copy()", source)
+        self.assertIn('arm_actions={"right": arm_action}', source)
 
 
 class JointSeedMathTests(unittest.TestCase):
