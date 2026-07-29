@@ -1778,6 +1778,7 @@ def _posture_locked_carry_probe(
     world_direction_x: float | None,
     world_direction_y: float | None,
     table_object_z: float,
+    max_linear_m_s: float,
     _transport_module=None,
     _gripper_position=None,
     _contact_reader=object_robot_contacts,
@@ -1785,12 +1786,17 @@ def _posture_locked_carry_probe(
     """Measure one attachment-free physical carry under posture-locked navigation."""
     requested_distance = float(distance_m)
     table_z = float(table_object_z)
+    requested_max_linear = float(max_linear_m_s)
     if (
         not np.isfinite(requested_distance)
         or requested_distance <= 0.0
         or not np.isfinite(table_z)
+        or not np.isfinite(requested_max_linear)
+        or requested_max_linear <= 0.0
     ):
-        raise ValueError("carry distance must be positive and table height finite")
+        raise ValueError(
+            "carry distance and max speed must be positive and table height finite"
+        )
     if (world_direction_x is None) != (world_direction_y is None):
         raise ValueError("both world direction components must be provided together")
 
@@ -1867,6 +1873,7 @@ def _posture_locked_carry_probe(
     legacy_update_was_local = "_update_held_crate_position" in backend_dict
     local_recorder = backend_dict.get("_record_trajectory_frame")
     local_legacy_update = backend_dict.get("_update_held_crate_position")
+    original_max_linear = float(getattr(backend, "_max_linear"))
     legacy_calls = 0
 
     def record_and_sample(*args: object, **kwargs: object):
@@ -1882,6 +1889,7 @@ def _posture_locked_carry_probe(
 
     setattr(backend, "_record_trajectory_frame", record_and_sample)
     setattr(backend, "_update_held_crate_position", audited_legacy_update)
+    setattr(backend, "_max_linear", requested_max_linear)
     navigation_reached = False
     try:
         with transport_attachment_audit(raw_env, _transport_module) as audit:
@@ -1909,6 +1917,7 @@ def _posture_locked_carry_probe(
             setattr(backend, "_update_held_crate_position", local_legacy_update)
         else:
             delattr(backend, "_update_held_crate_position")
+        setattr(backend, "_max_linear", original_max_linear)
 
     end_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
     end_object = object_position()
@@ -1966,6 +1975,7 @@ def _posture_locked_carry_probe(
     return {
         "posture_carry_success": success,
         "requested_distance_m": requested_distance,
+        "max_linear_m_s": requested_max_linear,
         "world_direction": direction.tolist(),
         "target_base_xy": target_base_xy.tolist(),
         "navigation_reached": navigation_reached,
@@ -6036,6 +6046,9 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                             args.posture_locked_carry_world_direction_y
                         ),
                         table_object_z=pre_grasp_z,
+                        max_linear_m_s=(
+                            args.posture_locked_carry_max_linear_m_s
+                        ),
                     )
                     for key in _POSTURE_CARRY_REQUIRED_FIELDS:
                         record[key] = probe[key]
@@ -6325,6 +6338,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--posture-locked-carry-distance-m",
         type=float,
         default=0.0,
+    )
+    parser.add_argument(
+        "--posture-locked-carry-max-linear-m-s",
+        type=float,
+        default=0.04,
     )
     parser.add_argument("--posture-locked-carry-world-direction-x", type=float)
     parser.add_argument("--posture-locked-carry-world-direction-y", type=float)

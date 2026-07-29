@@ -335,7 +335,9 @@ class PostureLockedCarryProbeTests(unittest.TestCase):
             )
             self._held_crate_name = "box" if legacy_held else None
             self._held_crate_body_id = 0 if legacy_held else None
+            self._max_linear = 0.70
             self.follow_calls = []
+            self.follow_speeds = []
             self.record_calls = 0
 
         def get_base_pose(self):
@@ -353,6 +355,7 @@ class PostureLockedCarryProbeTests(unittest.TestCase):
 
         def follow_path(self, path, **kwargs):
             self.follow_calls.append((path, kwargs))
+            self.follow_speeds.append(self._max_linear)
             self.base_xy = np.asarray(path[0], dtype=float).copy()
             displacement = np.array([0.09, 0.0, 0.0], dtype=float)
             self.env.sim.data.body_xpos[0] += displacement
@@ -388,12 +391,15 @@ class PostureLockedCarryProbeTests(unittest.TestCase):
             world_direction_x=None,
             world_direction_y=None,
             table_object_z=1.0,
+            max_linear_m_s=0.04,
             _transport_module=self.fake_transport_module(),
             _gripper_position=self.gripper_position(backend),
             _contact_reader=self.contacts,
         )
 
         self.assertEqual(len(backend.follow_calls), 1)
+        self.assertEqual(backend.follow_speeds, [0.04])
+        self.assertAlmostEqual(backend._max_linear, 0.70)
         np.testing.assert_allclose(backend.follow_calls[0][0][0], [-0.9, 0.0])
         self.assertAlmostEqual(result["projected_object_progress_m"], 0.09)
         self.assertAlmostEqual(result["lateral_object_drift_m"], 0.0)
@@ -413,6 +419,7 @@ class PostureLockedCarryProbeTests(unittest.TestCase):
             world_direction_x=1.0,
             world_direction_y=0.0,
             table_object_z=1.0,
+            max_linear_m_s=0.04,
             _transport_module=self.fake_transport_module(),
             _gripper_position=self.gripper_position(backend),
             _contact_reader=self.contacts,
@@ -1618,6 +1625,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.orientation_joint_seed_torso_margin_m, 0.005)
         self.assertAlmostEqual(args.regrasp_base_advance_m, 0.0)
         self.assertAlmostEqual(args.posture_locked_carry_distance_m, 0.0)
+        self.assertAlmostEqual(args.posture_locked_carry_max_linear_m_s, 0.04)
         self.assertIsNone(args.posture_locked_carry_world_direction_x)
         self.assertIsNone(args.posture_locked_carry_world_direction_y)
         self.assertAlmostEqual(args.center_carry_distance_m, 0.0)
@@ -1697,6 +1705,8 @@ class JointSeedParserTests(unittest.TestCase):
                 "0.005",
                 "--posture-locked-carry-distance-m",
                 "0.10",
+                "--posture-locked-carry-max-linear-m-s",
+                "0.02",
                 "--posture-locked-carry-world-direction-x",
                 "-1.0",
                 "--posture-locked-carry-world-direction-y",
@@ -1787,6 +1797,7 @@ class JointSeedParserTests(unittest.TestCase):
 
         self.assertAlmostEqual(args.center_carry_max_linear, 0.005)
         self.assertAlmostEqual(args.posture_locked_carry_distance_m, 0.10)
+        self.assertAlmostEqual(args.posture_locked_carry_max_linear_m_s, 0.02)
         self.assertAlmostEqual(
             args.posture_locked_carry_world_direction_x,
             -1.0,
