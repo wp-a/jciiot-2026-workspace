@@ -897,6 +897,8 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.center_carry_base_reset_m, 0.0)
         self.assertAlmostEqual(args.center_carry_inchworm_distance_m, 0.0)
         self.assertFalse(args.center_carry_inchworm_toward_base)
+        self.assertAlmostEqual(args.center_carry_inchworm_stroke_m, 0.08)
+        self.assertAlmostEqual(args.center_carry_inchworm_reset_m, 0.06)
 
     def test_center_carry_speed_can_be_overridden_for_single_variable_probe(self):
         args = parse_args(
@@ -923,6 +925,10 @@ class JointSeedParserTests(unittest.TestCase):
                 "--center-carry-inchworm-distance-m",
                 "0.06",
                 "--center-carry-inchworm-toward-base",
+                "--center-carry-inchworm-stroke-m",
+                "0.06",
+                "--center-carry-inchworm-reset-m",
+                "0.04",
             ]
         )
 
@@ -934,6 +940,8 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.center_carry_base_reset_m, 0.07)
         self.assertAlmostEqual(args.center_carry_inchworm_distance_m, 0.06)
         self.assertTrue(args.center_carry_inchworm_toward_base)
+        self.assertAlmostEqual(args.center_carry_inchworm_stroke_m, 0.06)
+        self.assertAlmostEqual(args.center_carry_inchworm_reset_m, 0.04)
 
 
 class OrientationCommandTests(unittest.TestCase):

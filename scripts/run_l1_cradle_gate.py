@@ -1791,6 +1791,8 @@ def _center_regrasp_probe(
     center_carry_base_reset_m: float = 0.0,
     center_carry_inchworm_distance_m: float = 0.0,
     center_carry_inchworm_toward_base: bool = False,
+    center_carry_inchworm_stroke_m: float = 0.08,
+    center_carry_inchworm_reset_m: float = 0.06,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import (
         OfficialScriptedGraspDriver,
@@ -3478,10 +3480,14 @@ def _center_regrasp_probe(
                                                 float(table_object_z) + 0.10
                                             ),
                                             config=InchwormCarryConfig(
-                                                stroke_distance=0.08,
+                                                stroke_distance=(
+                                                    center_carry_inchworm_stroke_m
+                                                ),
                                                 stroke_vertical_feedforward=0.015,
                                                 stroke_height_gain=0.75,
-                                                reset_distance=0.06,
+                                                reset_distance=(
+                                                    center_carry_inchworm_reset_m
+                                                ),
                                                 reset_max_linear=0.04,
                                                 max_cycles=max(
                                                     2,
@@ -3817,6 +3823,12 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                         center_carry_inchworm_toward_base=(
                             args.center_carry_inchworm_toward_base
                         ),
+                        center_carry_inchworm_stroke_m=(
+                            args.center_carry_inchworm_stroke_m
+                        ),
+                        center_carry_inchworm_reset_m=(
+                            args.center_carry_inchworm_reset_m
+                        ),
                     )
                     record["mode"] = (
                         "center_grasp_physical_transport"
@@ -3988,6 +4000,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--center-carry-inchworm-toward-base", action="store_true"
+    )
+    parser.add_argument(
+        "--center-carry-inchworm-stroke-m", type=float, default=0.08
+    )
+    parser.add_argument(
+        "--center-carry-inchworm-reset-m", type=float, default=0.06
     )
     parser.add_argument("--align-closure-axes", action="store_true")
     parser.add_argument("--orientation-max-action", type=float, default=0.30)
