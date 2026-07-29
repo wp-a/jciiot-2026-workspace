@@ -343,7 +343,7 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
         result = self.run_transport(driver)
 
         self.assertEqual(result["start_object_pos"], [0.5, 0.0, 1.0])
-        self.assertEqual(result["final_object_pos"], [0.509, 0.0, 1.0])
+        self.assertEqual(result["final_object_pos"], [0.5, 0.0, 1.0])
         self.assertEqual(sorted(result["start_gripper_positions"]), ["left", "right"])
         self.assertEqual(sorted(result["final_gripper_positions"]), ["left", "right"])
         self.assertAlmostEqual(result["max_planar_grasp_drift_m"], 0.0)
@@ -381,7 +381,7 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
         self.assertEqual(result["failure_stage"], "timeout")
         self.assertEqual(len(driver.steps), 3)
 
-    def test_arms_lead_object_before_base_catches_up(self):
+    def test_direct_base_step_does_not_add_planar_arm_lead(self):
         driver = FakePhysicalTransportDriver()
         config = self.module.PhysicalCarryConfig(
             waypoint_tolerance=0.02,
@@ -398,17 +398,10 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
         )
 
         self.assertTrue(result["success"])
-        self.assertEqual(len(driver.steps), 2)
-        np.testing.assert_allclose(driver.steps[0]["base_command"], np.zeros(3))
-        self.assertGreater(driver.steps[0]["arm_world_deltas"]["right"][0], 0.0)
-        self.assertGreater(driver.steps[1]["base_command"][0], 0.0)
+        self.assertEqual(len(driver.steps), 1)
+        self.assertGreater(driver.steps[0]["base_command"][0], 0.0)
         np.testing.assert_allclose(
-            driver.steps[1]["arm_world_deltas"]["right"][:2],
-            np.zeros(2),
-        )
-        self.assertAlmostEqual(
-            driver.object_xy[0] - 0.5,
-            driver.steps[0]["arm_world_deltas"]["right"][0],
+            driver.steps[0]["arm_world_deltas"]["right"][:2], np.zeros(2)
         )
 
     def test_object_slip_triggers_a_physical_height_recovery(self):

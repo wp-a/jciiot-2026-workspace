@@ -780,10 +780,7 @@ def run_physical_transport(
             base_command=command,
             control_dt=config.base_control_dt,
         ) - base_xy
-        phases = (
-            (np.zeros(3, dtype=float), world_step),
-            (command, np.zeros(2, dtype=float)),
-        )
+        phases = ((command, np.zeros(2, dtype=float)),)
         abort = False
         for phase_base_command, phase_arm_xy in phases:
             if steps >= config.max_steps:
