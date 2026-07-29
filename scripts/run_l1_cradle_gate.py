@@ -261,7 +261,11 @@ def normalized_osc_orientation_command(
 
     local_delta = origin.T @ world_delta @ origin
     rotation_vector = _rotation_matrix_to_axis_angle(local_delta)
-    return np.clip(rotation_vector / orientation_scale, -limit, limit)
+    command = rotation_vector / orientation_scale
+    command_norm = float(np.linalg.norm(command))
+    if command_norm > limit:
+        command *= limit / command_norm
+    return command
 
 
 _ORIENTATION_REQUIRED_FIELDS = (

@@ -154,6 +154,31 @@ class OrientationCommandTests(unittest.TestCase):
 
         np.testing.assert_allclose(command, np.zeros(3), atol=1e-12)
 
+    def test_osc_orientation_command_preserves_axis_when_limited(self):
+        axis = np.array([1.0, 0.0, 1.0]) / np.sqrt(2.0)
+        angle = np.pi / 2.0
+        skew = np.array(
+            [
+                [0.0, -axis[2], axis[1]],
+                [axis[2], 0.0, -axis[0]],
+                [-axis[1], axis[0], 0.0],
+            ]
+        )
+        rotation = np.eye(3) + skew * np.sin(angle) + (skew @ skew) * (
+            1.0 - np.cos(angle)
+        )
+
+        command = normalized_osc_orientation_command(
+            world_rotation_delta=rotation,
+            controller_origin_rotation=np.eye(3),
+            output_min=np.array([-0.05] * 3 + [-0.5] * 3),
+            output_max=np.array([0.05] * 3 + [0.5] * 3),
+            max_action=0.30,
+        )
+
+        self.assertAlmostEqual(float(np.linalg.norm(command)), 0.30)
+        np.testing.assert_allclose(command / np.linalg.norm(command), axis, atol=1e-8)
+
     def test_osc_orientation_command_rejects_invalid_scaling(self):
         common = {
             "world_rotation_delta": np.eye(3),
