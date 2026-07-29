@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
+import scripts.run_l1_cradle_gate as gate_module
 from scripts.run_l1_cradle_gate import (
     _center_regrasp_probe,
     allocate_segment_steps,
@@ -79,6 +80,164 @@ VALID_JOINT_SEED_RECORD = {
 }
 
 
+class FingerpadBracketTests(unittest.TestCase):
+    def test_reads_official_fingerpad_geom_positions(self):
+        self.assertTrue(hasattr(gate_module, "fingerpad_world_positions"))
+        names = {
+            "left_left_pad": 0,
+            "left_right_pad": 1,
+            "right_left_pad": 2,
+            "right_right_pad": 3,
+        }
+        model = SimpleNamespace(geom_name2id=names.__getitem__)
+        data = SimpleNamespace(
+            geom_xpos=np.array(
+                [
+                    [0.0, -0.25, 1.0],
+                    [0.0, -0.15, 1.0],
+                    [0.0, 0.15, 1.0],
+                    [0.0, 0.25, 1.0],
+                ]
+            )
+        )
+        raw_env = SimpleNamespace(sim=SimpleNamespace(model=model, data=data))
+        robot = SimpleNamespace(
+            gripper={
+                "left": SimpleNamespace(
+                    important_geoms={
+                        "left_fingerpad": ["left_left_pad"],
+                        "right_fingerpad": ["left_right_pad"],
+                    }
+                ),
+                "right": SimpleNamespace(
+                    important_geoms={
+                        "left_fingerpad": ["right_left_pad"],
+                        "right_fingerpad": ["right_right_pad"],
+                    }
+                ),
+            }
+        )
+
+        positions = gate_module.fingerpad_world_positions(raw_env, robot)
+
+        np.testing.assert_allclose(
+            positions["left"],
+            [[0.0, -0.25, 1.0], [0.0, -0.15, 1.0]],
+        )
+        np.testing.assert_allclose(
+            positions["right"],
+            [[0.0, 0.15, 1.0], [0.0, 0.25, 1.0]],
+        )
+
+    def test_reads_extreme_object_wall_centers_along_axis(self):
+        self.assertTrue(hasattr(gate_module, "opposed_object_wall_centers"))
+        geom_names = ["bottom", "front", "back", "robot"]
+        model = SimpleNamespace(
+            nbody=2,
+            body_parentid=np.array([0, 0]),
+            ngeom=4,
+            geom_bodyid=np.array([1, 1, 1, 0]),
+            geom_id2name=geom_names.__getitem__,
+        )
+        data = SimpleNamespace(
+            geom_xpos=np.array(
+                [
+                    [0.0, 0.0, 0.9],
+                    [0.0, -0.2, 1.0],
+                    [0.0, 0.2, 1.0],
+                    [0.0, 1.0, 1.0],
+                ]
+            )
+        )
+        raw_env = SimpleNamespace(
+            sim=SimpleNamespace(model=model, data=data),
+            obj_body_id={"box": 1},
+        )
+
+        centers = gate_module.opposed_object_wall_centers(
+            raw_env,
+            "box",
+            separation_axis=np.array([0.0, 1.0, 0.0]),
+        )
+
+        np.testing.assert_allclose(
+            centers,
+            [[0.0, -0.2, 1.0], [0.0, 0.2, 1.0]],
+        )
+
+    def test_distinct_opposed_walls_between_fingerpads_are_ready(self):
+        self.assertTrue(hasattr(gate_module, "fingerpad_bracket_evidence"))
+
+        evidence = gate_module.fingerpad_bracket_evidence(
+            fingerpads={
+                "left": np.array([[0.0, -0.25, 0.0], [0.0, -0.15, 0.0]]),
+                "right": np.array([[0.0, 0.15, 0.0], [0.0, 0.25, 0.0]]),
+            },
+            wall_centers=np.array(
+                [[0.0, -0.20, 0.0], [0.0, 0.20, 0.0]]
+            ),
+            separation_axis=np.array([0.0, 1.0, 0.0]),
+        )
+
+        self.assertTrue(evidence["ready"])
+        self.assertEqual(evidence["arms"]["left"]["wall_index"], 0)
+        self.assertEqual(evidence["arms"]["right"]["wall_index"], 1)
+
+    def test_wall_outside_one_fingerpad_pair_is_not_ready(self):
+        evidence = gate_module.fingerpad_bracket_evidence(
+            fingerpads={
+                "left": np.array([[0.0, -0.30, 0.0], [0.0, -0.25, 0.0]]),
+                "right": np.array([[0.0, 0.15, 0.0], [0.0, 0.25, 0.0]]),
+            },
+            wall_centers=np.array(
+                [[0.0, -0.20, 0.0], [0.0, 0.20, 0.0]]
+            ),
+            separation_axis=np.array([0.0, 1.0, 0.0]),
+        )
+
+        self.assertFalse(evidence["ready"])
+        self.assertFalse(evidence["arms"]["left"]["bracketed"])
+
+    def test_same_wall_assignment_is_not_ready(self):
+        evidence = gate_module.fingerpad_bracket_evidence(
+            fingerpads={
+                "left": np.array([[0.0, -0.25, 0.0], [0.0, -0.15, 0.0]]),
+                "right": np.array([[0.0, -0.24, 0.0], [0.0, -0.16, 0.0]]),
+            },
+            wall_centers=np.array(
+                [[0.0, -0.20, 0.0], [0.0, 0.20, 0.0]]
+            ),
+            separation_axis=np.array([0.0, 1.0, 0.0]),
+        )
+
+        self.assertFalse(evidence["ready"])
+        self.assertFalse(evidence["distinct_walls"])
+
+    def test_invalid_axis_and_nonfinite_coordinates_are_rejected(self):
+        valid_fingerpads = {
+            "left": np.array([[0.0, -0.25, 0.0], [0.0, -0.15, 0.0]]),
+            "right": np.array([[0.0, 0.15, 0.0], [0.0, 0.25, 0.0]]),
+        }
+        walls = np.array([[0.0, -0.20, 0.0], [0.0, 0.20, 0.0]])
+
+        with self.assertRaisesRegex(ValueError, "separation_axis"):
+            gate_module.fingerpad_bracket_evidence(
+                fingerpads=valid_fingerpads,
+                wall_centers=walls,
+                separation_axis=np.zeros(3),
+            )
+        invalid_fingerpads = dict(valid_fingerpads)
+        invalid_fingerpads["left"] = np.array(
+            [[0.0, np.nan, 0.0], [0.0, -0.15, 0.0]]
+        )
+        with self.assertRaisesRegex(ValueError, "fingerpads"):
+            gate_module.fingerpad_bracket_evidence(
+                fingerpads=invalid_fingerpads,
+                wall_centers=walls,
+                separation_axis=np.array([0.0, 1.0, 0.0]),
+            )
+
+
 class L1CradleGateTests(unittest.TestCase):
     def test_geometry_snapshot_includes_all_gripper_geometries(self):
         source = inspect.getsource(geometry_snapshot)
@@ -110,6 +269,23 @@ class L1CradleGateTests(unittest.TestCase):
 
 
 class CenterRegraspSequenceTests(unittest.TestCase):
+    def test_contact_constrained_close_is_guarded_after_failed_approach(self):
+        source = inspect.getsource(_center_regrasp_probe)
+
+        approach_index = source.index('"approach_center_walls"')
+        collision_guard_index = source.index(
+            'if not bool(approach_stage["collision"]):',
+            approach_index,
+        )
+        bracket_index = source.index(
+            "fingerpad_bracket_evidence(",
+            collision_guard_index,
+        )
+        close_index = source.index('"close_center_grasp"')
+        self.assertLess(approach_index, collision_guard_index)
+        self.assertLess(collision_guard_index, bracket_index)
+        self.assertLess(bracket_index, close_index)
+
     def test_high_precenter_precedes_wall_approach_and_close(self):
         source = inspect.getsource(_center_regrasp_probe)
 

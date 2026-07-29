@@ -789,6 +789,115 @@ def has_bilateral_object_contact(
     return all(bool(contacts.get(arm)) for arm in ("right", "left"))
 
 
+def fingerpad_bracket_evidence(
+    *,
+    fingerpads: Mapping[str, np.ndarray],
+    wall_centers: np.ndarray,
+    separation_axis: np.ndarray,
+) -> dict[str, object]:
+    """Measure whether distinct opposed walls lie between each fingerpad pair."""
+    axis = np.asarray(separation_axis, dtype=float).reshape(3)
+    axis_norm = float(np.linalg.norm(axis))
+    if not np.all(np.isfinite(axis)) or axis_norm <= 1e-9:
+        raise ValueError("separation_axis must be finite and nonzero")
+    axis /= axis_norm
+    walls = np.asarray(wall_centers, dtype=float).reshape(2, 3)
+    if not np.all(np.isfinite(walls)):
+        raise ValueError("wall_centers must be finite")
+    wall_projections = walls @ axis
+    arms: dict[str, object] = {}
+    assigned_walls = []
+    for arm in ("left", "right"):
+        pad_positions = np.asarray(fingerpads[arm], dtype=float).reshape(2, 3)
+        if not np.all(np.isfinite(pad_positions)):
+            raise ValueError("fingerpads must be finite")
+        pad_projections = pad_positions @ axis
+        wall_index = int(
+            np.argmin(np.abs(wall_projections - float(np.mean(pad_projections))))
+        )
+        wall_projection = float(wall_projections[wall_index])
+        lower = float(np.min(pad_projections))
+        upper = float(np.max(pad_projections))
+        bracketed = lower <= wall_projection <= upper
+        assigned_walls.append(wall_index)
+        arms[arm] = {
+            "wall_index": wall_index,
+            "wall_projection": wall_projection,
+            "fingerpad_projections": pad_projections.tolist(),
+            "bracketed": bool(bracketed),
+        }
+    distinct = len(set(assigned_walls)) == 2
+    return {
+        "ready": bool(distinct and all(arm["bracketed"] for arm in arms.values())),
+        "distinct_walls": distinct,
+        "wall_centers": walls.tolist(),
+        "wall_projections": wall_projections.tolist(),
+        "fingerpads": {
+            arm: np.asarray(fingerpads[arm], dtype=float).reshape(2, 3).tolist()
+            for arm in ("left", "right")
+        },
+        "arms": arms,
+    }
+
+
+def fingerpad_world_positions(raw_env, robot) -> dict[str, np.ndarray]:
+    """Read the two official important fingerpad geom centers for each arm."""
+    model = raw_env.sim.model
+    data = raw_env.sim.data
+    result = {}
+    for arm in ("left", "right"):
+        important = getattr(robot.gripper[arm], "important_geoms", {})
+        names = []
+        for group in ("left_fingerpad", "right_fingerpad"):
+            group_names = important.get(group, ())
+            if not group_names:
+                raise ValueError(f"missing {arm} {group} geometry")
+            names.append(group_names[0])
+        positions = np.stack(
+            [
+                np.asarray(data.geom_xpos[model.geom_name2id(name)], dtype=float)
+                for name in names
+            ],
+            axis=0,
+        )
+        if positions.shape != (2, 3) or not np.all(np.isfinite(positions)):
+            raise ValueError(f"invalid {arm} fingerpad positions")
+        result[arm] = positions.copy()
+    return result
+
+
+def opposed_object_wall_centers(
+    raw_env,
+    object_name: str,
+    *,
+    separation_axis: np.ndarray,
+) -> np.ndarray:
+    """Read the two extreme object geom centers along the opposed-wall axis."""
+    axis = np.asarray(separation_axis, dtype=float).reshape(3)
+    axis_norm = float(np.linalg.norm(axis))
+    if not np.all(np.isfinite(axis)) or axis_norm <= 1e-9:
+        raise ValueError("separation_axis must be finite and nonzero")
+    axis /= axis_norm
+    model = raw_env.sim.model
+    data = raw_env.sim.data
+    object_bodies = _object_body_ids(raw_env, object_name)
+    centers = np.stack(
+        [
+            np.asarray(data.geom_xpos[geom_id], dtype=float)
+            for geom_id in range(model.ngeom)
+            if int(model.geom_bodyid[geom_id]) in object_bodies
+        ],
+        axis=0,
+    )
+    if centers.shape[0] < 2 or not np.all(np.isfinite(centers)):
+        raise ValueError("object must provide finite opposed wall geometries")
+    projections = centers @ axis
+    indices = np.array([int(np.argmin(projections)), int(np.argmax(projections))])
+    if float(projections[indices[1]] - projections[indices[0]]) <= 1e-9:
+        raise ValueError("object wall projections must be distinct")
+    return centers[indices].copy()
+
+
 def opposed_wall_clearance_targets(
     current_positions: Mapping[str, np.ndarray],
     *,
@@ -2678,12 +2787,43 @@ def _center_regrasp_probe(
                         )
                         for arm, position in current.items()
                     }
-                    if not execute_stage(
+                    approach_reached = execute_stage(
                         "approach_center_walls",
                         approach_targets,
                         max_steps=220,
                         gripper_value=-1.0,
-                    ):
+                    )
+                    approach_stage = stage_results[-1]
+                    approach_stage["pose_target_reached"] = approach_reached
+                    approach_stage["contact_constrained_ready"] = False
+                    approach_stage["completion_mode"] = (
+                        "pose_target" if approach_reached else None
+                    )
+                    if not approach_reached:
+                        if not bool(approach_stage["collision"]):
+                            bracket_evidence = fingerpad_bracket_evidence(
+                                fingerpads=fingerpad_world_positions(
+                                    raw_env,
+                                    robot,
+                                ),
+                                wall_centers=opposed_object_wall_centers(
+                                    raw_env,
+                                    object_name,
+                                    separation_axis=separation_axis,
+                                ),
+                                separation_axis=separation_axis,
+                            )
+                            approach_stage["fingerpad_bracket"] = bracket_evidence
+                            approach_reached = bool(bracket_evidence["ready"])
+                            approach_stage["contact_constrained_ready"] = (
+                                approach_reached
+                            )
+                            if approach_reached:
+                                approach_stage["success"] = True
+                                approach_stage["completion_mode"] = (
+                                    "fingerpad_bracket"
+                                )
+                    if not approach_reached:
                         failure_stage = "approach_center_walls"
                     else:
                         if not execute_stage(
