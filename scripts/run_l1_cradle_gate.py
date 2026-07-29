@@ -28,6 +28,12 @@ ORIENTATION_ALIGNMENT_THRESHOLDS = {
     "max_position_drift_m": 0.03,
 }
 
+JOINT_SEED_THRESHOLDS = {
+    "error_deg": 10.0,
+    "max_endpoint_position_error_m": 0.015,
+    "max_path_position_drift_m": 0.03,
+}
+
 _REQUIRED_FIELDS = (
     "physical_grasp",
     "lift_m",
@@ -447,6 +453,58 @@ def orientation_alignment_failures(record: Mapping[str, object]) -> list[str]:
             failures.append(key)
         elif kind == "maximum" and value > threshold:
             failures.append(key)
+    if record.get("infrastructure_error") is not None:
+        failures.append("infrastructure_error")
+    return list(dict.fromkeys(failures))
+
+
+_JOINT_SEED_REQUIRED_FIELDS = (
+    "joint_seed_success",
+    "joint_seed_right_error_deg",
+    "joint_seed_left_error_deg",
+    "joint_seed_max_endpoint_position_error_m",
+    "joint_seed_max_path_position_drift_m",
+    "joint_seed_min_bound_margin_rad",
+    "joint_seed_collision_frames",
+    "joint_seed_rolled_back",
+    "infrastructure_error",
+)
+
+
+def joint_seed_failures(record: Mapping[str, object]) -> list[str]:
+    """Return failed evidence fields for the robot-only joint seed gate."""
+    failures = [key for key in _JOINT_SEED_REQUIRED_FIELDS if key not in record]
+
+    def numeric(key: str) -> float | None:
+        if key not in record or isinstance(record[key], bool):
+            return None
+        try:
+            value = float(record[key])
+        except (TypeError, ValueError):
+            return None
+        return value if np.isfinite(value) and value >= 0.0 else None
+
+    maximums = {
+        "joint_seed_right_error_deg": JOINT_SEED_THRESHOLDS["error_deg"],
+        "joint_seed_left_error_deg": JOINT_SEED_THRESHOLDS["error_deg"],
+        "joint_seed_max_endpoint_position_error_m": JOINT_SEED_THRESHOLDS[
+            "max_endpoint_position_error_m"
+        ],
+        "joint_seed_max_path_position_drift_m": JOINT_SEED_THRESHOLDS[
+            "max_path_position_drift_m"
+        ],
+        "joint_seed_collision_frames": 0.0,
+    }
+    for key, maximum in maximums.items():
+        value = numeric(key)
+        if value is None or value > maximum:
+            failures.append(key)
+    if numeric("joint_seed_min_bound_margin_rad") is None:
+        failures.append("joint_seed_min_bound_margin_rad")
+    if record.get("joint_seed_success") is not True:
+        failures.append("joint_seed_success")
+    if record.get("joint_seed_rolled_back") is not False:
+        failures.append("joint_seed_rolled_back")
     if record.get("infrastructure_error") is not None:
         failures.append("infrastructure_error")
     return list(dict.fromkeys(failures))

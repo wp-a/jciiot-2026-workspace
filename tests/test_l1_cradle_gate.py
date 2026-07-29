@@ -10,6 +10,7 @@ from scripts.run_l1_cradle_gate import (
     eef_site_pose,
     has_bilateral_object_contact,
     interior_joint_bounds,
+    joint_seed_failures,
     joint_seed_objective_residual,
     minimum_undirected_axis_rotation,
     nearest_directed_axis_target,
@@ -52,6 +53,18 @@ VALID_ORIENTATION_RECORD = {
     "orientation_stable_steps": 5,
     "orientation_max_position_drift_m": 0.03,
     "orientation_collision_frames": 0,
+    "infrastructure_error": None,
+}
+
+VALID_JOINT_SEED_RECORD = {
+    "joint_seed_success": True,
+    "joint_seed_right_error_deg": 9.9,
+    "joint_seed_left_error_deg": 9.8,
+    "joint_seed_max_endpoint_position_error_m": 0.015,
+    "joint_seed_max_path_position_drift_m": 0.03,
+    "joint_seed_min_bound_margin_rad": 0.0,
+    "joint_seed_collision_frames": 0,
+    "joint_seed_rolled_back": False,
     "infrastructure_error": None,
 }
 
@@ -384,6 +397,49 @@ class OrientationAlignmentGateTests(unittest.TestCase):
                 record = dict(VALID_ORIENTATION_RECORD)
                 record[key] = float("nan")
                 self.assertIn(key, orientation_alignment_failures(record))
+
+
+class JointSeedGateTests(unittest.TestCase):
+    def test_joint_seed_gate_accepts_complete_bounded_evidence(self):
+        self.assertEqual(joint_seed_failures(VALID_JOINT_SEED_RECORD), [])
+
+    def test_joint_seed_gate_rejects_each_failed_condition(self):
+        invalid_values = {
+            "joint_seed_success": False,
+            "joint_seed_right_error_deg": 10.01,
+            "joint_seed_left_error_deg": 10.01,
+            "joint_seed_max_endpoint_position_error_m": 0.0151,
+            "joint_seed_max_path_position_drift_m": 0.0301,
+            "joint_seed_min_bound_margin_rad": -0.0001,
+            "joint_seed_collision_frames": 1,
+            "joint_seed_rolled_back": True,
+            "infrastructure_error": "simulator failed",
+        }
+        for key, value in invalid_values.items():
+            with self.subTest(key=key):
+                record = dict(VALID_JOINT_SEED_RECORD)
+                record[key] = value
+                self.assertIn(key, joint_seed_failures(record))
+
+    def test_joint_seed_gate_rejects_missing_and_non_finite_evidence(self):
+        numeric_fields = (
+            "joint_seed_right_error_deg",
+            "joint_seed_left_error_deg",
+            "joint_seed_max_endpoint_position_error_m",
+            "joint_seed_max_path_position_drift_m",
+            "joint_seed_min_bound_margin_rad",
+            "joint_seed_collision_frames",
+        )
+        for key in VALID_JOINT_SEED_RECORD:
+            with self.subTest(missing=key):
+                record = dict(VALID_JOINT_SEED_RECORD)
+                del record[key]
+                self.assertIn(key, joint_seed_failures(record))
+        for key in numeric_fields:
+            with self.subTest(non_finite=key):
+                record = dict(VALID_JOINT_SEED_RECORD)
+                record[key] = float("nan")
+                self.assertIn(key, joint_seed_failures(record))
 
 
 class OrientationAlignmentStateTests(unittest.TestCase):
