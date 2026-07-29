@@ -525,6 +525,30 @@ class CenterRegraspSequenceTests(unittest.TestCase):
         inchworm_index = source.index("run_inchworm_transport(")
         self.assertLess(hold_index, inchworm_index)
 
+    def test_single_arm_support_transition_runs_after_hold_before_transport(self):
+        source = inspect.getsource(_center_regrasp_probe)
+
+        hold_index = source.index('"hold_center_grasp"')
+        clearance_index = source.index('"raise_for_under_support"')
+        lower_index = source.index('f"lower_{center_support_moving_arm}_for_support"')
+        inset_index = source.index('f"inset_{center_support_moving_arm}_under_object"')
+        transport_index = source.index("run_physical_transport(")
+
+        self.assertLess(hold_index, clearance_index)
+        self.assertLess(clearance_index, lower_index)
+        self.assertLess(lower_index, inset_index)
+        self.assertLess(inset_index, transport_index)
+
+    def test_single_arm_transition_stops_on_height_or_stationary_grasp_loss(self):
+        source = inspect.getsource(_center_regrasp_probe)
+
+        self.assertEqual(source.count("required_grasp_arm=stationary_arm"), 2)
+        self.assertGreaterEqual(source.count("minimum_object_z="), 2)
+        self.assertIn("require_bilateral_grasp=True", source)
+        self.assertIn('safety_failure = "bilateral_grasp_loss"', source)
+        self.assertIn('safety_failure = "height_loss"', source)
+        self.assertIn('safety_failure = "required_grasp_loss"', source)
+
     def test_inchworm_extraction_can_reverse_toward_the_robot_base(self):
         direction = gate_module.resolve_inchworm_direction(
             base_xy=np.array([8.0, 4.6]),
@@ -929,6 +953,10 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.center_carry_inchworm_reset_m, 0.06)
         self.assertIsNone(args.center_carry_inchworm_world_direction_x)
         self.assertIsNone(args.center_carry_inchworm_world_direction_y)
+        self.assertEqual(args.center_support_moving_arm, "none")
+        self.assertAlmostEqual(args.center_support_clearance_lift_m, 0.08)
+        self.assertAlmostEqual(args.center_support_descent_m, 0.12)
+        self.assertAlmostEqual(args.center_support_inset_m, 0.04)
 
     def test_center_carry_speed_can_be_overridden_for_single_variable_probe(self):
         args = parse_args(
@@ -963,6 +991,14 @@ class JointSeedParserTests(unittest.TestCase):
                 "0.0",
                 "--center-carry-inchworm-world-direction-y",
                 "-1.0",
+                "--center-support-moving-arm",
+                "right",
+                "--center-support-clearance-lift-m",
+                "0.09",
+                "--center-support-descent-m",
+                "0.13",
+                "--center-support-inset-m",
+                "0.05",
             ]
         )
 
@@ -978,6 +1014,10 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.center_carry_inchworm_reset_m, 0.04)
         self.assertAlmostEqual(args.center_carry_inchworm_world_direction_x, 0.0)
         self.assertAlmostEqual(args.center_carry_inchworm_world_direction_y, -1.0)
+        self.assertEqual(args.center_support_moving_arm, "right")
+        self.assertAlmostEqual(args.center_support_clearance_lift_m, 0.09)
+        self.assertAlmostEqual(args.center_support_descent_m, 0.13)
+        self.assertAlmostEqual(args.center_support_inset_m, 0.05)
 
 
 class OrientationCommandTests(unittest.TestCase):

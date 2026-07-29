@@ -1817,9 +1817,14 @@ def _center_regrasp_probe(
     center_carry_inchworm_reset_m: float = 0.06,
     center_carry_inchworm_world_direction_x: float | None = None,
     center_carry_inchworm_world_direction_y: float | None = None,
+    center_support_moving_arm: str = "none",
+    center_support_clearance_lift_m: float = 0.08,
+    center_support_descent_m: float = 0.12,
+    center_support_inset_m: float = 0.04,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import (
         OfficialScriptedGraspDriver,
+        build_independent_gripper_action,
         gripper_close_command,
         joint_interpolation_path,
         synchronize_controller_goals,
@@ -1831,6 +1836,7 @@ def _center_regrasp_probe(
         _is_allowed_cradle_geom,
         run_inchworm_transport,
         run_physical_transport,
+        single_arm_under_support_targets,
         world_velocity_to_base_frame,
     )
 
@@ -1849,11 +1855,21 @@ def _center_regrasp_probe(
     physical_grasp = False
     hold_grasp_steps = 0
     transport_result = None
+    support_transition = None
     transport_object_translation = 0.0
     transport_base_translation = 0.0
     stroke_projected_progress = 0.0
     if orientation_joint_seed and not align_closure_axes:
         raise ValueError("orientation_joint_seed requires align_closure_axes")
+    if center_support_moving_arm not in ("none", "right", "left"):
+        raise ValueError("center_support_moving_arm must be none, right, or left")
+    for parameter_name, parameter_value in (
+        ("center_support_clearance_lift_m", center_support_clearance_lift_m),
+        ("center_support_descent_m", center_support_descent_m),
+        ("center_support_inset_m", center_support_inset_m),
+    ):
+        if not np.isfinite(float(parameter_value)) or float(parameter_value) < 0.0:
+            raise ValueError(f"{parameter_name} must be finite and non-negative")
 
     def eef_positions() -> dict[str, np.ndarray]:
         return {
@@ -2682,7 +2698,7 @@ def _center_regrasp_probe(
         targets: Mapping[str, np.ndarray],
         *,
         max_steps: int,
-        gripper_value: float,
+        gripper_value: float | Mapping[str, float],
         close_schedule: bool = False,
         stop_object_z: float | None = None,
         stop_object_z_at_least: float | None = None,
@@ -2691,6 +2707,9 @@ def _center_regrasp_probe(
         stop_grasp_contact_steps: int | None = None,
         support_seek_down_step: float = 0.0,
         support_seek_down_limit: float = 0.0,
+        minimum_object_z: float | None = None,
+        required_grasp_arm: str | None = None,
+        require_bilateral_grasp: bool = False,
         require_target: bool = True,
     ) -> bool:
         nonlocal stable_support_steps
@@ -2705,6 +2724,9 @@ def _center_regrasp_probe(
         object_stop_met = False
         grasp_stop_met = False
         stage_grasp_steps = 0
+        safety_failure = None
+        if required_grasp_arm not in (None, "right", "left"):
+            raise ValueError("required_grasp_arm must be right, left, or None")
         active_targets = {
             arm: np.asarray(targets[arm], dtype=float).copy()
             for arm in ("right", "left")
@@ -2728,17 +2750,34 @@ def _center_regrasp_probe(
                     controller_delta,
                     0.30,
                 )
-            command = (
-                gripper_close_command(local_step, interval=1)
-                if close_schedule
-                else float(gripper_value)
-            )
-            action = helpers["build_action"](
-                robot,
-                arm_actions=arm_actions,
-                gripper_value=command,
-                hold_targets=hold_targets,
-            )
+            if close_schedule:
+                if isinstance(gripper_value, Mapping):
+                    raise ValueError("close_schedule requires a scalar gripper value")
+                command: float | Mapping[str, float] = gripper_close_command(
+                    local_step,
+                    interval=1,
+                )
+            else:
+                command = (
+                    {arm: float(gripper_value[arm]) for arm in ("right", "left")}
+                    if isinstance(gripper_value, Mapping)
+                    else float(gripper_value)
+                )
+            if isinstance(command, Mapping):
+                action = build_independent_gripper_action(
+                    robot,
+                    arm_actions=arm_actions,
+                    gripper_values=command,
+                    hold_targets=hold_targets,
+                    build_action_fn=helpers["build_action"],
+                )
+            else:
+                action = helpers["build_action"](
+                    robot,
+                    arm_actions=arm_actions,
+                    gripper_value=command,
+                    hold_targets=hold_targets,
+                )
             _, _, _, info = raw_env.step(action)
             recorder = getattr(backend, "_record_trajectory_frame", None)
             if callable(recorder):
@@ -2778,12 +2817,31 @@ def _center_regrasp_probe(
                         arm: current[arm].tolist() for arm in ("right", "left")
                     },
                     "contacts": {arm: list(contacts[arm]) for arm in contacts},
+                    "arm_support": arm_supported,
+                    "grasp_contacts": {
+                        arm: bool(grasp_contacts.get(arm))
+                        for arm in ("right", "left")
+                    },
                     "bilateral_support": supported,
                     "bilateral_grasp": grasped,
                     "judge_collision": collision,
                 }
             )
             if collision:
+                break
+            if require_bilateral_grasp and not grasped:
+                safety_failure = "bilateral_grasp_loss"
+                break
+            if (
+                minimum_object_z is not None
+                and float(object_position[2]) < float(minimum_object_z)
+            ):
+                safety_failure = "height_loss"
+                break
+            if required_grasp_arm is not None and not bool(
+                grasp_contacts.get(required_grasp_arm)
+            ):
+                safety_failure = "required_grasp_loss"
                 break
             if float(support_seek_down_step) > 0.0:
                 for arm in ("right", "left"):
@@ -2848,13 +2906,16 @@ def _center_regrasp_probe(
             reached = grasp_stop_met
         if stop_object_z is not None or stop_object_z_at_least is not None:
             reached = object_stop_met
-        if not require_target and not collision:
+        if not require_target and not collision and safety_failure is None:
             reached = True
         stage_results.append(
             {
                 "stage": name,
-                "success": bool(reached and not collision),
+                "success": bool(
+                    reached and not collision and safety_failure is None
+                ),
                 "collision": collision,
+                "safety_failure": safety_failure,
                 "steps": sum(1 for item in observations if item["stage"] == name),
                 "final_object_position": np.asarray(
                     raw_env.sim.data.body_xpos[body_id],
@@ -2866,7 +2927,7 @@ def _center_regrasp_probe(
                 },
             }
         )
-        return bool(reached and not collision)
+        return bool(reached and not collision and safety_failure is None)
 
     current = eef_positions()
     lower_targets = {
@@ -3144,6 +3205,200 @@ def _center_regrasp_probe(
                                     )
                                     if (
                                         physical_grasp
+                                        and center_support_moving_arm != "none"
+                                    ):
+                                        stationary_arm = (
+                                            "left"
+                                            if center_support_moving_arm == "right"
+                                            else "right"
+                                        )
+                                        transition_start_object = np.asarray(
+                                            raw_env.sim.data.body_xpos[body_id],
+                                            dtype=float,
+                                        ).copy()
+                                        clearance_targets = {
+                                            arm: position
+                                            + np.array(
+                                                [
+                                                    0.0,
+                                                    0.0,
+                                                    float(
+                                                        center_support_clearance_lift_m
+                                                    ),
+                                                ]
+                                            )
+                                            for arm, position in eef_positions().items()
+                                        }
+                                        clearance_reached = execute_stage(
+                                            "raise_for_under_support",
+                                            clearance_targets,
+                                            max_steps=160,
+                                            gripper_value=1.0,
+                                            minimum_object_z=(
+                                                float(table_object_z) + 0.10
+                                            ),
+                                            require_bilateral_grasp=True,
+                                        )
+                                        clearance_stage = stage_results[-1]
+                                        clearance_object = np.asarray(
+                                            raw_env.sim.data.body_xpos[body_id],
+                                            dtype=float,
+                                        ).copy()
+                                        clearance_grasp = helpers["grasp_status"](
+                                            raw_env,
+                                            robot,
+                                            object_name,
+                                        )
+                                        clearance_safe = bool(
+                                            clearance_reached
+                                            and all(
+                                                bool(clearance_grasp.get(arm))
+                                                for arm in ("right", "left")
+                                            )
+                                            and float(clearance_object[2])
+                                            >= float(table_object_z) + 0.10
+                                        )
+                                        clearance_stage.update(
+                                            {
+                                                "requested_lift_m": float(
+                                                    center_support_clearance_lift_m
+                                                ),
+                                                "object_lift_m": float(
+                                                    clearance_object[2]
+                                                    - transition_start_object[2]
+                                                ),
+                                                "bilateral_grasp": bool(
+                                                    all(
+                                                        bool(
+                                                            clearance_grasp.get(arm)
+                                                        )
+                                                        for arm in ("right", "left")
+                                                    )
+                                                ),
+                                                "height_safe": bool(
+                                                    float(clearance_object[2])
+                                                    >= float(table_object_z) + 0.10
+                                                ),
+                                            }
+                                        )
+                                        lower_reached = False
+                                        inset_reached = False
+                                        if clearance_safe:
+                                            gripper_commands = {
+                                                center_support_moving_arm: -1.0,
+                                                stationary_arm: 1.0,
+                                            }
+                                            lower_targets = (
+                                                single_arm_under_support_targets(
+                                                    eef_positions(),
+                                                    moving_arm=(
+                                                        center_support_moving_arm
+                                                    ),
+                                                    separation_axis=separation_axis,
+                                                    descent_m=(
+                                                        center_support_descent_m
+                                                    ),
+                                                    inset_m=0.0,
+                                                )
+                                            )
+                                            lower_reached = execute_stage(
+                                                f"lower_{center_support_moving_arm}_for_support",
+                                                lower_targets,
+                                                max_steps=180,
+                                                gripper_value=gripper_commands,
+                                                minimum_object_z=(
+                                                    float(table_object_z) + 0.10
+                                                ),
+                                                required_grasp_arm=stationary_arm,
+                                            )
+                                        if lower_reached:
+                                            inset_targets = (
+                                                single_arm_under_support_targets(
+                                                    eef_positions(),
+                                                    moving_arm=(
+                                                        center_support_moving_arm
+                                                    ),
+                                                    separation_axis=separation_axis,
+                                                    descent_m=0.0,
+                                                    inset_m=center_support_inset_m,
+                                                )
+                                            )
+                                            inset_reached = execute_stage(
+                                                f"inset_{center_support_moving_arm}_under_object",
+                                                inset_targets,
+                                                max_steps=180,
+                                                gripper_value=gripper_commands,
+                                                minimum_object_z=(
+                                                    float(table_object_z) + 0.10
+                                                ),
+                                                required_grasp_arm=stationary_arm,
+                                            )
+                                        transition_contacts = object_robot_contacts(
+                                            raw_env,
+                                            object_name,
+                                        )
+                                        transition_grasp = helpers["grasp_status"](
+                                            raw_env,
+                                            robot,
+                                            object_name,
+                                        )
+                                        transition_object = np.asarray(
+                                            raw_env.sim.data.body_xpos[body_id],
+                                            dtype=float,
+                                        ).copy()
+                                        moving_support = any(
+                                            _is_allowed_cradle_geom(
+                                                geom,
+                                                center_support_moving_arm,
+                                            )
+                                            for geom in transition_contacts[
+                                                center_support_moving_arm
+                                            ]
+                                        )
+                                        stationary_grasp = bool(
+                                            transition_grasp.get(stationary_arm)
+                                        )
+                                        height_safe = bool(
+                                            float(transition_object[2])
+                                            >= float(table_object_z) + 0.10
+                                        )
+                                        transition_success = bool(
+                                            clearance_safe
+                                            and lower_reached
+                                            and inset_reached
+                                            and moving_support
+                                            and stationary_grasp
+                                            and height_safe
+                                        )
+                                        support_transition = {
+                                            "success": transition_success,
+                                            "moving_arm": center_support_moving_arm,
+                                            "stationary_arm": stationary_arm,
+                                            "clearance_success": clearance_safe,
+                                            "lower_success": lower_reached,
+                                            "inset_success": inset_reached,
+                                            "moving_arm_support": moving_support,
+                                            "stationary_arm_grasp": stationary_grasp,
+                                            "height_safe": height_safe,
+                                            "object_lift_m": float(
+                                                transition_object[2]
+                                                - transition_start_object[2]
+                                            ),
+                                            "contacts": {
+                                                arm: list(names)
+                                                for arm, names in (
+                                                    transition_contacts.items()
+                                                )
+                                            },
+                                        }
+                                        failure_stage = (
+                                            None
+                                            if transition_success
+                                            else "single_arm_under_support"
+                                        )
+                                    if (
+                                        physical_grasp
+                                        and center_support_moving_arm == "none"
                                         and float(center_carry_corner_seat_m) > 0.0
                                     ):
                                         seat_base_xy = np.asarray(
@@ -3202,6 +3457,7 @@ def _center_regrasp_probe(
                                             failure_stage = "seat_trailing_corners"
                                     if (
                                         physical_grasp
+                                        and center_support_moving_arm == "none"
                                         and float(center_carry_arm_stroke_m) > 0.0
                                         and float(center_carry_inchworm_distance_m) <= 0.0
                                     ):
@@ -3279,6 +3535,7 @@ def _center_regrasp_probe(
                                             failure_stage = "arm_transport_stroke"
                                     if (
                                         physical_grasp
+                                        and center_support_moving_arm == "none"
                                         and float(center_carry_base_reset_m) > 0.0
                                         and float(center_carry_inchworm_distance_m) <= 0.0
                                     ):
@@ -3479,6 +3736,17 @@ def _center_regrasp_probe(
                                             failure_stage = "inchworm_base_reset"
                                     if not physical_grasp:
                                         failure_stage = failure_stage or "final_contact"
+                                    elif center_support_moving_arm != "none":
+                                        failure_stage = (
+                                            None
+                                            if bool(
+                                                (support_transition or {}).get(
+                                                    "success"
+                                                )
+                                            )
+                                            else failure_stage
+                                            or "single_arm_under_support"
+                                        )
                                     elif float(center_carry_inchworm_distance_m) > 0.0:
                                         transport_start_base_xy = np.asarray(
                                             backend.get_base_pose()[0], dtype=float
@@ -3693,6 +3961,7 @@ def _center_regrasp_probe(
         "object_translation_m": transport_object_translation,
         "transport_base_translation_m": transport_base_translation,
         "transport": transport_result,
+        "support_transition": support_transition,
         "support_contact_steps": maximum_support_steps,
         "collision_steps": collision_steps,
         "joint_seed": joint_seed,
@@ -3876,16 +4145,26 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                         center_carry_inchworm_world_direction_y=(
                             args.center_carry_inchworm_world_direction_y
                         ),
+                        center_support_moving_arm=(
+                            args.center_support_moving_arm
+                        ),
+                        center_support_clearance_lift_m=(
+                            args.center_support_clearance_lift_m
+                        ),
+                        center_support_descent_m=(
+                            args.center_support_descent_m
+                        ),
+                        center_support_inset_m=args.center_support_inset_m,
                     )
-                    record["mode"] = (
-                        "center_grasp_physical_transport"
-                        if max(
+                    if args.center_support_moving_arm != "none":
+                        record["mode"] = "single_arm_under_support_probe"
+                    elif max(
                             args.center_carry_distance_m,
                             args.center_carry_inchworm_distance_m,
-                        )
-                        > 0.0
-                        else "table_assisted_center_regrasp"
-                    )
+                    ) > 0.0:
+                        record["mode"] = "center_grasp_physical_transport"
+                    else:
+                        record["mode"] = "table_assisted_center_regrasp"
                     record["physical_grasp"] = bool(
                         probe.get("physical_grasp", probe.get("success", False))
                     )
@@ -3904,6 +4183,9 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                     )
                     record["transport_base_translation_m"] = float(
                         probe.get("transport_base_translation_m", 0.0)
+                    )
+                    record["support_transition"] = probe.get(
+                        "support_transition"
                     )
                     alignment = probe.get("orientation_alignment")
                     if isinstance(alignment, Mapping):
@@ -4056,6 +4338,26 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--center-carry-inchworm-world-direction-x", type=float)
     parser.add_argument("--center-carry-inchworm-world-direction-y", type=float)
+    parser.add_argument(
+        "--center-support-moving-arm",
+        choices=("none", "right", "left"),
+        default="none",
+    )
+    parser.add_argument(
+        "--center-support-clearance-lift-m",
+        type=float,
+        default=0.08,
+    )
+    parser.add_argument(
+        "--center-support-descent-m",
+        type=float,
+        default=0.12,
+    )
+    parser.add_argument(
+        "--center-support-inset-m",
+        type=float,
+        default=0.04,
+    )
     parser.add_argument("--align-closure-axes", action="store_true")
     parser.add_argument("--orientation-max-action", type=float, default=0.30)
     parser.add_argument("--orientation-fine-max-action", type=float)
