@@ -34,6 +34,13 @@ JOINT_SEED_THRESHOLDS = {
     "max_path_position_drift_m": 0.03,
 }
 
+POSTURE_CARRY_THRESHOLDS = {
+    "projected_object_progress_m": 0.08,
+    "lateral_object_drift_m": 0.03,
+    "object_gripper_drift_m": 0.03,
+    "final_object_lift_m": 0.10,
+}
+
 _REQUIRED_FIELDS = (
     "physical_grasp",
     "lift_m",
@@ -161,6 +168,67 @@ def center_grasp_transport_failures(
 def center_grasp_transport_accepted(record: Mapping[str, object]) -> bool:
     """Accept only complete, collision-free center-grasp transport evidence."""
     return not center_grasp_transport_failures(record)
+
+
+_POSTURE_CARRY_REQUIRED_FIELDS = (
+    "posture_carry_success",
+    "projected_object_progress_m",
+    "lateral_object_drift_m",
+    "object_gripper_drift_m",
+    "final_object_lift_m",
+    "terminal_bilateral_contact",
+    "collision_frames",
+    "attachment_activations",
+    "object_pose_writes",
+    "infrastructure_error",
+)
+
+
+def posture_carry_failures(record: Mapping[str, object]) -> list[str]:
+    """Return failed evidence fields for short posture-locked physical carry."""
+    failures = [
+        key for key in _POSTURE_CARRY_REQUIRED_FIELDS if key not in record
+    ]
+
+    def numeric(key: str) -> float | None:
+        if key not in record or isinstance(record[key], bool):
+            return None
+        try:
+            value = float(record[key])
+        except (TypeError, ValueError):
+            return None
+        return value if np.isfinite(value) else None
+
+    if record.get("posture_carry_success") is not True:
+        failures.append("posture_carry_success")
+    progress = numeric("projected_object_progress_m")
+    if (
+        progress is None
+        or progress
+        < POSTURE_CARRY_THRESHOLDS["projected_object_progress_m"]
+    ):
+        failures.append("projected_object_progress_m")
+    for key in ("lateral_object_drift_m", "object_gripper_drift_m"):
+        value = numeric(key)
+        if value is None or value > POSTURE_CARRY_THRESHOLDS[key]:
+            failures.append(key)
+    lift = numeric("final_object_lift_m")
+    if lift is None or lift < POSTURE_CARRY_THRESHOLDS["final_object_lift_m"]:
+        failures.append("final_object_lift_m")
+    if record.get("terminal_bilateral_contact") is not True:
+        failures.append("terminal_bilateral_contact")
+    for key in ("collision_frames", "attachment_activations", "object_pose_writes"):
+        value = numeric(key)
+        if value is None or value != 0.0:
+            failures.append(key)
+    if record.get("infrastructure_error") is not None:
+        failures.append("infrastructure_error")
+    return list(dict.fromkeys(failures))
+
+
+def posture_carry_accepted(record: Mapping[str, object]) -> bool:
+    """Accept only complete, attachment-free short physical carry evidence."""
+    return not posture_carry_failures(record)
 
 
 _PUSH_REQUIRED_FIELDS = (

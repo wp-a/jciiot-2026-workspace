@@ -114,6 +114,83 @@ VALID_CENTER_GRASP_TRANSPORT_RECORD = {
     "infrastructure_error": None,
 }
 
+VALID_POSTURE_CARRY_RECORD = {
+    "posture_carry_success": True,
+    "projected_object_progress_m": 0.08,
+    "lateral_object_drift_m": 0.03,
+    "object_gripper_drift_m": 0.03,
+    "final_object_lift_m": 0.10,
+    "terminal_bilateral_contact": True,
+    "collision_frames": 0,
+    "attachment_activations": 0,
+    "object_pose_writes": 0,
+    "infrastructure_error": None,
+}
+
+
+class PostureCarryGateTests(unittest.TestCase):
+    def test_posture_carry_gate_accepts_every_inclusive_boundary(self):
+        self.assertTrue(hasattr(gate_module, "posture_carry_failures"))
+        self.assertTrue(hasattr(gate_module, "posture_carry_accepted"))
+
+        self.assertEqual(
+            gate_module.posture_carry_failures(VALID_POSTURE_CARRY_RECORD),
+            [],
+        )
+        self.assertTrue(
+            gate_module.posture_carry_accepted(VALID_POSTURE_CARRY_RECORD)
+        )
+
+    def test_each_posture_carry_hard_condition_rejects_the_record(self):
+        invalid_values = {
+            "posture_carry_success": False,
+            "projected_object_progress_m": 0.079999,
+            "lateral_object_drift_m": 0.030001,
+            "object_gripper_drift_m": 0.030001,
+            "final_object_lift_m": 0.099999,
+            "terminal_bilateral_contact": False,
+            "collision_frames": 1,
+            "attachment_activations": 1,
+            "object_pose_writes": 1,
+            "infrastructure_error": "RuntimeError: failed",
+        }
+
+        for key, value in invalid_values.items():
+            with self.subTest(key=key):
+                record = dict(VALID_POSTURE_CARRY_RECORD)
+                record[key] = value
+                self.assertIn(
+                    key,
+                    gate_module.posture_carry_failures(record),
+                )
+                self.assertFalse(gate_module.posture_carry_accepted(record))
+
+    def test_missing_and_nonfinite_posture_carry_evidence_is_rejected(self):
+        for key in VALID_POSTURE_CARRY_RECORD:
+            with self.subTest(missing=key):
+                record = dict(VALID_POSTURE_CARRY_RECORD)
+                del record[key]
+                self.assertIn(key, gate_module.posture_carry_failures(record))
+
+        numeric_fields = (
+            "projected_object_progress_m",
+            "lateral_object_drift_m",
+            "object_gripper_drift_m",
+            "final_object_lift_m",
+            "collision_frames",
+            "attachment_activations",
+            "object_pose_writes",
+        )
+        for key in numeric_fields:
+            for value in (np.nan, np.inf, -np.inf, True, "invalid"):
+                with self.subTest(key=key, value=value):
+                    record = dict(VALID_POSTURE_CARRY_RECORD)
+                    record[key] = value
+                    self.assertIn(
+                        key,
+                        gate_module.posture_carry_failures(record),
+                    )
+
 
 class FingerpadBracketTests(unittest.TestCase):
     def test_reads_official_fingerpad_geom_positions(self):
