@@ -284,6 +284,33 @@ def forward_carry_target(
     return base + direction * (distance / direction_norm)
 
 
+def trailing_corner_seat_targets(
+    current: Mapping[str, object],
+    *,
+    travel_direction: object,
+    distance_m: float,
+) -> dict[str, np.ndarray]:
+    """Slide both closed grippers toward the trailing wall corner."""
+    direction = np.asarray(travel_direction, dtype=float).reshape(2)
+    distance = float(distance_m)
+    if not np.all(np.isfinite(direction)):
+        raise ValueError("travel_direction must be finite")
+    norm = float(np.linalg.norm(direction))
+    if norm <= 1e-12:
+        raise ValueError("travel_direction must be non-zero")
+    if not np.isfinite(distance) or distance < 0.0:
+        raise ValueError("distance_m must be finite and non-negative")
+    offset = -direction * (distance / norm)
+    targets = {}
+    for arm in ("right", "left"):
+        position = np.asarray(current[arm], dtype=float).reshape(3).copy()
+        if not np.all(np.isfinite(position)):
+            raise ValueError(f"{arm} position must be finite")
+        position[:2] += offset
+        targets[arm] = position
+    return targets
+
+
 def allocate_segment_steps(*, total_steps: int, segment_count: int) -> tuple[int, ...]:
     """Distribute a fixed positive waypoint budget across path segments."""
     if (
@@ -1653,6 +1680,7 @@ def _center_regrasp_probe(
     orientation_joint_seed_torso_margin_m: float = 0.005,
     center_carry_distance_m: float = 0.0,
     center_carry_max_linear: float = 0.04,
+    center_carry_corner_seat_m: float = 0.0,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import (
         OfficialScriptedGraspDriver,
@@ -2975,8 +3003,64 @@ def _center_regrasp_probe(
                                         hold_grasp_steps >= 20
                                         and has_bilateral_object_contact(final_contacts)
                                     )
+                                    if (
+                                        physical_grasp
+                                        and float(center_carry_corner_seat_m) > 0.0
+                                    ):
+                                        seat_base_xy = np.asarray(
+                                            backend.get_base_pose()[0], dtype=float
+                                        )
+                                        seat_start_object = np.asarray(
+                                            raw_env.sim.data.body_xpos[body_id],
+                                            dtype=float,
+                                        ).copy()
+                                        seat_direction = (
+                                            seat_start_object[:2] - seat_base_xy
+                                        )
+                                        seat_targets = trailing_corner_seat_targets(
+                                            eef_positions(),
+                                            travel_direction=seat_direction,
+                                            distance_m=center_carry_corner_seat_m,
+                                        )
+                                        seat_reached = execute_stage(
+                                            "seat_trailing_corners",
+                                            seat_targets,
+                                            max_steps=100,
+                                            gripper_value=1.0,
+                                        )
+                                        seat_stage = stage_results[-1]
+                                        seat_end_object = np.asarray(
+                                            raw_env.sim.data.body_xpos[body_id],
+                                            dtype=float,
+                                        ).copy()
+                                        seat_stage.update(
+                                            {
+                                                "requested_distance_m": float(
+                                                    center_carry_corner_seat_m
+                                                ),
+                                                "object_translation_m": float(
+                                                    np.linalg.norm(
+                                                        seat_end_object[:2]
+                                                        - seat_start_object[:2]
+                                                    )
+                                                ),
+                                            }
+                                        )
+                                        final_contacts = object_robot_contacts(
+                                            raw_env, object_name
+                                        )
+                                        physical_grasp = bool(
+                                            seat_reached
+                                            and has_bilateral_object_contact(
+                                                final_contacts
+                                            )
+                                            and float(seat_end_object[2])
+                                            >= float(table_object_z) + 0.10
+                                        )
+                                        if not physical_grasp:
+                                            failure_stage = "seat_trailing_corners"
                                     if not physical_grasp:
-                                        failure_stage = "final_contact"
+                                        failure_stage = failure_stage or "final_contact"
                                     elif float(center_carry_distance_m) > 0.0:
                                         transport_start_base_xy, hold_yaw = (
                                             backend.get_base_pose()
@@ -3241,6 +3325,7 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                         ),
                         center_carry_distance_m=args.center_carry_distance_m,
                         center_carry_max_linear=args.center_carry_max_linear,
+                        center_carry_corner_seat_m=args.center_carry_corner_seat_m,
                     )
                     record["mode"] = (
                         "center_grasp_physical_transport"
@@ -3396,6 +3481,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--regrasp-base-advance-m", type=float, default=0.0)
     parser.add_argument("--center-carry-distance-m", type=float, default=0.0)
     parser.add_argument("--center-carry-max-linear", type=float, default=0.04)
+    parser.add_argument("--center-carry-corner-seat-m", type=float, default=0.0)
     parser.add_argument("--align-closure-axes", action="store_true")
     parser.add_argument("--orientation-max-action", type=float, default=0.30)
     parser.add_argument("--orientation-fine-max-action", type=float)

@@ -33,6 +33,7 @@ from scripts.run_l1_cradle_gate import (
     push_gate_accepted,
     push_gate_failures,
     scheduled_orientation_action_limit,
+    trailing_corner_seat_targets,
 )
 
 
@@ -338,6 +339,34 @@ class CenterGraspTransportTests(unittest.TestCase):
                 distance_m=0.1,
             )
 
+    def test_trailing_corner_seat_moves_both_grippers_away_from_travel(self):
+        targets = trailing_corner_seat_targets(
+            {
+                "right": np.array([7.25, 4.82, 1.36]),
+                "left": np.array([7.25, 4.42, 1.36]),
+            },
+            travel_direction=np.array([-1.0, 0.0]),
+            distance_m=0.08,
+        )
+
+        np.testing.assert_allclose(targets["right"], [7.33, 4.82, 1.36])
+        np.testing.assert_allclose(targets["left"], [7.33, 4.42, 1.36])
+
+    def test_corner_seat_rejects_invalid_direction_and_distance(self):
+        current = {"right": np.zeros(3), "left": np.zeros(3)}
+        for direction, distance in (
+            (np.zeros(2), 0.08),
+            (np.array([1.0, 0.0]), -0.01),
+            (np.array([1.0, np.nan]), 0.08),
+        ):
+            with self.subTest(direction=direction, distance=distance):
+                with self.assertRaises(ValueError):
+                    trailing_corner_seat_targets(
+                        current,
+                        travel_direction=direction,
+                        distance_m=distance,
+                    )
+
 
 class L1CradleGateTests(unittest.TestCase):
     def test_geometry_snapshot_includes_all_gripper_geometries(self):
@@ -376,6 +405,15 @@ class CenterRegraspSequenceTests(unittest.TestCase):
         hold_index = source.index('"hold_center_grasp"')
         transport_index = source.index("run_physical_transport(")
         self.assertLess(hold_index, transport_index)
+
+    def test_optional_corner_seat_runs_after_hold_and_before_transport(self):
+        source = inspect.getsource(_center_regrasp_probe)
+
+        hold_index = source.index('"hold_center_grasp"')
+        seat_index = source.index('"seat_trailing_corners"')
+        transport_index = source.index("run_physical_transport(")
+        self.assertLess(hold_index, seat_index)
+        self.assertLess(seat_index, transport_index)
 
     def test_contact_constrained_close_is_guarded_after_failed_approach(self):
         source = inspect.getsource(_center_regrasp_probe)
@@ -761,6 +799,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.regrasp_base_advance_m, 0.0)
         self.assertAlmostEqual(args.center_carry_distance_m, 0.0)
         self.assertAlmostEqual(args.center_carry_max_linear, 0.04)
+        self.assertAlmostEqual(args.center_carry_corner_seat_m, 0.0)
 
     def test_center_carry_speed_can_be_overridden_for_single_variable_probe(self):
         args = parse_args(
@@ -775,10 +814,13 @@ class JointSeedParserTests(unittest.TestCase):
                 "/tmp/trajectory.json",
                 "--center-carry-max-linear",
                 "0.005",
+                "--center-carry-corner-seat-m",
+                "0.08",
             ]
         )
 
         self.assertAlmostEqual(args.center_carry_max_linear, 0.005)
+        self.assertAlmostEqual(args.center_carry_corner_seat_m, 0.08)
 
 
 class OrientationCommandTests(unittest.TestCase):

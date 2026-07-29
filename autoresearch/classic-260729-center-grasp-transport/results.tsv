@@ -1,3 +1,5 @@
 iteration	variant	seed	requested_distance_m	transport_success	transport_steps	base_translation_m	object_translation_m	minimum_object_z	bilateral_hold_steps	collision_frames	accepted	failure_stage	elapsed_s	status
 2	arm-lead-plus-retract	0	0.20	true	234	0.190397	0.011470	1.248400	20	0	false	lift_m+object_translation_m+dropped	-	discard
 3	arm-lead-no-retract	0	0.20	true	234	0.190393	0.027205	1.249065	20	0	false	lift_m+object_translation_m+dropped	85.500480	discard
+4	base-only-drift-gated	0	0.20	false	22	0.041002	0.005870	1.326161	20	0	false	planar_grasp_drift	75.655548	discard
+5	base-only-0.005mps	0	0.20	false	150	0.037500	0.009960	1.279186	20	0	false	planar_grasp_drift	81.557106	discard
