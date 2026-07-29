@@ -14,6 +14,7 @@ from scripts.run_l1_cradle_gate import (
     joint_seed_objective_residual,
     minimum_undirected_axis_rotation,
     nearest_directed_axis_target,
+    next_joint_seed_path_state,
     next_orientation_alignment_state,
     normalized_osc_orientation_command,
     opposed_wall_clearance_targets,
@@ -440,6 +441,78 @@ class JointSeedGateTests(unittest.TestCase):
                 record = dict(VALID_JOINT_SEED_RECORD)
                 record[key] = float("nan")
                 self.assertIn(key, joint_seed_failures(record))
+
+
+class JointSeedPathStateTests(unittest.TestCase):
+    def test_path_state_accumulates_the_largest_two_arm_drift(self):
+        state = next_joint_seed_path_state(
+            {},
+            waypoint_index=1,
+            right_drift_m=0.01,
+            left_drift_m=0.02,
+            collision_pairs=(),
+        )
+        self.assertAlmostEqual(state["max_position_drift_m"], 0.02)
+        self.assertFalse(state["terminate"])
+
+        state = next_joint_seed_path_state(
+            state,
+            waypoint_index=2,
+            right_drift_m=0.025,
+            left_drift_m=0.01,
+            collision_pairs=(),
+        )
+        self.assertAlmostEqual(state["max_position_drift_m"], 0.025)
+        self.assertEqual(state["waypoint_count"], 2)
+        self.assertFalse(state["terminate"])
+
+    def test_path_state_stops_on_the_first_collision_and_keeps_pairs(self):
+        state = next_joint_seed_path_state(
+            {},
+            waypoint_index=7,
+            right_drift_m=0.01,
+            left_drift_m=0.02,
+            collision_pairs=(("robot_link", "table"),),
+        )
+
+        self.assertTrue(state["terminate"])
+        self.assertEqual(state["failure"], "collision")
+        self.assertEqual(state["failed_waypoint"], 7)
+        self.assertEqual(state["collision_frames"], 1)
+        self.assertEqual(state["collision_pairs"], [["robot_link", "table"]])
+
+    def test_path_state_stops_on_excessive_position_drift(self):
+        state = next_joint_seed_path_state(
+            {},
+            waypoint_index=3,
+            right_drift_m=0.0301,
+            left_drift_m=0.0,
+            collision_pairs=(),
+        )
+
+        self.assertTrue(state["terminate"])
+        self.assertEqual(state["failure"], "position_drift")
+        self.assertEqual(state["failed_waypoint"], 3)
+
+    def test_path_state_rejects_invalid_measurements(self):
+        invalid = (
+            {"waypoint_index": 0},
+            {"right_drift_m": float("nan")},
+            {"left_drift_m": -0.01},
+            {"collision_pairs": (("only-one-name",),)},
+            {"max_position_drift_m": 0.0},
+        )
+        common = {
+            "waypoint_index": 1,
+            "right_drift_m": 0.0,
+            "left_drift_m": 0.0,
+            "collision_pairs": (),
+            "max_position_drift_m": 0.03,
+        }
+        for override in invalid:
+            with self.subTest(override=override):
+                with self.assertRaises(ValueError):
+                    next_joint_seed_path_state({}, **{**common, **override})
 
 
 class OrientationAlignmentStateTests(unittest.TestCase):

@@ -510,6 +510,74 @@ def joint_seed_failures(record: Mapping[str, object]) -> list[str]:
     return list(dict.fromkeys(failures))
 
 
+def next_joint_seed_path_state(
+    previous: Mapping[str, object],
+    *,
+    waypoint_index: int,
+    right_drift_m: float,
+    left_drift_m: float,
+    collision_pairs: object,
+    max_position_drift_m: float = JOINT_SEED_THRESHOLDS[
+        "max_path_position_drift_m"
+    ],
+) -> dict[str, object]:
+    """Advance collision and grip-site drift evidence for a joint path."""
+    if (
+        isinstance(waypoint_index, bool)
+        or int(waypoint_index) != waypoint_index
+        or int(waypoint_index) < 1
+    ):
+        raise ValueError("waypoint_index must be a positive integer")
+    measurements = (float(right_drift_m), float(left_drift_m))
+    drift_limit = float(max_position_drift_m)
+    if not all(np.isfinite(value) and value >= 0.0 for value in measurements):
+        raise ValueError("joint seed drift measurements must be finite and non-negative")
+    if not np.isfinite(drift_limit) or drift_limit <= 0.0:
+        raise ValueError("max_position_drift_m must be finite and positive")
+    try:
+        pairs = [list(pair) for pair in collision_pairs]
+    except TypeError as exc:
+        raise ValueError("collision_pairs must contain geom-name pairs") from exc
+    if any(
+        len(pair) != 2 or not all(isinstance(name, str) for name in pair)
+        for pair in pairs
+    ):
+        raise ValueError("collision_pairs must contain geom-name pairs")
+
+    previous_drift = float(previous.get("max_position_drift_m", 0.0))
+    previous_frames = previous.get("collision_frames", 0)
+    if not np.isfinite(previous_drift) or previous_drift < 0.0:
+        raise ValueError("previous path drift is invalid")
+    if (
+        isinstance(previous_frames, bool)
+        or int(previous_frames) != previous_frames
+        or int(previous_frames) < 0
+    ):
+        raise ValueError("previous collision frame count is invalid")
+    previous_pairs = previous.get("collision_pairs", [])
+    if not isinstance(previous_pairs, list):
+        raise ValueError("previous collision pairs are invalid")
+
+    maximum_drift = max(previous_drift, *measurements)
+    collision_frames = int(previous_frames) + int(bool(pairs))
+    all_pairs = [list(pair) for pair in previous_pairs]
+    for pair in pairs:
+        if pair not in all_pairs:
+            all_pairs.append(pair)
+    failure = "collision" if pairs else None
+    if failure is None and maximum_drift > drift_limit:
+        failure = "position_drift"
+    return {
+        "waypoint_count": int(waypoint_index),
+        "max_position_drift_m": maximum_drift,
+        "collision_frames": collision_frames,
+        "collision_pairs": all_pairs,
+        "terminate": failure is not None,
+        "failure": failure,
+        "failed_waypoint": int(waypoint_index) if failure is not None else None,
+    }
+
+
 def next_orientation_alignment_state(
     previous: Mapping[str, object],
     *,
@@ -1245,10 +1313,23 @@ def _center_regrasp_probe(
     orientation_stable_steps: int,
     orientation_max_steps: int,
     orientation_max_position_drift_m: float,
+    orientation_joint_seed: bool = False,
+    orientation_joint_seed_margin_rad: float = 0.03,
+    orientation_joint_seed_max_nfev: int = 800,
+    orientation_joint_seed_steps: int = 240,
+    orientation_joint_seed_position_scale_m: float = 0.01,
+    orientation_joint_seed_axis_scale: float = float(np.sin(np.deg2rad(5.0))),
+    orientation_joint_seed_regularization: float = 0.02,
+    orientation_joint_seed_max_error_deg: float = JOINT_SEED_THRESHOLDS["error_deg"],
+    orientation_joint_seed_max_endpoint_position_error_m: float = (
+        JOINT_SEED_THRESHOLDS["max_endpoint_position_error_m"]
+    ),
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import (
         OfficialScriptedGraspDriver,
         gripper_close_command,
+        joint_interpolation_path,
+        synchronize_controller_goals,
     )
     from robot_agent.skills.competition_transport import _is_allowed_cradle_geom
 
@@ -1263,6 +1344,9 @@ def _center_regrasp_probe(
     maximum_support_steps = 0
     collision_steps = 0
     orientation_alignment = None
+    joint_seed = None
+    if orientation_joint_seed and not align_closure_axes:
+        raise ValueError("orientation_joint_seed requires align_closure_axes")
 
     def eef_positions() -> dict[str, np.ndarray]:
         return {
@@ -1278,6 +1362,353 @@ def _center_regrasp_probe(
             arm: eef_site_pose(raw_env, robot, arm)
             for arm in ("right", "left")
         }
+
+    def execute_joint_orientation_seed(target_axis: np.ndarray) -> dict[str, object]:
+        nonlocal collision_steps
+        arms = ("right", "left")
+        model = raw_env.sim.model
+        data = raw_env.sim.data
+        joint_names = [
+            f"robot0_arm_{arm}_{index}_joint"
+            for arm in arms
+            for index in range(1, 7)
+        ]
+        joint_ids = [model.joint_name2id(name) for name in joint_names]
+        qpos_addrs = [model.get_joint_qpos_addr(name) for name in joint_names]
+        if any(isinstance(address, tuple) for address in qpos_addrs):
+            raise RuntimeError("arm joints must have scalar qpos addresses")
+        official_lower = np.asarray(
+            [model.jnt_range[joint_id][0] for joint_id in joint_ids],
+            dtype=float,
+        )
+        official_upper = np.asarray(
+            [model.jnt_range[joint_id][1] for joint_id in joint_ids],
+            dtype=float,
+        )
+        lower, upper = interior_joint_bounds(
+            official_lower,
+            official_upper,
+            margin_rad=orientation_joint_seed_margin_rad,
+        )
+        start = np.asarray(data.qpos[qpos_addrs], dtype=float).copy()
+        start_poses = alignment_eef_poses()
+        start_positions = {arm: start_poses[arm][0] for arm in arms}
+        start_axes = {arm: start_poses[arm][1][:, 0] for arm in arms}
+        target_axes = {
+            arm: nearest_directed_axis_target(start_axes[arm], target_axis)
+            for arm in arms
+        }
+        joint_ranges = official_upper - official_lower
+        steps = int(orientation_joint_seed_steps)
+        max_nfev = int(orientation_joint_seed_max_nfev)
+        max_error = float(orientation_joint_seed_max_error_deg)
+        max_endpoint_position_error = float(
+            orientation_joint_seed_max_endpoint_position_error_m
+        )
+        if steps < 1 or max_nfev < 1:
+            raise ValueError("joint seed steps and max_nfev must be positive")
+        if (
+            not np.isfinite(max_error)
+            or max_error < 0.0
+            or max_error > JOINT_SEED_THRESHOLDS["error_deg"]
+        ):
+            raise ValueError("joint seed endpoint error exceeds the hard gate")
+        if (
+            not np.isfinite(max_endpoint_position_error)
+            or max_endpoint_position_error < 0.0
+            or max_endpoint_position_error
+            > JOINT_SEED_THRESHOLDS["max_endpoint_position_error_m"]
+        ):
+            raise ValueError("joint seed endpoint position error exceeds the hard gate")
+
+        summary: dict[str, object] = {
+            "success": False,
+            "failure": None,
+            "right_error_deg": closure_axis_error_degrees(
+                start_axes["right"], target_axes["right"]
+            ),
+            "left_error_deg": closure_axis_error_degrees(
+                start_axes["left"], target_axes["left"]
+            ),
+            "max_endpoint_position_error_m": 0.0,
+            "max_path_position_drift_m": 0.0,
+            "min_bound_margin_rad": 0.0,
+            "collision_frames": 0,
+            "collision_pairs": [],
+            "rolled_back": False,
+            "controller_synchronized": False,
+            "joint_names": joint_names,
+            "start_joints": start.tolist(),
+            "target_joints": None,
+            "official_lower_bounds": official_lower.tolist(),
+            "official_upper_bounds": official_upper.tolist(),
+            "interior_lower_bounds": lower.tolist(),
+            "interior_upper_bounds": upper.tolist(),
+            "initial_positions": {
+                arm: start_positions[arm].tolist() for arm in arms
+            },
+            "initial_closure_axes": {
+                arm: start_axes[arm].tolist() for arm in arms
+            },
+            "target_closure_axes": {
+                arm: target_axes[arm].tolist() for arm in arms
+            },
+            "solver": None,
+            "endpoint_residual": None,
+            "waypoint_count": 0,
+            "failed_waypoint": None,
+        }
+
+        def restore_start(*, record_frame: bool) -> None:
+            data.qpos[qpos_addrs] = start
+            raw_env.sim.forward()
+            synchronize_controller_goals(robot)
+            summary["controller_synchronized"] = True
+            if record_frame:
+                recorder = getattr(backend, "_record_trajectory_frame", None)
+                if callable(recorder):
+                    recorder(_env=raw_env)
+
+        from scipy.optimize import least_squares
+
+        solution = None
+        proposal = None
+        try:
+            solver_start = np.clip(start, lower + 1e-9, upper - 1e-9)
+
+            def residual(joints: np.ndarray) -> np.ndarray:
+                data.qpos[qpos_addrs] = joints
+                raw_env.sim.forward()
+                poses = alignment_eef_poses()
+                return joint_seed_objective_residual(
+                    current_positions={arm: poses[arm][0] for arm in arms},
+                    target_positions=start_positions,
+                    current_axes={arm: poses[arm][1][:, 0] for arm in arms},
+                    target_axes=target_axes,
+                    joints=joints,
+                    start_joints=start,
+                    joint_ranges=joint_ranges,
+                    position_scale_m=orientation_joint_seed_position_scale_m,
+                    axis_scale=orientation_joint_seed_axis_scale,
+                    regularization=orientation_joint_seed_regularization,
+                )
+
+            solution = least_squares(
+                residual,
+                solver_start,
+                bounds=(lower, upper),
+                max_nfev=max_nfev,
+            )
+            proposal = np.asarray(solution.x, dtype=float).copy()
+        except Exception as exc:
+            summary["failure"] = "solver_exception"
+            summary["solver"] = {
+                "success": False,
+                "exception": f"{type(exc).__name__}: {exc}",
+            }
+        finally:
+            data.qpos[qpos_addrs] = start
+            raw_env.sim.forward()
+
+        if solution is None or proposal is None:
+            summary["rolled_back"] = True
+            restore_start(record_frame=True)
+            stage_results.append({"stage": "joint_space_wrist_seed", **summary})
+            return summary
+
+        summary["target_joints"] = proposal.tolist()
+        summary["solver"] = {
+            "success": bool(solution.success),
+            "status": int(solution.status),
+            "message": str(solution.message),
+            "nfev": int(solution.nfev),
+            "cost": float(solution.cost),
+            "optimality": float(solution.optimality),
+        }
+
+        endpoint_collisions: list[tuple[str, str]] = []
+        try:
+            data.qpos[qpos_addrs] = proposal
+            raw_env.sim.forward()
+            endpoint_poses = alignment_eef_poses()
+            endpoint_positions = {arm: endpoint_poses[arm][0] for arm in arms}
+            endpoint_axes = {arm: endpoint_poses[arm][1][:, 0] for arm in arms}
+            endpoint_errors = {
+                arm: closure_axis_error_degrees(
+                    endpoint_axes[arm], target_axes[arm]
+                )
+                for arm in arms
+            }
+            endpoint_position_errors = {
+                arm: float(
+                    np.linalg.norm(endpoint_positions[arm] - start_positions[arm])
+                )
+                for arm in arms
+            }
+            endpoint_residual = joint_seed_objective_residual(
+                current_positions=endpoint_positions,
+                target_positions=start_positions,
+                current_axes=endpoint_axes,
+                target_axes=target_axes,
+                joints=proposal,
+                start_joints=start,
+                joint_ranges=joint_ranges,
+                position_scale_m=orientation_joint_seed_position_scale_m,
+                axis_scale=orientation_joint_seed_axis_scale,
+                regularization=orientation_joint_seed_regularization,
+            )
+            from robot_agent.environments.robosuite_backend import (
+                _navigation_collisions,
+            )
+
+            endpoint_collisions = list(
+                _navigation_collisions(
+                    raw_env,
+                    robot,
+                    getattr(backend, "_ignore_collision_geom", ()),
+                )
+            )
+            summary.update(
+                {
+                    "right_error_deg": endpoint_errors["right"],
+                    "left_error_deg": endpoint_errors["left"],
+                    "max_endpoint_position_error_m": max(
+                        endpoint_position_errors.values()
+                    ),
+                    "min_bound_margin_rad": float(
+                        np.min(
+                            np.concatenate(
+                                [proposal - lower, upper - proposal]
+                            )
+                        )
+                    ),
+                    "endpoint_positions": {
+                        arm: endpoint_positions[arm].tolist() for arm in arms
+                    },
+                    "endpoint_closure_axes": {
+                        arm: endpoint_axes[arm].tolist() for arm in arms
+                    },
+                    "endpoint_position_errors_m": endpoint_position_errors,
+                    "endpoint_residual": endpoint_residual.tolist(),
+                    "collision_pairs": [
+                        [str(name) for name in pair]
+                        for pair in endpoint_collisions
+                    ],
+                    "collision_frames": int(bool(endpoint_collisions)),
+                }
+            )
+        finally:
+            data.qpos[qpos_addrs] = start
+            raw_env.sim.forward()
+
+        endpoint_failure = None
+        if not bool(solution.success):
+            endpoint_failure = "solver"
+        elif endpoint_collisions:
+            endpoint_failure = "endpoint_collision"
+        elif float(summary["right_error_deg"]) > max_error or float(
+            summary["left_error_deg"]
+        ) > max_error:
+            endpoint_failure = "endpoint_orientation"
+        elif (
+            float(summary["max_endpoint_position_error_m"])
+            > max_endpoint_position_error
+        ):
+            endpoint_failure = "endpoint_position"
+        elif float(summary["min_bound_margin_rad"]) < 0.0:
+            endpoint_failure = "endpoint_bounds"
+        if endpoint_failure is not None:
+            collision_steps += int(bool(endpoint_collisions))
+            summary["failure"] = endpoint_failure
+            summary["rolled_back"] = True
+            restore_start(record_frame=True)
+            stage_results.append({"stage": "joint_space_wrist_seed", **summary})
+            return summary
+
+        path_state: dict[str, object] = {
+            "max_position_drift_m": 0.0,
+            "collision_frames": 0,
+            "collision_pairs": [],
+        }
+        for waypoint_index, values in enumerate(
+            joint_interpolation_path(start, proposal, steps=steps),
+            start=1,
+        ):
+            data.qpos[qpos_addrs] = values
+            raw_env.sim.forward()
+            poses = alignment_eef_poses()
+            drift = {
+                arm: float(np.linalg.norm(poses[arm][0] - start_positions[arm]))
+                for arm in arms
+            }
+            collisions = list(
+                _navigation_collisions(
+                    raw_env,
+                    robot,
+                    getattr(backend, "_ignore_collision_geom", ()),
+                )
+            )
+            path_state = next_joint_seed_path_state(
+                path_state,
+                waypoint_index=waypoint_index,
+                right_drift_m=drift["right"],
+                left_drift_m=drift["left"],
+                collision_pairs=collisions,
+                max_position_drift_m=JOINT_SEED_THRESHOLDS[
+                    "max_path_position_drift_m"
+                ],
+            )
+            observations.append(
+                {
+                    "stage": "joint_space_wrist_seed",
+                    "step": waypoint_index,
+                    "joints": np.asarray(values, dtype=float).tolist(),
+                    "eef_positions": {
+                        arm: poses[arm][0].tolist() for arm in arms
+                    },
+                    "closure_axes": {
+                        arm: poses[arm][1][:, 0].tolist() for arm in arms
+                    },
+                    "position_drift_m": drift,
+                    "judge_collision_pairs": [
+                        [str(name) for name in pair] for pair in collisions
+                    ],
+                }
+            )
+            recorder = getattr(backend, "_record_trajectory_frame", None)
+            if callable(recorder):
+                recorder(_env=raw_env)
+            if bool(path_state["terminate"]):
+                break
+
+        summary.update(
+            {
+                "max_path_position_drift_m": float(
+                    path_state["max_position_drift_m"]
+                ),
+                "waypoint_count": int(path_state["waypoint_count"]),
+                "failed_waypoint": path_state["failed_waypoint"],
+                "collision_frames": int(summary["collision_frames"])
+                + int(path_state["collision_frames"]),
+                "collision_pairs": list(summary["collision_pairs"])
+                + [
+                    pair
+                    for pair in path_state["collision_pairs"]
+                    if pair not in summary["collision_pairs"]
+                ],
+            }
+        )
+        if bool(path_state["terminate"]):
+            collision_steps += int(path_state["collision_frames"])
+            summary["failure"] = f"path_{path_state['failure']}"
+            summary["rolled_back"] = True
+            restore_start(record_frame=True)
+        else:
+            synchronize_controller_goals(robot)
+            summary["controller_synchronized"] = True
+            summary["success"] = True
+        stage_results.append({"stage": "joint_space_wrist_seed", **summary})
+        return summary
 
     def controller_origin_rotation(arm: str) -> np.ndarray:
         controller = robot.part_controllers[arm]
@@ -1751,6 +2182,18 @@ def _center_regrasp_probe(
                 "stages": stage_results,
                 "observations": observations,
             }
+        if orientation_joint_seed:
+            joint_seed = execute_joint_orientation_seed(separation_axis)
+            if not joint_seed["success"]:
+                return {
+                    "success": False,
+                    "failure_stage": "joint_space_wrist_seed",
+                    "support_contact_steps": maximum_support_steps,
+                    "collision_steps": collision_steps,
+                    "joint_seed": joint_seed,
+                    "stages": stage_results,
+                    "observations": observations,
+                }
         if align_closure_axes:
             orientation_alignment = execute_orientation_alignment(separation_axis)
             if not orientation_alignment["success"]:
@@ -1759,6 +2202,7 @@ def _center_regrasp_probe(
                     "failure_stage": "align_closure_axes_high",
                     "support_contact_steps": maximum_support_steps,
                     "collision_steps": collision_steps,
+                    "joint_seed": joint_seed,
                     "orientation_alignment": orientation_alignment,
                     "stages": stage_results,
                     "observations": observations,
@@ -1875,6 +2319,7 @@ def _center_regrasp_probe(
         "lift_m": final_object_z - float(table_object_z),
         "support_contact_steps": maximum_support_steps,
         "collision_steps": collision_steps,
+        "joint_seed": joint_seed,
         "orientation_alignment": orientation_alignment,
         "stages": stage_results,
         "observations": observations,
