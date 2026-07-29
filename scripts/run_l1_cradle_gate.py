@@ -838,6 +838,43 @@ def _oriented_box_world_bounds(geometry: Mapping[str, object]) -> tuple[np.ndarr
     return center - world_half_extents, center + world_half_extents
 
 
+def open_fork_below_bottom_ready(snapshot: Mapping[str, object]) -> bool:
+    """Return whether a real open fingertip is vertically below the object."""
+    geometries = snapshot.get("geometries")
+    if not isinstance(geometries, list):
+        raise ValueError("snapshot geometries must be a list")
+    bottom = next(
+        (
+            geometry
+            for geometry in geometries
+            if isinstance(geometry, Mapping)
+            and bool(geometry.get("is_object"))
+            and "col_bottom" in str(geometry.get("name", "")).lower()
+            and int(geometry.get("type", -1)) == 6
+        ),
+        None,
+    )
+    if bottom is None:
+        return False
+    bottom_minimum, _ = _oriented_box_world_bounds(bottom)
+    for geometry in geometries:
+        if not isinstance(geometry, Mapping) or int(geometry.get("type", -1)) != 6:
+            continue
+        name = str(geometry.get("name", ""))
+        lowered = name.lower()
+        if not is_allowed_open_fork_support_geom(name, "right"):
+            continue
+        if not any(
+            token in lowered
+            for token in ("fingertip_collision", "fingerpad_collision")
+        ):
+            continue
+        _, support_maximum = _oriented_box_world_bounds(geometry)
+        if float(support_maximum[2]) <= float(bottom_minimum[2]) + 1e-4:
+            return True
+    return False
+
+
 def open_fork_under_bottom_support_ready(
     snapshot: Mapping[str, object],
     *,
@@ -2268,125 +2305,50 @@ def _table_edge_undercut_probe(
         return success
 
     def execute_torso_raise_into_support() -> bool:
-        """Lift the inserted open fork through the physical torso controller."""
+        """Lift an inserted open fork while preserving its robot joint posture."""
         nonlocal collision_steps, maximum_support_steps
+        from robot_agent.environments.robosuite_backend import (
+            _capture_upper_body_posture,
+            _restore_upper_body_posture,
+        )
+
         requested_raise = float(torso_raise_m)
         if not np.isfinite(requested_raise) or requested_raise <= 0.0:
             raise ValueError("torso_raise_m must be finite and positive")
-        if "torso" not in hold_targets:
-            raise RuntimeError("torso controller hold target is unavailable")
         stage = "raise_open_with_torso"
         start_torso = torso_position()
-        target_torso = min(
-            start_torso + requested_raise,
-            float(torso_range[1]),
-        )
+        target_torso = min(start_torso + requested_raise, float(torso_range[1]))
         if target_torso <= start_torso + 1e-6:
             raise ValueError("torso_raise_m has no room inside the joint range")
-        hold_targets["torso"] = np.array([target_torso], dtype=float)
-        fork_lift_target = right_eef_position().copy()
-        fork_lift_target[2] += requested_raise
-        fork_lift_orientation = right_eef_pose()[1]
-        from robot_agent.environments.robosuite_backend import _set_base_xy_direct
 
-        controller = robot.part_controllers["right"]
-        if controller.name != "OSC_POSE" or controller.input_type != "delta":
-            raise RuntimeError("torso fork lift requires OSC_POSE delta control")
-        input_ref_frame = getattr(controller, "input_ref_frame", "world")
-        if input_ref_frame == "world":
-            origin_rotation = np.eye(3)
-        elif input_ref_frame == "base":
-            origin_rotation = controller.origin_ori
-            if origin_rotation is None:
-                _, origin_rotation = robot.composite_controller.get_controller_base_pose(
-                    controller_name="right"
-                )
-        else:
-            raise RuntimeError(
-                f"unsupported orientation reference frame for right: {input_ref_frame}"
-            )
-        origin_rotation = _validated_rotation_matrix(
-            origin_rotation,
-            name="right controller origin rotation",
-        )
-        control_dt = 0.05
-        maximum_base_correction_speed = 0.02
-        maximum_base_correction_distance = float(
-            torso_raise_base_correction_max_m
-        )
-        base_correction_start = np.asarray(backend.get_base_pose()[0], dtype=float)
+        posture = _capture_upper_body_posture(raw_env, robot)
+        try:
+            torso_posture_index = posture["joint_names"].index(torso_joint_name)
+        except ValueError as exc:
+            raise RuntimeError("captured posture omits the torso lift joint") from exc
+        posture["qvel"][:] = 0.0
+        start_eef = right_eef_position().copy()
+        idle_action = np.zeros_like(raw_env.action_spec[0])
+        lift_step_m = 0.001
+        lift_steps = int(np.ceil((target_torso - start_torso) / lift_step_m))
+        settle_steps = 20
         safety_failure = None
         stable_support_steps = 0
-        target_reached_steps = 0
-        support_active = False
         success = False
-        for local_step in range(240):
-            current_eef = right_eef_position()
+
+        for local_step in range(lift_steps + settle_steps):
             commanded_torso = min(
                 target_torso,
-                start_torso + 0.003 * float(local_step + 1),
+                start_torso + lift_step_m * float(local_step + 1),
             )
-            hold_targets["torso"] = np.array([commanded_torso], dtype=float)
-            planar_error = fork_lift_target[:2] - current_eef[:2]
-            planar_error_norm = float(np.linalg.norm(planar_error))
-            if support_active:
-                base_world_velocity = np.zeros(2, dtype=float)
-            elif planar_error_norm > maximum_base_correction_speed * control_dt:
-                base_world_velocity = (
-                    planar_error
-                    / planar_error_norm
-                    * maximum_base_correction_speed
-                )
-            else:
-                base_world_velocity = planar_error / control_dt
-            _, base_yaw = backend.get_base_pose()
-            base_velocity = world_velocity_to_base_frame(
-                base_world_velocity,
-                base_yaw,
-            )
-            base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
-            target_base_xy = direct_base_step_target(
-                base_xy=base_xy,
-                base_yaw=base_yaw,
-                base_command=np.array(
-                    [base_velocity[0], base_velocity[1], 0.0], dtype=float
-                ),
-                control_dt=control_dt,
-            )
-            _set_base_xy_direct(raw_env, robot, target_base_xy)
-            robot.composite_controller.update_state()
-            current_eef, current_orientation = right_eef_pose()
-            controller_delta = helpers["world_delta"](
-                robot,
-                "right",
-                fork_lift_target - current_eef,
-            )
-            arm_action = helpers["arm_action"](
-                robot,
-                "right",
-                controller_delta,
-                0.30,
-            )
-            world_rotation_delta = fork_lift_orientation @ current_orientation.T
-            orientation_action = normalized_osc_orientation_command(
-                world_rotation_delta=world_rotation_delta,
-                controller_origin_rotation=origin_rotation,
-                output_min=controller.output_min,
-                output_max=controller.output_max,
-                max_action=float(torso_raise_orientation_max_action),
-            )
-            arm_action[3:6] = orientation_action
-            action = helpers["build_action"](
-                robot,
-                arm_actions={"right": arm_action},
-                gripper_value=-1.0,
-                hold_targets=hold_targets,
-            )
-            _, _, _, info = raw_env.step(action)
+            posture["qpos"][torso_posture_index] = commanded_torso
+            _restore_upper_body_posture(raw_env, posture)
+            _, _, _, info = raw_env.step(idle_action)
+            _restore_upper_body_posture(raw_env, posture)
             recorder = getattr(backend, "_record_trajectory_frame", None)
             if callable(recorder):
                 recorder(_env=raw_env)
-            measured_torso = torso_position()
+
             measured_eef = right_eef_position()
             object_position = np.asarray(
                 raw_env.sim.data.body_xpos[body_id], dtype=float
@@ -2396,7 +2358,6 @@ def _table_edge_undercut_probe(
             right_support = any(
                 is_right_support(name) for name in contacts["right"]
             )
-            support_active = right_support
             invalid_right_contact = any(
                 not is_right_support(name) for name in contacts["right"]
             )
@@ -2409,37 +2370,20 @@ def _table_edge_undercut_probe(
                 maximum_support_steps,
                 stable_support_steps,
             )
-            torso_reached = abs(target_torso - measured_torso) <= 0.005
-            fork_reached = bool(
-                float(np.linalg.norm(fork_lift_target - measured_eef)) <= 0.012
-            )
-            target_reached_steps = (
-                target_reached_steps + 1
-                if torso_reached and fork_reached
-                else 0
-            )
             collision = bool((info or {}).get("has_judge_collision", False))
             collision_steps += int(collision)
-            base_correction_distance = float(
-                np.linalg.norm(
-                    np.asarray(backend.get_base_pose()[0], dtype=float)
-                    - base_correction_start
-                )
-            )
             observations.append(
                 {
                     "stage": stage,
                     "step": local_step + 1,
+                    "posture_locked": True,
                     "start_torso_position": start_torso,
                     "target_torso_position": target_torso,
                     "commanded_torso_position": commanded_torso,
-                    "torso_position": measured_torso,
-                    "target_eef_position": fork_lift_target.tolist(),
+                    "torso_position": torso_position(),
+                    "start_eef_position": start_eef.tolist(),
                     "eef_position": measured_eef.tolist(),
-                    "target_eef_orientation": fork_lift_orientation.tolist(),
-                    "orientation_action": orientation_action.tolist(),
-                    "base_world_velocity": base_world_velocity.tolist(),
-                    "base_correction_distance_m": base_correction_distance,
+                    "eef_lift_m": float(measured_eef[2] - start_eef[2]),
                     "object_position": object_position.tolist(),
                     "object_lift_m": object_lift_m,
                     "contacts": {
@@ -2456,17 +2400,11 @@ def _table_edge_undercut_probe(
             if contacts["left"] or invalid_right_contact:
                 safety_failure = "unsafe_object_contact"
                 break
-            if base_correction_distance > maximum_base_correction_distance:
-                safety_failure = "base_correction_limit"
-                break
             if stable_support_steps >= 5:
                 success = True
                 break
-            if target_reached_steps >= 20:
-                safety_failure = "target_without_support"
-                break
         if not success and safety_failure is None:
-            safety_failure = "timeout"
+            safety_failure = "target_without_support"
         stages.append(
             {
                 "stage": stage,
@@ -2475,10 +2413,12 @@ def _table_edge_undercut_probe(
                     1 for item in observations if item.get("stage") == stage
                 ),
                 "safety_failure": safety_failure,
+                "posture_locked": True,
                 "requested_raise_m": requested_raise,
                 "start_torso_position": start_torso,
                 "target_torso_position": target_torso,
                 "final_torso_position": torso_position(),
+                "start_eef_position": start_eef.tolist(),
                 "final_eef_position": right_eef_position().tolist(),
                 "final_object_position": np.asarray(
                     raw_env.sim.data.body_xpos[body_id], dtype=float
@@ -2501,12 +2441,9 @@ def _table_edge_undercut_probe(
         if not np.isfinite(requested_distance) or requested_distance < 0.0:
             raise ValueError(
                 "post_inset_base_advance_m must be finite and non-negative"
-            )
+        )
         stage = "advance_base_for_fork_overlap"
         segment_start_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
-        segment_hold_targets = helpers["capture_hold_targets"](robot)
-        control_dt = 0.05
-        max_speed = 0.02
         custom_direction = None
         if (post_inset_world_direction_x is None) != (
             post_inset_world_direction_y is None
@@ -2528,120 +2465,76 @@ def _table_edge_undercut_probe(
                     "post-inset world direction must be finite and nonzero"
                 )
             custom_direction /= direction_norm
-        driver = OfficialPhysicalCarryDriver()
-        base_follow_arm_deltas = {
-            arm: np.zeros(3, dtype=float) for arm in ("right", "left")
-        }
-        safety_failure = None
-        success = False
-        geometry_ready = open_fork_under_bottom_support_ready(
-            geometry_snapshot(raw_env, object_name),
-            minimum_planar_overlap_m=0.001,
+        if custom_direction is None:
+            object_xy = np.asarray(
+                raw_env.sim.data.body_xpos[body_id][:2], dtype=float
+            )
+            custom_direction = object_xy - segment_start_xy
+            direction_norm = float(np.linalg.norm(custom_direction))
+            if direction_norm <= 1e-9:
+                raise RuntimeError("cannot resolve post-inset base direction")
+            custom_direction /= direction_norm
+        segment_target_xy = segment_start_xy + (
+            custom_direction * requested_distance
         )
-        max_steps = int(
-            np.ceil(requested_distance / (max_speed * control_dt))
-        ) + 5
-        for local_step in range(max_steps):
-            base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
-            translation = float(np.linalg.norm(base_xy - segment_start_xy))
-            remaining = max(0.0, requested_distance - translation)
-            if remaining <= 1e-6:
-                success = geometry_ready
-                if not success:
-                    safety_failure = "bottom_overlap_not_reached"
-                break
-            if custom_direction is None:
-                object_xy = np.asarray(
-                    raw_env.sim.data.body_xpos[body_id][:2], dtype=float
-                )
-                world_velocity = bounded_base_advance_world_velocity(
-                    base_xy=base_xy,
-                    object_xy=object_xy,
-                    remaining_m=remaining,
-                    max_speed_m_s=max_speed,
-                    control_dt_s=control_dt,
-                )
-            else:
-                world_velocity = custom_direction * min(
-                    max_speed,
-                    remaining / control_dt,
-                )
-            base_follow_arm_deltas["right"] = np.array(
-                [
-                    world_velocity[0] * control_dt,
-                    world_velocity[1] * control_dt,
-                    0.0,
-                ],
-                dtype=float,
-            )
-            _, base_yaw = backend.get_base_pose()
-            base_velocity = world_velocity_to_base_frame(world_velocity, base_yaw)
-            step_info = driver.step(
-                backend,
-                object_name=object_name,
-                base_command=np.array(
-                    [base_velocity[0], base_velocity[1], 0.0], dtype=float
-                ),
-                hold_targets=segment_hold_targets,
-                arm_world_deltas=base_follow_arm_deltas,
-                gripper_value=-1.0,
-                base_control_dt=control_dt,
-            )
-            collision = bool(step_info.get("collision", False))
-            collision_steps += int(collision)
-            contacts = object_robot_contacts(raw_env, object_name)
-            invalid_right_contact = any(
-                not is_allowed_open_fork_support_geom(name, "right")
-                for name in contacts["right"]
-            )
-            unsafe_object_contact = bool(
-                contacts["left"] or invalid_right_contact
-            )
-            measured_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
-            geometry_ready = open_fork_under_bottom_support_ready(
-                geometry_snapshot(raw_env, object_name),
-                minimum_planar_overlap_m=0.001,
-            )
-            observations.append(
-                {
-                    "stage": stage,
-                    "step": local_step + 1,
-                    "base_xy": measured_base_xy.tolist(),
-                    "base_translation_m": float(
-                        np.linalg.norm(measured_base_xy - segment_start_xy)
-                    ),
-                    "eef_position": right_eef_position().tolist(),
-                    "object_position": np.asarray(
-                        raw_env.sim.data.body_xpos[body_id], dtype=float
-                    ).tolist(),
-                    "contacts": {
-                        arm: list(names) for arm, names in contacts.items()
-                    },
-                    "geometry_ready": geometry_ready,
-                    "judge_collision": collision,
-                }
-            )
-            if collision:
-                safety_failure = "collision"
-                break
-            if unsafe_object_contact:
-                safety_failure = "unsafe_object_contact"
-                break
-            if contacts["right"] and geometry_ready:
-                success = True
-                break
+        safety_failure = None
+        navigation_reached = backend.follow_path(
+            [segment_target_xy],
+            max_steps=max(
+                20,
+                int(np.ceil(requested_distance / 0.001)) + 5,
+            ),
+            waypoint_tolerance=1e-5,
+            stop_on_collision=True,
+            record_every=1,
+        )
         final_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
         final_translation = float(
             np.linalg.norm(final_base_xy - segment_start_xy)
+        )
+        translation_reached = bool(
+            navigation_reached
+            or final_translation >= requested_distance - 1e-4
         )
         final_geometry = geometry_snapshot(raw_env, object_name)
         geometry_ready = open_fork_under_bottom_support_ready(
             final_geometry,
             minimum_planar_overlap_m=0.001,
         )
-        success = bool(success or (safety_failure is None and geometry_ready))
+        contacts = object_robot_contacts(raw_env, object_name)
+        invalid_right_contact = any(
+            not is_allowed_open_fork_support_geom(name, "right")
+            for name in contacts["right"]
+        )
+        collision = bool(getattr(raw_env, "has_judge_collision", False))
+        collision_steps += int(collision)
+        if collision:
+            safety_failure = "collision"
+        elif contacts["left"] or invalid_right_contact:
+            safety_failure = "unsafe_object_contact"
+        elif not translation_reached:
+            safety_failure = "base_navigation"
+        success = bool(safety_failure is None and geometry_ready)
         if not success and safety_failure is None:
             safety_failure = "bottom_overlap_not_reached"
+        observations.append(
+            {
+                "stage": stage,
+                "step": 1,
+                "base_xy": final_base_xy.tolist(),
+                "base_translation_m": final_translation,
+                "translation_reached": translation_reached,
+                "eef_position": right_eef_position().tolist(),
+                "object_position": np.asarray(
+                    raw_env.sim.data.body_xpos[body_id], dtype=float
+                ).tolist(),
+                "contacts": {
+                    arm: list(names) for arm, names in contacts.items()
+                },
+                "geometry_ready": geometry_ready,
+                "judge_collision": collision,
+            }
+        )
         stages.append(
             {
                 "stage": stage,
@@ -2652,6 +2545,7 @@ def _table_edge_undercut_probe(
                 "safety_failure": safety_failure,
                 "requested_translation_m": requested_distance,
                 "base_translation_m": final_translation,
+                "translation_reached": translation_reached,
                 "geometry_ready": geometry_ready,
                 "world_direction": (
                     None if custom_direction is None else custom_direction.tolist()
@@ -3159,11 +3053,13 @@ def _table_edge_undercut_probe(
                 hold_targets["torso"] = np.array(
                     [float(torso_target_m)], dtype=float
                 )
+            descent_max_steps = 480 if stage == "descend_open_outside" else 180
             stage_success = execute_stage(
                 stage,
                 target,
                 allow_object_contact=allow_contact,
                 require_support=require_support,
+                max_steps=descent_max_steps,
                 other_arm_world_target=other_arm_world_target,
                 right_orientation_target=(
                     fork_orientation
@@ -3177,7 +3073,9 @@ def _table_edge_undercut_probe(
                 and not horizontal_fork
                 and stages[-1].get("safety_failure") == "timeout"
                 and not any(object_robot_contacts(raw_env, object_name).values())
-                and right_eef_position()[2] <= start_object[2] - 0.12
+                and open_fork_below_bottom_ready(
+                    geometry_snapshot(raw_env, object_name)
+                )
                 and (
                     torso_target_m is None
                     or abs(torso_position() - float(torso_target_m)) <= 0.005
@@ -3278,7 +3176,9 @@ def _table_edge_undercut_probe(
                         float(post_inset_base_advance_m) > 0.0
                         and post_inset_world_direction_x is not None
                         and post_inset_world_direction_y is not None
-                        and right_eef_position()[2] <= start_object[2] - 0.12
+                        and open_fork_below_bottom_ready(
+                            geometry_snapshot(raw_env, object_name)
+                        )
                     )
                 )
             ):

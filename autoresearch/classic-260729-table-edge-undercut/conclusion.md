@@ -2,7 +2,7 @@
 
 ## Status
 
-Experiment in progress. No open-gripper support or official score is claimed.
+Experiment rejected. No open-gripper support or official score is claimed.
 
 Iteration 0 stopped safely in the first clearance stage. The right end effector
 moved from `z=1.161` to `z=1.324` without object contact or judge collision but
@@ -58,3 +58,23 @@ the open fingers still pointed primarily toward world `+x`, leaving them outside
 the bottom support footprint. The next isolated variable is wrist orientation:
 rotate the open hand toward world `-y` before insertion, then accept the route
 only after measured non-finger support contact and at least `0.02 m` object lift.
+
+## Final Finding
+
+Iterations 36-44 used the official posture-locking navigation mechanism to
+make the open fork follow the base and later to raise it with the torso. This
+removed the controller compensation problem and produced one transient
+`0.025111 m` object-height peak, but no terminal lift or sustained support.
+Every retained run had zero official collision frames, task-object pose writes,
+and attachment calls.
+
+The apparent bottom overlap was a false route. The official L1 scene adds the
+transparent static world geom `line_5_container_h01_near_support` below the
+movable container. Its half-size is `0.340 x 0.240 x 0.010 m`, while the
+container bottom is approximately `0.300 x 0.200 m`. Replaying iteration 44 at
+the pre-lift state showed 10-30 mm penetration between the right fingers and
+this static support. The fork was not under a freely movable bottom.
+
+Stop all undercut parameter sweeps. The next primary experiment is the
+candidate's real bilateral grasp followed by attachment-audited,
+posture-locked physical base transport.

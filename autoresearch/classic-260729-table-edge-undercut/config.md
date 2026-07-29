@@ -17,3 +17,13 @@ collisions, object-pose writes, and attachment calls.
 - Gripper: open throughout.
 
 Change one parameter per iteration and preserve every compact result JSON.
+
+## Later Evidence
+
+- Remote root: `/home/user/jciiot-2026/results/l1-table-edge-undercut-20260729/`
+- Static support geom: `line_5_container_h01_near_support`
+- Static support half-size: `0.340 x 0.240 x 0.010 m`
+- Movable bottom half-size: approximately `0.300 x 0.200 m`
+
+Trajectory-state replay showed the proposed fork deeply penetrating the static
+support before any attempted lift. The route is therefore rejected.

@@ -6,3 +6,9 @@ iteration	base_advance_m	object_offset_x_m	torso_target_m	below_bottom_clearance
 4	0.10	0.31	none	0.05	0.07	true	true	false	false	false	0	0.000000	0	0	0	discard:reachable edge target passed outside stage, but descent saturated at z=1.173 with torso fixed at its 0.35 m upper limit
 5	0.10	0.31	0.15	0.05	0.07	true	true	false	false	false	0	0.000000	0	0	0	discard:torso reached 0.150001 and EEF reached z=0.972 below the box, but missed the unnecessarily deep z=0.950 target tolerance
 6	0.10	0.31	0.15	0.03	0.07	true	true	true	false	false	0	0.000000	0	0	0	discard:reached z=0.971 below the container, but inward motion plateaued at y=4.854 for target y=4.748; open fingers remained outside the bottom footprint, so wrist orientation is the next variable
+36	0.148	0.25	0.15	0.03	0.07	true	true	true	true	false	0	0.000000	0	0	0	discard:official posture-locked base insertion passed the AABB overlap gate, but OSC raise moved the EEF down and produced no support
+38	0.148	0.25	0.15	0.03	0.07	true	true	true	true	false	0	0.000000	0	0	0	discard:torso rose 0.113 m while OSC compensated the fork downward; no object lift
+39	0.148	0.25	0.15	0.03	0.07	true	true	true	true	false	0	0.000004	0	0	0	discard:posture lock raised the fork 0.120 m, but edge overlap pushed the object laterally instead of supporting it
+40	0.148	0.25	0.15	0.03	0.07	true	true	true	true	false	0	0.000002	0	0	0	discard:transient peak lift 0.025111 m followed by immediate drop; no terminal support
+43	0.148	0.25	0.15	0.03	0.07	true	true	true	true	false	0	0.000000	0	0	0	discard:x-centered fork produced no lift after the object slid outward during insertion
+44	0.148	0.25	0.15	0.03	0.07	true	true	true	true	false	0	0.000002	0	0	0	discard:trajectory replay exposed deep contact with the static line_5_container_h01_near_support geom, not load-bearing contact with the movable bottom

@@ -778,6 +778,35 @@ class L1TableEdgeUndercutTests(unittest.TestCase):
             )
         )
 
+    def test_open_fork_vertical_clearance_does_not_require_planar_overlap(self):
+        bottom = self.box_geometry(
+            "container_col_bottom",
+            [7.059, 4.619, 1.009],
+            [0.300, 0.200, 0.009],
+            is_object=True,
+        )
+        outside_below = self.box_geometry(
+            "gripper0_right_left_fingertip_collision",
+            [7.345, 4.900, 0.995],
+            [0.015, 0.035, 0.004],
+        )
+        outside_high = self.box_geometry(
+            "gripper0_right_left_fingertip_collision",
+            [7.345, 4.900, 1.005],
+            [0.015, 0.035, 0.004],
+        )
+
+        self.assertTrue(
+            gate_module.open_fork_below_bottom_ready(
+                {"geometries": [bottom, outside_below]}
+            )
+        )
+        self.assertFalse(
+            gate_module.open_fork_below_bottom_ready(
+                {"geometries": [bottom, outside_high]}
+            )
+        )
+
     def test_open_fork_alignment_accepts_measured_safe_partial_rotation(self):
         measured = np.array(
             [
@@ -941,6 +970,36 @@ class L1TableEdgeUndercutTests(unittest.TestCase):
         capture_index = source.index("initial_eef = right_eef_position()")
         self.assertLess(advance_index, capture_index)
 
+    def test_post_inset_uses_official_posture_locked_navigation(self):
+        source = inspect.getsource(gate_module._table_edge_undercut_probe)
+        insertion = source[source.index("def execute_post_inset_base_advance") :]
+        insertion = insertion[: insertion.index("def execute_stage")]
+
+        self.assertIn("segment_target_xy = segment_start_xy +", insertion)
+        self.assertIn("backend.follow_path(", insertion)
+        self.assertIn("int(np.ceil(requested_distance / 0.001)) + 5", insertion)
+        self.assertIn("translation_reached", insertion)
+        self.assertIn("requested_distance - 1e-4", insertion)
+        self.assertNotIn("driver.step(", insertion)
+
+    def test_torso_raise_uses_official_posture_lock_without_osc_compensation(self):
+        source = inspect.getsource(gate_module._table_edge_undercut_probe)
+        lift = source[source.index("def execute_torso_raise_into_support") :]
+        lift = lift[: lift.index("def execute_post_inset_base_advance")]
+
+        self.assertIn("_capture_upper_body_posture", lift)
+        self.assertIn("_restore_upper_body_posture", lift)
+        self.assertIn("env.step(idle_action)", lift)
+        self.assertNotIn('arm_actions={"right": arm_action}', lift)
+
+    def test_descent_waits_for_measured_fingertip_bottom_clearance(self):
+        source = inspect.getsource(gate_module._table_edge_undercut_probe)
+
+        self.assertIn('stage == "descend_open_outside"', source)
+        self.assertIn("open_fork_below_bottom_ready(", source)
+        self.assertIn("descent_max_steps = 480", source)
+        self.assertIn("max_steps=descent_max_steps", source)
+
     def test_horizontal_fork_rotates_after_descent_and_skips_deep_inset(self):
         source = inspect.getsource(gate_module._table_edge_undercut_probe)
 
@@ -959,18 +1018,16 @@ class L1TableEdgeUndercutTests(unittest.TestCase):
         self.assertIn('"advance_base_for_fork_overlap"', source)
         self.assertIn("fork_raise_target = right_eef_position().copy()", source)
         self.assertIn('"raise_open_with_torso"', source)
-        self.assertIn("fork_lift_target = right_eef_position().copy()", source)
-        self.assertIn('arm_actions={"right": arm_action}', source)
+        self.assertIn("start_eef = right_eef_position().copy()", source)
+        self.assertIn("_capture_upper_body_posture", source)
+        self.assertIn("_restore_upper_body_posture", source)
         self.assertIn("commanded_torso", source)
-        self.assertIn("world_velocity_to_base_frame", source)
-        self.assertIn("fork_lift_orientation = right_eef_pose()[1]", source)
-        self.assertIn("arm_action[3:6] = orientation_action", source)
+        self.assertIn("raw_env.step(idle_action)", source)
         self.assertIn('"orient_open_fork_at_clearance"', source)
         self.assertIn("orient_before_descent", source)
         self.assertIn('"safe_unrotated_inset_plateau"', source)
         self.assertIn('"safe_unrotated_descent_plateau"', source)
         self.assertIn('"safe_unrotated_base_assisted_inset"', source)
-        self.assertIn("arm_world_deltas=base_follow_arm_deltas", source)
 
 
 class JointSeedMathTests(unittest.TestCase):
