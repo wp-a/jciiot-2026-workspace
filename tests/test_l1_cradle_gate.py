@@ -475,6 +475,21 @@ class CenterRegraspSequenceTests(unittest.TestCase):
         self.assertLess(hold_index, seat_index)
         self.assertLess(seat_index, transport_index)
 
+    def test_corner_seat_remains_available_before_repeating_inchworm(self):
+        source = inspect.getsource(_center_regrasp_probe)
+        seat_body = source.index("seat_base_xy")
+        condition_start = source.rfind("if (", 0, seat_body)
+        condition_end = source.index("):", condition_start) + 2
+        condition = source[condition_start:condition_end]
+
+        self.assertNotIn("center_carry_inchworm_distance_m", condition)
+        seat_direction = source.index("seat_direction =", seat_body)
+        reverse_direction = source.index(
+            "if center_carry_inchworm_toward_base:", seat_direction
+        )
+        seat_targets = source.index("trailing_corner_seat_targets(", seat_direction)
+        self.assertLess(reverse_direction, seat_targets)
+
     def test_optional_arm_stroke_runs_after_hold_and_before_transport(self):
         source = inspect.getsource(_center_regrasp_probe)
 

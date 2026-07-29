@@ -3121,7 +3121,6 @@ def _center_regrasp_probe(
                                     if (
                                         physical_grasp
                                         and float(center_carry_corner_seat_m) > 0.0
-                                        and float(center_carry_inchworm_distance_m) <= 0.0
                                     ):
                                         seat_base_xy = np.asarray(
                                             backend.get_base_pose()[0], dtype=float
@@ -3133,6 +3132,8 @@ def _center_regrasp_probe(
                                         seat_direction = (
                                             seat_start_object[:2] - seat_base_xy
                                         )
+                                        if center_carry_inchworm_toward_base:
+                                            seat_direction = -seat_direction
                                         seat_targets = trailing_corner_seat_targets(
                                             eef_positions(),
                                             travel_direction=seat_direction,
