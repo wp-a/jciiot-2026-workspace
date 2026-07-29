@@ -2058,6 +2058,7 @@ def _table_edge_undercut_probe(
     orientation_max_closure_vertical: float,
     horizontal_inset_m: float,
     left_clearance_lift_m: float,
+    post_inset_base_advance_m: float,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import OfficialScriptedGraspDriver
     from robot_agent.skills.competition_transport import (
@@ -2243,6 +2244,139 @@ def _table_edge_undercut_probe(
                 "final_object_position": np.asarray(
                     raw_env.sim.data.body_xpos[body_id], dtype=float
                 ).tolist(),
+            }
+        )
+        return success
+
+    def execute_post_inset_base_advance() -> bool:
+        """Shift the physically held open fork into measured bottom overlap."""
+        nonlocal collision_steps
+        requested_distance = float(post_inset_base_advance_m)
+        if not np.isfinite(requested_distance) or requested_distance < 0.0:
+            raise ValueError(
+                "post_inset_base_advance_m must be finite and non-negative"
+            )
+        stage = "advance_base_for_fork_overlap"
+        segment_start_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
+        segment_hold_targets = helpers["capture_hold_targets"](robot)
+        control_dt = 0.05
+        max_speed = 0.02
+        driver = OfficialPhysicalCarryDriver()
+        safety_failure = None
+        success = False
+        geometry_ready = open_fork_under_bottom_support_ready(
+            geometry_snapshot(raw_env, object_name),
+            minimum_planar_overlap_m=0.001,
+        )
+        max_steps = int(
+            np.ceil(requested_distance / (max_speed * control_dt))
+        ) + 5
+        for local_step in range(max_steps):
+            base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
+            translation = float(np.linalg.norm(base_xy - segment_start_xy))
+            remaining = max(0.0, requested_distance - translation)
+            if geometry_ready:
+                success = True
+                break
+            if remaining <= 1e-6:
+                safety_failure = "bottom_overlap_not_reached"
+                break
+            object_xy = np.asarray(
+                raw_env.sim.data.body_xpos[body_id][:2], dtype=float
+            )
+            world_velocity = bounded_base_advance_world_velocity(
+                base_xy=base_xy,
+                object_xy=object_xy,
+                remaining_m=remaining,
+                max_speed_m_s=max_speed,
+                control_dt_s=control_dt,
+            )
+            _, base_yaw = backend.get_base_pose()
+            base_velocity = world_velocity_to_base_frame(world_velocity, base_yaw)
+            step_info = driver.step(
+                backend,
+                object_name=object_name,
+                base_command=np.array(
+                    [base_velocity[0], base_velocity[1], 0.0], dtype=float
+                ),
+                hold_targets=segment_hold_targets,
+                arm_world_deltas=None,
+                gripper_value=-1.0,
+                base_control_dt=control_dt,
+            )
+            collision = bool(step_info.get("collision", False))
+            collision_steps += int(collision)
+            contacts = object_robot_contacts(raw_env, object_name)
+            invalid_right_contact = any(
+                not is_allowed_open_fork_support_geom(name, "right")
+                for name in contacts["right"]
+            )
+            unsafe_object_contact = bool(
+                contacts["left"] or invalid_right_contact
+            )
+            measured_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
+            geometry_ready = open_fork_under_bottom_support_ready(
+                geometry_snapshot(raw_env, object_name),
+                minimum_planar_overlap_m=0.001,
+            )
+            observations.append(
+                {
+                    "stage": stage,
+                    "step": local_step + 1,
+                    "base_xy": measured_base_xy.tolist(),
+                    "base_translation_m": float(
+                        np.linalg.norm(measured_base_xy - segment_start_xy)
+                    ),
+                    "eef_position": right_eef_position().tolist(),
+                    "object_position": np.asarray(
+                        raw_env.sim.data.body_xpos[body_id], dtype=float
+                    ).tolist(),
+                    "contacts": {
+                        arm: list(names) for arm, names in contacts.items()
+                    },
+                    "geometry_ready": geometry_ready,
+                    "judge_collision": collision,
+                }
+            )
+            if collision:
+                safety_failure = "collision"
+                break
+            if unsafe_object_contact:
+                safety_failure = "unsafe_object_contact"
+                break
+        final_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
+        final_translation = float(
+            np.linalg.norm(final_base_xy - segment_start_xy)
+        )
+        final_geometry = geometry_snapshot(raw_env, object_name)
+        geometry_ready = open_fork_under_bottom_support_ready(
+            final_geometry,
+            minimum_planar_overlap_m=0.001,
+        )
+        success = bool(success or (safety_failure is None and geometry_ready))
+        if not success and safety_failure is None:
+            safety_failure = "bottom_overlap_not_reached"
+        stages.append(
+            {
+                "stage": stage,
+                "success": success,
+                "steps": sum(
+                    1 for item in observations if item.get("stage") == stage
+                ),
+                "safety_failure": safety_failure,
+                "requested_translation_m": requested_distance,
+                "base_translation_m": final_translation,
+                "geometry_ready": geometry_ready,
+                "final_eef_position": right_eef_position().tolist(),
+                "final_object_position": np.asarray(
+                    raw_env.sim.data.body_xpos[body_id], dtype=float
+                ).tolist(),
+                "final_contacts": {
+                    arm: list(names)
+                    for arm, names in object_robot_contacts(
+                        raw_env, object_name
+                    ).items()
+                },
             }
         )
         return success
@@ -2713,16 +2847,20 @@ def _table_edge_undercut_probe(
                     success = False
                     failure_stage = "inset_horizontal_fork_under_overhang"
                 else:
-                    fork_raise_target = fork_inset_target.copy()
-                    fork_raise_target[2] = float(targets["raise"][2])
-                    if not execute_stage(
-                        "raise_open_into_support",
-                        fork_raise_target,
-                        allow_object_contact=True,
-                        require_support=True,
-                    ):
+                    if not geometry_ready and not execute_post_inset_base_advance():
                         success = False
-                        failure_stage = "raise_open_into_support"
+                        failure_stage = "advance_base_for_fork_overlap"
+                    else:
+                        fork_raise_target = right_eef_position().copy()
+                        fork_raise_target[2] = float(targets["raise"][2])
+                        if not execute_stage(
+                            "raise_open_into_support",
+                            fork_raise_target,
+                            allow_object_contact=True,
+                            require_support=True,
+                        ):
+                            success = False
+                            failure_stage = "raise_open_into_support"
         elif success:
             if not execute_stage(
                 "inset_open_under_overhang",
@@ -2755,6 +2893,7 @@ def _table_edge_undercut_probe(
         "torso_target_m": torso_target_m,
         "horizontal_fork": bool(horizontal_fork),
         "horizontal_inset_m": float(horizontal_inset_m),
+        "post_inset_base_advance_m": float(post_inset_base_advance_m),
         "final_torso_position": torso_position(),
         "start_object_position": start_object.tolist(),
         "final_object_position": final_object.tolist(),
@@ -5136,6 +5275,9 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                     left_clearance_lift_m=(
                         args.undercut_left_clearance_lift_m
                     ),
+                    post_inset_base_advance_m=(
+                        args.undercut_post_inset_base_advance_m
+                    ),
                 )
                 record["mode"] = "table_edge_undercut_probe"
                 record["open_gripper"] = bool(probe.get("open_gripper", False))
@@ -5565,6 +5707,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--undercut-left-clearance-lift-m",
         type=float,
         default=0.25,
+    )
+    parser.add_argument(
+        "--undercut-post-inset-base-advance-m",
+        type=float,
+        default=0.0,
     )
     parser.add_argument("--align-closure-axes", action="store_true")
     parser.add_argument("--orientation-max-action", type=float, default=0.30)
