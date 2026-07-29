@@ -49,3 +49,12 @@ Iteration 5 reached torso `0.150001 m` and right EEF `z=0.972`, already about
 the unnecessarily deep `z=0.950` target by `0.022 m`. The next trial changes
 only the below-bottom clearance from `0.05 m` to `0.03 m`, matching the measured
 safe reach while preserving real geometric clearance.
+
+Iteration 6 passed base advance, clearance, outside positioning, and descent.
+The right EEF reached `[7.368, 4.854, 0.971]`, below the container bottom, with
+zero collision frames, pose writes, attachments, or object motion. The inward
+stage then plateaued at `y=4.854` for target `y=4.748`. Contact geometry shows
+the open fingers still pointed primarily toward world `+x`, leaving them outside
+the bottom support footprint. The next isolated variable is wrist orientation:
+rotate the open hand toward world `-y` before insertion, then accept the route
+only after measured non-finger support contact and at least `0.02 m` object lift.
