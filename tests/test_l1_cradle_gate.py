@@ -963,6 +963,8 @@ class L1TableEdgeUndercutTests(unittest.TestCase):
         self.assertIn('arm_actions={"right": arm_action}', source)
         self.assertIn("commanded_torso", source)
         self.assertIn("world_velocity_to_base_frame", source)
+        self.assertIn("fork_lift_orientation = right_eef_pose()[1]", source)
+        self.assertIn("arm_action[3:6] = orientation_action", source)
 
 
 class JointSeedMathTests(unittest.TestCase):

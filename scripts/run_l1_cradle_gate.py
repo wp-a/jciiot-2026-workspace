@@ -2065,6 +2065,7 @@ def _table_edge_undercut_probe(
     from robot_agent.skills.competition_transport import (
         OfficialPhysicalCarryDriver,
         _is_allowed_cradle_geom,
+        direct_base_step_target,
         world_velocity_to_base_frame,
     )
 
@@ -2270,7 +2271,29 @@ def _table_edge_undercut_probe(
         hold_targets["torso"] = np.array([target_torso], dtype=float)
         fork_lift_target = right_eef_position().copy()
         fork_lift_target[2] += requested_raise
-        driver = OfficialPhysicalCarryDriver()
+        fork_lift_orientation = right_eef_pose()[1]
+        from robot_agent.environments.robosuite_backend import _set_base_xy_direct
+
+        controller = robot.part_controllers["right"]
+        if controller.name != "OSC_POSE" or controller.input_type != "delta":
+            raise RuntimeError("torso fork lift requires OSC_POSE delta control")
+        input_ref_frame = getattr(controller, "input_ref_frame", "world")
+        if input_ref_frame == "world":
+            origin_rotation = np.eye(3)
+        elif input_ref_frame == "base":
+            origin_rotation = controller.origin_ori
+            if origin_rotation is None:
+                _, origin_rotation = robot.composite_controller.get_controller_base_pose(
+                    controller_name="right"
+                )
+        else:
+            raise RuntimeError(
+                f"unsupported orientation reference frame for right: {input_ref_frame}"
+            )
+        origin_rotation = _validated_rotation_matrix(
+            origin_rotation,
+            name="right controller origin rotation",
+        )
         control_dt = 0.05
         maximum_base_correction_speed = 0.02
         maximum_base_correction_distance = 0.04
@@ -2304,17 +2327,48 @@ def _table_edge_undercut_probe(
                 base_world_velocity,
                 base_yaw,
             )
-            step_info = driver.step(
-                backend,
-                object_name=object_name,
+            base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
+            target_base_xy = direct_base_step_target(
+                base_xy=base_xy,
+                base_yaw=base_yaw,
                 base_command=np.array(
                     [base_velocity[0], base_velocity[1], 0.0], dtype=float
                 ),
-                hold_targets=hold_targets,
-                arm_world_deltas={"right": fork_lift_target - current_eef},
-                gripper_value=-1.0,
-                base_control_dt=control_dt,
+                control_dt=control_dt,
             )
+            _set_base_xy_direct(raw_env, robot, target_base_xy)
+            robot.composite_controller.update_state()
+            current_eef, current_orientation = right_eef_pose()
+            controller_delta = helpers["world_delta"](
+                robot,
+                "right",
+                fork_lift_target - current_eef,
+            )
+            arm_action = helpers["arm_action"](
+                robot,
+                "right",
+                controller_delta,
+                0.30,
+            )
+            world_rotation_delta = fork_lift_orientation @ current_orientation.T
+            orientation_action = normalized_osc_orientation_command(
+                world_rotation_delta=world_rotation_delta,
+                controller_origin_rotation=origin_rotation,
+                output_min=controller.output_min,
+                output_max=controller.output_max,
+                max_action=float(orientation_max_action),
+            )
+            arm_action[3:6] = orientation_action
+            action = helpers["build_action"](
+                robot,
+                arm_actions={"right": arm_action},
+                gripper_value=-1.0,
+                hold_targets=hold_targets,
+            )
+            _, _, _, info = raw_env.step(action)
+            recorder = getattr(backend, "_record_trajectory_frame", None)
+            if callable(recorder):
+                recorder(_env=raw_env)
             measured_torso = torso_position()
             measured_eef = right_eef_position()
             object_position = np.asarray(
@@ -2347,7 +2401,7 @@ def _table_edge_undercut_probe(
                 if torso_reached and fork_reached
                 else 0
             )
-            collision = bool(step_info.get("collision", False))
+            collision = bool((info or {}).get("has_judge_collision", False))
             collision_steps += int(collision)
             base_correction_distance = float(
                 np.linalg.norm(
@@ -2365,6 +2419,8 @@ def _table_edge_undercut_probe(
                     "torso_position": measured_torso,
                     "target_eef_position": fork_lift_target.tolist(),
                     "eef_position": measured_eef.tolist(),
+                    "target_eef_orientation": fork_lift_orientation.tolist(),
+                    "orientation_action": orientation_action.tolist(),
                     "base_world_velocity": base_world_velocity.tolist(),
                     "base_correction_distance_m": base_correction_distance,
                     "object_position": object_position.tolist(),
