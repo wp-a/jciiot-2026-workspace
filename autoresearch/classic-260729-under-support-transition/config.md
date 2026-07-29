@@ -61,3 +61,8 @@ fingertip contact disappeared. Iteration 3 changes the transition early-stop
 gate from complete stationary grasp to measured stationary object contact.
 Collision and minimum-height gates remain unchanged, and final success still
 requires new non-finger support on the moving side.
+
+Iteration 3 confirmed that sequential pure descent consumes the full
+stationary-contact window before inset begins. Iteration 4 combines descent and
+inset into one Cartesian stage while keeping all distances, gripper commands,
+and hard gates fixed.

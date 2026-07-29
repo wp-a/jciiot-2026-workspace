@@ -104,3 +104,11 @@ lost. Four other stationary-arm contacts remained. The transition safety gate
 is therefore revised to require measured stationary-arm object contact and
 minimum height, rather than the stricter complete-grasp heuristic. The initial
 center grasp and hold still require the official bilateral grasp check.
+
+With the physical-contact gate, the right arm reached 0.080 m of descent before
+the stationary-side contacts disappeared. The object followed downward by
+0.064 m and the right side still had finger contacts only, so completing pure
+descent before starting inset is not a viable path. The next experiment combines
+the same 0.12 m descent and 0.04 m inset in one Cartesian target. This changes
+only path timing and tests whether the hand can enter the bottom region during
+the measured stationary-contact window.
