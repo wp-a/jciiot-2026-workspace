@@ -965,6 +965,8 @@ class L1TableEdgeUndercutTests(unittest.TestCase):
         self.assertIn("world_velocity_to_base_frame", source)
         self.assertIn("fork_lift_orientation = right_eef_pose()[1]", source)
         self.assertIn("arm_action[3:6] = orientation_action", source)
+        self.assertIn('"orient_open_fork_at_clearance"', source)
+        self.assertIn("orient_before_descent", source)
 
 
 class JointSeedMathTests(unittest.TestCase):
@@ -1285,6 +1287,7 @@ class JointSeedParserTests(unittest.TestCase):
             args.undercut_torso_raise_base_correction_max_m,
             0.04,
         )
+        self.assertFalse(args.undercut_orient_before_descent)
 
     def test_center_carry_speed_can_be_overridden_for_single_variable_probe(self):
         args = parse_args(
@@ -1375,6 +1378,7 @@ class JointSeedParserTests(unittest.TestCase):
                 "0.25",
                 "--undercut-torso-raise-base-correction-max-m",
                 "0.06",
+                "--undercut-orient-before-descent",
             ]
         )
 
@@ -1435,6 +1439,7 @@ class JointSeedParserTests(unittest.TestCase):
             args.undercut_torso_raise_base_correction_max_m,
             0.06,
         )
+        self.assertTrue(args.undercut_orient_before_descent)
 
 
 class OrientationCommandTests(unittest.TestCase):

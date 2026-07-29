@@ -2062,6 +2062,7 @@ def _table_edge_undercut_probe(
     torso_raise_m: float,
     torso_raise_orientation_max_action: float,
     torso_raise_base_correction_max_m: float,
+    orient_before_descent: bool,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import OfficialScriptedGraspDriver
     from robot_agent.skills.competition_transport import (
@@ -2636,6 +2637,7 @@ def _table_edge_undercut_probe(
         require_support: bool = False,
         max_steps: int = 180,
         other_arm_world_target: np.ndarray | None = None,
+        right_orientation_target: np.ndarray | None = None,
     ) -> bool:
         nonlocal collision_steps, maximum_support_steps
         stable_support_steps = 0
@@ -2655,6 +2657,44 @@ def _table_edge_undercut_probe(
                 controller_delta,
                 0.12,
             )
+            measured_orientation = None
+            orientation_error_deg = None
+            orientation_aligned = True
+            if right_orientation_target is not None:
+                controller = robot.part_controllers["right"]
+                if controller.name != "OSC_POSE" or controller.input_type != "delta":
+                    raise RuntimeError(
+                        "open fork pose hold requires OSC_POSE delta control"
+                    )
+                _, measured_orientation = right_eef_pose()
+                input_ref_frame = getattr(controller, "input_ref_frame", "world")
+                if input_ref_frame == "world":
+                    origin_rotation = np.eye(3)
+                elif input_ref_frame == "base":
+                    origin_rotation = controller.origin_ori
+                    if origin_rotation is None:
+                        _, origin_rotation = (
+                            robot.composite_controller.get_controller_base_pose(
+                                controller_name="right"
+                            )
+                        )
+                else:
+                    raise RuntimeError(
+                        "unsupported orientation reference frame for right: "
+                        f"{input_ref_frame}"
+                    )
+                world_rotation_delta = (
+                    np.asarray(right_orientation_target, dtype=float)
+                    @ measured_orientation.T
+                )
+                orientation_action = normalized_osc_orientation_command(
+                    world_rotation_delta=world_rotation_delta,
+                    controller_origin_rotation=origin_rotation,
+                    output_min=controller.output_min,
+                    output_max=controller.output_max,
+                    max_action=float(torso_raise_orientation_max_action),
+                )
+                arm_action[3:6] = orientation_action
             arm_actions = {"right": arm_action}
             measured_left = None
             if other_arm_world_target is not None:
@@ -2686,6 +2726,21 @@ def _table_edge_undercut_probe(
             if callable(recorder):
                 recorder(_env=raw_env)
             measured_eef = right_eef_position()
+            if right_orientation_target is not None:
+                _, measured_orientation = right_eef_pose()
+                orientation_error_deg = rotation_error_degrees(
+                    measured_orientation,
+                    right_orientation_target,
+                )
+                orientation_aligned = bool(
+                    orientation_error_deg <= float(orientation_tolerance_deg)
+                    or open_fork_alignment_sufficient(
+                        measured_orientation,
+                        inward_axis=np.array([0.0, -1.0, 0.0]),
+                        min_inward_projection=orientation_min_inward_projection,
+                        max_closure_vertical=orientation_max_closure_vertical,
+                    )
+                )
             object_position = np.asarray(
                 raw_env.sim.data.body_xpos[body_id], dtype=float
             )
@@ -2730,6 +2785,8 @@ def _table_edge_undercut_probe(
                 "right_support": right_support,
                 "stable_support_steps": stable_support_steps,
                 "judge_collision": collision,
+                "orientation_error_deg": orientation_error_deg,
+                "orientation_aligned": orientation_aligned,
             }
             observations.append(observation)
             if collision:
@@ -2755,6 +2812,7 @@ def _table_edge_undercut_probe(
                 break
             right_reached = bool(
                 float(np.linalg.norm(np.asarray(target) - measured_eef)) <= 0.012
+                and orientation_aligned
             )
             other_reached = bool(
                 other_arm_world_target is None
@@ -3003,6 +3061,15 @@ def _table_edge_undercut_probe(
 
     success = execute_base_advance()
     failure_stage = None if success else "advance_base_for_undercut"
+    fork_orientation = (
+        open_fork_target_orientation(
+            inward_axis=np.array([0.0, -1.0, 0.0]),
+            closure_axis=np.array([1.0, 0.0, 0.0]),
+        )
+        if horizontal_fork
+        else None
+    )
+    fork_orientation_completed = False
     if success:
         initial_eef = right_eef_position()
         clearance_target = initial_eef.copy()
@@ -3040,6 +3107,15 @@ def _table_edge_undercut_probe(
                         failure_stage = "raise_left_clearance_for_torso"
                         break
                     other_arm_world_target = left_eef_position().copy()
+                    if orient_before_descent:
+                        if not execute_orientation_stage(
+                            "orient_open_fork_at_clearance",
+                            fork_orientation,
+                        ):
+                            success = False
+                            failure_stage = "orient_open_fork_at_clearance"
+                            break
+                        fork_orientation_completed = True
                 hold_targets["torso"] = np.array(
                     [float(torso_target_m)], dtype=float
                 )
@@ -3049,22 +3125,24 @@ def _table_edge_undercut_probe(
                 allow_object_contact=allow_contact,
                 require_support=require_support,
                 other_arm_world_target=other_arm_world_target,
+                right_orientation_target=(
+                    fork_orientation
+                    if fork_orientation_completed and stage == "descend_open_outside"
+                    else None
+                ),
             ):
                 success = False
                 failure_stage = stage
                 break
         if success and horizontal_fork:
-            fork_orientation = open_fork_target_orientation(
-                inward_axis=np.array([0.0, -1.0, 0.0]),
-                closure_axis=np.array([1.0, 0.0, 0.0]),
-            )
-            if not execute_orientation_stage(
+            if not fork_orientation_completed and not execute_orientation_stage(
                 "orient_open_fork_inward",
                 fork_orientation,
             ):
                 success = False
                 failure_stage = "orient_open_fork_inward"
             else:
+                fork_orientation_completed = True
                 inset_distance = float(horizontal_inset_m)
                 if not np.isfinite(inset_distance) or inset_distance <= 0.0:
                     raise ValueError("horizontal_inset_m must be finite and positive")
@@ -3152,6 +3230,7 @@ def _table_edge_undercut_probe(
         "torso_raise_base_correction_max_m": float(
             torso_raise_base_correction_max_m
         ),
+        "orient_before_descent": bool(orient_before_descent),
         "final_torso_position": torso_position(),
         "start_object_position": start_object.tolist(),
         "final_object_position": final_object.tolist(),
@@ -5543,6 +5622,9 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                     torso_raise_base_correction_max_m=(
                         args.undercut_torso_raise_base_correction_max_m
                     ),
+                    orient_before_descent=(
+                        args.undercut_orient_before_descent
+                    ),
                 )
                 record["mode"] = "table_edge_undercut_probe"
                 record["open_gripper"] = bool(probe.get("open_gripper", False))
@@ -5992,6 +6074,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--undercut-torso-raise-base-correction-max-m",
         type=float,
         default=0.04,
+    )
+    parser.add_argument(
+        "--undercut-orient-before-descent",
+        action="store_true",
     )
     parser.add_argument("--align-closure-axes", action="store_true")
     parser.add_argument("--orientation-max-action", type=float, default=0.30)
