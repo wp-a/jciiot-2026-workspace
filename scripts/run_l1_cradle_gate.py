@@ -150,6 +150,28 @@ def push_gate_accepted(record: Mapping[str, object]) -> bool:
     return not push_gate_failures(record)
 
 
+def allocate_segment_steps(*, total_steps: int, segment_count: int) -> tuple[int, ...]:
+    """Distribute a fixed positive waypoint budget across path segments."""
+    if (
+        isinstance(total_steps, bool)
+        or int(total_steps) != total_steps
+        or int(total_steps) < 1
+    ):
+        raise ValueError("total_steps must be a positive integer")
+    if (
+        isinstance(segment_count, bool)
+        or int(segment_count) != segment_count
+        or int(segment_count) < 1
+    ):
+        raise ValueError("segment_count must be a positive integer")
+    total = int(total_steps)
+    segments = int(segment_count)
+    if total < segments:
+        raise ValueError("total_steps must provide at least one step per segment")
+    base, remainder = divmod(total, segments)
+    return tuple(base + int(index < remainder) for index in range(segments))
+
+
 def interior_joint_bounds(
     lower: object,
     upper: object,
@@ -1344,6 +1366,7 @@ def _center_regrasp_probe(
     orientation_joint_seed_max_endpoint_position_error_m: float = (
         JOINT_SEED_THRESHOLDS["max_endpoint_position_error_m"]
     ),
+    orientation_joint_seed_continuation_nodes: int = 1,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import (
         OfficialScriptedGraspDriver,
@@ -1425,8 +1448,18 @@ def _center_regrasp_probe(
         max_endpoint_position_error = float(
             orientation_joint_seed_max_endpoint_position_error_m
         )
+        continuation_nodes = int(orientation_joint_seed_continuation_nodes)
         if steps < 1 or max_nfev < 1:
             raise ValueError("joint seed steps and max_nfev must be positive")
+        if (
+            isinstance(orientation_joint_seed_continuation_nodes, bool)
+            or continuation_nodes != orientation_joint_seed_continuation_nodes
+            or continuation_nodes < 1
+            or continuation_nodes > steps
+        ):
+            raise ValueError(
+                "joint seed continuation nodes must be in [1, total steps]"
+            )
         if (
             not np.isfinite(max_error)
             or max_error < 0.0
@@ -1474,6 +1507,8 @@ def _center_regrasp_probe(
                 arm: target_axes[arm].tolist() for arm in arms
             },
             "solver": None,
+            "continuation_node_count": continuation_nodes,
+            "continuation_nodes": [],
             "endpoint_residual": None,
             "waypoint_count": 0,
             "failed_waypoint": None,
@@ -1490,36 +1525,143 @@ def _center_regrasp_probe(
                     recorder(_env=raw_env)
 
         from scipy.optimize import least_squares
+        from robot_agent.environments.robosuite_backend import (
+            _navigation_collisions,
+        )
 
         solution = None
         proposal = None
+        proposals: list[np.ndarray] = []
+        node_records: list[dict[str, object]] = []
+        solver_reference = start.copy()
         try:
-            solver_start = np.clip(start, lower + 1e-9, upper - 1e-9)
-
-            def residual(joints: np.ndarray) -> np.ndarray:
-                data.qpos[qpos_addrs] = joints
-                raw_env.sim.forward()
-                poses = alignment_eef_poses()
-                return joint_seed_objective_residual(
-                    current_positions={arm: poses[arm][0] for arm in arms},
-                    target_positions=start_positions,
-                    current_axes={arm: poses[arm][1][:, 0] for arm in arms},
-                    target_axes=target_axes,
-                    joints=joints,
-                    start_joints=start,
-                    joint_ranges=joint_ranges,
-                    position_scale_m=orientation_joint_seed_position_scale_m,
-                    axis_scale=orientation_joint_seed_axis_scale,
-                    regularization=orientation_joint_seed_regularization,
+            for node_index in range(1, continuation_nodes + 1):
+                fraction = node_index / continuation_nodes
+                node_target_axes = {
+                    arm: interpolate_directed_axis(
+                        start_axes[arm],
+                        target_axes[arm],
+                        fraction=fraction,
+                    )
+                    for arm in arms
+                }
+                solver_start = np.clip(
+                    solver_reference,
+                    lower + 1e-9,
+                    upper - 1e-9,
                 )
 
-            solution = least_squares(
-                residual,
-                solver_start,
-                bounds=(lower, upper),
-                max_nfev=max_nfev,
-            )
-            proposal = np.asarray(solution.x, dtype=float).copy()
+                def residual(joints: np.ndarray) -> np.ndarray:
+                    data.qpos[qpos_addrs] = joints
+                    raw_env.sim.forward()
+                    poses = alignment_eef_poses()
+                    return joint_seed_objective_residual(
+                        current_positions={arm: poses[arm][0] for arm in arms},
+                        target_positions=start_positions,
+                        current_axes={arm: poses[arm][1][:, 0] for arm in arms},
+                        target_axes=node_target_axes,
+                        joints=joints,
+                        start_joints=solver_reference,
+                        joint_ranges=joint_ranges,
+                        position_scale_m=orientation_joint_seed_position_scale_m,
+                        axis_scale=orientation_joint_seed_axis_scale,
+                        regularization=orientation_joint_seed_regularization,
+                    )
+
+                solution = least_squares(
+                    residual,
+                    solver_start,
+                    bounds=(lower, upper),
+                    max_nfev=max_nfev,
+                )
+                proposal = np.asarray(solution.x, dtype=float).copy()
+                data.qpos[qpos_addrs] = proposal
+                raw_env.sim.forward()
+                node_poses = alignment_eef_poses()
+                node_errors = {
+                    arm: closure_axis_error_degrees(
+                        node_poses[arm][1][:, 0], node_target_axes[arm]
+                    )
+                    for arm in arms
+                }
+                node_position_errors = {
+                    arm: float(
+                        np.linalg.norm(
+                            node_poses[arm][0] - start_positions[arm]
+                        )
+                    )
+                    for arm in arms
+                }
+                node_collisions = list(
+                    _navigation_collisions(
+                        raw_env,
+                        robot,
+                        getattr(backend, "_ignore_collision_geom", ()),
+                    )
+                )
+                node_bound_margin = float(
+                    np.min(
+                        np.concatenate([proposal - lower, upper - proposal])
+                    )
+                )
+                solver_record = {
+                    "success": bool(solution.success),
+                    "status": int(solution.status),
+                    "message": str(solution.message),
+                    "nfev": int(solution.nfev),
+                    "cost": float(solution.cost),
+                    "optimality": float(solution.optimality),
+                }
+                node_record: dict[str, object] = {
+                    "node": node_index,
+                    "fraction": fraction,
+                    "target_axes": {
+                        arm: node_target_axes[arm].tolist() for arm in arms
+                    },
+                    "joints": proposal.tolist(),
+                    "right_error_deg": node_errors["right"],
+                    "left_error_deg": node_errors["left"],
+                    "position_errors_m": node_position_errors,
+                    "max_position_error_m": max(node_position_errors.values()),
+                    "min_bound_margin_rad": node_bound_margin,
+                    "collision_pairs": [
+                        [str(name) for name in pair] for pair in node_collisions
+                    ],
+                    "solver": solver_record,
+                    "failure": None,
+                }
+                node_error_limit = (
+                    max_error
+                    if continuation_nodes == 1
+                    else ORIENTATION_ALIGNMENT_THRESHOLDS["error_deg"]
+                )
+                if not bool(solution.success):
+                    node_record["failure"] = "solver"
+                elif node_collisions:
+                    node_record["failure"] = "collision"
+                elif max(node_errors.values()) > node_error_limit:
+                    node_record["failure"] = "orientation"
+                elif max(node_position_errors.values()) > max_endpoint_position_error:
+                    node_record["failure"] = "position"
+                elif node_bound_margin < 0.0:
+                    node_record["failure"] = "bounds"
+                node_records.append(node_record)
+                if node_record["failure"] is not None:
+                    if node_collisions:
+                        collision_steps += 1
+                        summary["collision_frames"] = int(
+                            summary["collision_frames"]
+                        ) + 1
+                        summary["collision_pairs"] = [
+                            [str(name) for name in pair]
+                            for pair in node_collisions
+                        ]
+                    summary["failure"] = (
+                        f"continuation_node_{node_index}_{node_record['failure']}"
+                    )
+                    break
+                proposals.append(proposal)
+                solver_reference = proposal
         except Exception as exc:
             summary["failure"] = "solver_exception"
             summary["solver"] = {
@@ -1530,21 +1672,20 @@ def _center_regrasp_probe(
             data.qpos[qpos_addrs] = start
             raw_env.sim.forward()
 
-        if solution is None or proposal is None:
+        summary["continuation_nodes"] = node_records
+        if node_records:
+            summary["solver"] = node_records[-1]["solver"]
+        if (
+            solution is None
+            or proposal is None
+            or len(proposals) != continuation_nodes
+        ):
             summary["rolled_back"] = True
             restore_start(record_frame=True)
             stage_results.append({"stage": "joint_space_wrist_seed", **summary})
             return summary
 
         summary["target_joints"] = proposal.tolist()
-        summary["solver"] = {
-            "success": bool(solution.success),
-            "status": int(solution.status),
-            "message": str(solution.message),
-            "nfev": int(solution.nfev),
-            "cost": float(solution.cost),
-            "optimality": float(solution.optimality),
-        }
 
         endpoint_collisions: list[tuple[str, str]] = []
         try:
@@ -1577,10 +1718,6 @@ def _center_regrasp_probe(
                 axis_scale=orientation_joint_seed_axis_scale,
                 regularization=orientation_joint_seed_regularization,
             )
-            from robot_agent.environments.robosuite_backend import (
-                _navigation_collisions,
-            )
-
             endpoint_collisions = list(
                 _navigation_collisions(
                     raw_env,
@@ -1650,56 +1787,79 @@ def _center_regrasp_probe(
             "collision_frames": 0,
             "collision_pairs": [],
         }
-        for waypoint_index, values in enumerate(
-            joint_interpolation_path(start, proposal, steps=steps),
+        segment_steps = allocate_segment_steps(
+            total_steps=steps,
+            segment_count=len(proposals),
+        )
+        segment_start = start
+        waypoint_index = 0
+        for node_index, (segment_target, local_steps) in enumerate(
+            zip(proposals, segment_steps),
             start=1,
         ):
-            data.qpos[qpos_addrs] = values
-            raw_env.sim.forward()
-            poses = alignment_eef_poses()
-            drift = {
-                arm: float(np.linalg.norm(poses[arm][0] - start_positions[arm]))
-                for arm in arms
-            }
-            collisions = list(
-                _navigation_collisions(
-                    raw_env,
-                    robot,
-                    getattr(backend, "_ignore_collision_geom", ()),
-                )
-            )
-            path_state = next_joint_seed_path_state(
-                path_state,
-                waypoint_index=waypoint_index,
-                right_drift_m=drift["right"],
-                left_drift_m=drift["left"],
-                collision_pairs=collisions,
-                max_position_drift_m=JOINT_SEED_THRESHOLDS[
-                    "max_path_position_drift_m"
-                ],
-            )
-            observations.append(
-                {
-                    "stage": "joint_space_wrist_seed",
-                    "step": waypoint_index,
-                    "joints": np.asarray(values, dtype=float).tolist(),
-                    "eef_positions": {
-                        arm: poses[arm][0].tolist() for arm in arms
-                    },
-                    "closure_axes": {
-                        arm: poses[arm][1][:, 0].tolist() for arm in arms
-                    },
-                    "position_drift_m": drift,
-                    "judge_collision_pairs": [
-                        [str(name) for name in pair] for pair in collisions
-                    ],
+            for local_step, values in enumerate(
+                joint_interpolation_path(
+                    segment_start,
+                    segment_target,
+                    steps=local_steps,
+                ),
+                start=1,
+            ):
+                waypoint_index += 1
+                data.qpos[qpos_addrs] = values
+                raw_env.sim.forward()
+                poses = alignment_eef_poses()
+                drift = {
+                    arm: float(
+                        np.linalg.norm(poses[arm][0] - start_positions[arm])
+                    )
+                    for arm in arms
                 }
-            )
-            recorder = getattr(backend, "_record_trajectory_frame", None)
-            if callable(recorder):
-                recorder(_env=raw_env)
+                collisions = list(
+                    _navigation_collisions(
+                        raw_env,
+                        robot,
+                        getattr(backend, "_ignore_collision_geom", ()),
+                    )
+                )
+                path_state = next_joint_seed_path_state(
+                    path_state,
+                    waypoint_index=waypoint_index,
+                    right_drift_m=drift["right"],
+                    left_drift_m=drift["left"],
+                    collision_pairs=collisions,
+                    max_position_drift_m=JOINT_SEED_THRESHOLDS[
+                        "max_path_position_drift_m"
+                    ],
+                )
+                observations.append(
+                    {
+                        "stage": "joint_space_wrist_seed",
+                        "step": waypoint_index,
+                        "continuation_node": node_index,
+                        "node_local_step": local_step,
+                        "joints": np.asarray(values, dtype=float).tolist(),
+                        "eef_positions": {
+                            arm: poses[arm][0].tolist() for arm in arms
+                        },
+                        "closure_axes": {
+                            arm: poses[arm][1][:, 0].tolist() for arm in arms
+                        },
+                        "position_drift_m": drift,
+                        "judge_collision_pairs": [
+                            [str(name) for name in pair]
+                            for pair in collisions
+                        ],
+                    }
+                )
+                recorder = getattr(backend, "_record_trajectory_frame", None)
+                if callable(recorder):
+                    recorder(_env=raw_env)
+                if bool(path_state["terminate"]):
+                    break
             if bool(path_state["terminate"]):
                 break
+            segment_start = segment_target
 
         summary.update(
             {
@@ -2481,6 +2641,9 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                         orientation_joint_seed_max_endpoint_position_error_m=(
                             args.orientation_joint_seed_max_endpoint_position_error_m
                         ),
+                        orientation_joint_seed_continuation_nodes=(
+                            args.orientation_joint_seed_continuation_nodes
+                        ),
                     )
                     record["mode"] = "table_assisted_center_regrasp"
                     record["physical_grasp"] = bool(probe.get("success", False))
@@ -2666,6 +2829,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--orientation-joint-seed-max-endpoint-position-error-m",
         type=float,
         default=JOINT_SEED_THRESHOLDS["max_endpoint_position_error_m"],
+    )
+    parser.add_argument(
+        "--orientation-joint-seed-continuation-nodes",
+        type=int,
+        default=1,
     )
     parser.add_argument("--physical-push", action="store_true")
     parser.add_argument("--push-distance-m", type=float, default=0.50)

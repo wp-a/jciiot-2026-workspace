@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from scripts.run_l1_cradle_gate import (
+    allocate_segment_steps,
     closure_axis_error_degrees,
     cradle_gate_accepted,
     cradle_gate_failures,
@@ -144,6 +145,23 @@ class L1PhysicalPushGateTests(unittest.TestCase):
 
 
 class JointSeedMathTests(unittest.TestCase):
+    def test_allocate_segment_steps_preserves_total_and_balance(self):
+        allocation = allocate_segment_steps(total_steps=10, segment_count=3)
+
+        self.assertEqual(allocation, (4, 3, 3))
+        self.assertEqual(sum(allocation), 10)
+        self.assertEqual(max(allocation) - min(allocation), 1)
+
+    def test_allocate_segment_steps_rejects_invalid_counts(self):
+        invalid = ((0, 1), (4, 0), (2, 3), (2.5, 2), (4, True))
+        for total_steps, segment_count in invalid:
+            with self.subTest(total_steps=total_steps, segment_count=segment_count):
+                with self.assertRaises(ValueError):
+                    allocate_segment_steps(
+                        total_steps=total_steps,
+                        segment_count=segment_count,
+                    )
+
     def test_interior_joint_bounds_move_both_limits_inward(self):
         lower, upper = interior_joint_bounds(
             [-1.0, -2.0],
@@ -308,6 +326,7 @@ class JointSeedParserTests(unittest.TestCase):
             args.orientation_joint_seed_max_endpoint_position_error_m,
             0.015,
         )
+        self.assertEqual(args.orientation_joint_seed_continuation_nodes, 1)
 
 
 class OrientationCommandTests(unittest.TestCase):
