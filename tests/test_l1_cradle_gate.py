@@ -433,6 +433,65 @@ class PostureLockedCarryProbeTests(unittest.TestCase):
             gate_module.posture_carry_failures(result),
         )
 
+    def test_probe_can_use_actuated_gripper_hold_without_follow_path(self):
+        backend = self.FakeBackend()
+        calls = []
+
+        def config_factory(**kwargs):
+            return SimpleNamespace(**kwargs)
+
+        def actuated_transport(
+            selected_backend,
+            *,
+            path,
+            object_name,
+            hold_yaw,
+            minimum_object_z,
+            config,
+        ):
+            calls.append(
+                {
+                    "backend": selected_backend,
+                    "path": path,
+                    "object_name": object_name,
+                    "hold_yaw": hold_yaw,
+                    "minimum_object_z": minimum_object_z,
+                    "config": config,
+                }
+            )
+            selected_backend.base_xy = np.asarray(path[0], dtype=float).copy()
+            displacement = np.array([0.09, 0.0, 0.0], dtype=float)
+            selected_backend.env.sim.data.body_xpos[0] += displacement
+            for arm in selected_backend.grippers:
+                selected_backend.grippers[arm] += displacement
+            selected_backend._record_trajectory_frame(_env=selected_backend.env)
+            return {"success": True, "failure_stage": None, "steps": 55}
+
+        result = gate_module._posture_locked_carry_probe(
+            backend,
+            "box",
+            distance_m=0.10,
+            world_direction_x=None,
+            world_direction_y=None,
+            table_object_z=1.0,
+            max_linear_m_s=0.04,
+            actuated_gripper_hold=True,
+            _transport_module=self.fake_transport_module(),
+            _gripper_position=self.gripper_position(backend),
+            _contact_reader=self.contacts,
+            _actuated_transport=actuated_transport,
+            _physical_carry_config_factory=config_factory,
+        )
+
+        self.assertEqual(backend.follow_calls, [])
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]["object_name"], "box")
+        self.assertAlmostEqual(calls[0]["minimum_object_z"], 1.10)
+        self.assertAlmostEqual(calls[0]["config"].max_linear, 0.04)
+        self.assertAlmostEqual(calls[0]["config"].max_linear_delta, 0.005)
+        self.assertEqual(result["control_mode"], "actuated_gripper_hold")
+        self.assertTrue(result["posture_carry_success"])
+
     def test_runner_selects_probe_after_physical_grasp_and_uses_its_gate(self):
         source = inspect.getsource(gate_module.run_probe)
 
@@ -1626,6 +1685,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.regrasp_base_advance_m, 0.0)
         self.assertAlmostEqual(args.posture_locked_carry_distance_m, 0.0)
         self.assertAlmostEqual(args.posture_locked_carry_max_linear_m_s, 0.04)
+        self.assertFalse(args.posture_locked_carry_actuated_gripper_hold)
         self.assertIsNone(args.posture_locked_carry_world_direction_x)
         self.assertIsNone(args.posture_locked_carry_world_direction_y)
         self.assertAlmostEqual(args.center_carry_distance_m, 0.0)
@@ -1707,6 +1767,7 @@ class JointSeedParserTests(unittest.TestCase):
                 "0.10",
                 "--posture-locked-carry-max-linear-m-s",
                 "0.02",
+                "--posture-locked-carry-actuated-gripper-hold",
                 "--posture-locked-carry-world-direction-x",
                 "-1.0",
                 "--posture-locked-carry-world-direction-y",
@@ -1798,6 +1859,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.center_carry_max_linear, 0.005)
         self.assertAlmostEqual(args.posture_locked_carry_distance_m, 0.10)
         self.assertAlmostEqual(args.posture_locked_carry_max_linear_m_s, 0.02)
+        self.assertTrue(args.posture_locked_carry_actuated_gripper_hold)
         self.assertAlmostEqual(
             args.posture_locked_carry_world_direction_x,
             -1.0,

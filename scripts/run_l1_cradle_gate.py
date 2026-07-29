@@ -1779,9 +1779,12 @@ def _posture_locked_carry_probe(
     world_direction_y: float | None,
     table_object_z: float,
     max_linear_m_s: float,
+    actuated_gripper_hold: bool = False,
     _transport_module=None,
     _gripper_position=None,
     _contact_reader=object_robot_contacts,
+    _actuated_transport=None,
+    _physical_carry_config_factory=None,
 ) -> dict[str, Any]:
     """Measure one attachment-free physical carry under posture-locked navigation."""
     requested_distance = float(distance_m)
@@ -1810,6 +1813,16 @@ def _posture_locked_carry_probe(
         _gripper_position = OfficialScriptedGraspDriver._helpers()[
             "gripper_position"
         ]
+    if actuated_gripper_hold and _actuated_transport is None:
+        from robot_agent.skills.competition_transport import (
+            PhysicalCarryConfig,
+            run_physical_transport,
+        )
+
+        _actuated_transport = run_physical_transport
+        _physical_carry_config_factory = PhysicalCarryConfig
+    if actuated_gripper_hold and _physical_carry_config_factory is None:
+        raise ValueError("actuated carry requires a physical carry config factory")
 
     raw_env = backend.env
     robot = raw_env.robots[0]
@@ -1845,9 +1858,13 @@ def _posture_locked_carry_probe(
             or getattr(backend, "_held_crate_body_id", None) is not None
         )
 
-    start_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
+    start_base_pose = backend.get_base_pose()
+    start_base_xy = np.asarray(start_base_pose[0], dtype=float)
+    start_base_yaw = float(start_base_pose[1])
     if start_base_xy.shape != (2,) or not np.all(np.isfinite(start_base_xy)):
         raise RuntimeError("invalid base position during carry probe")
+    if not np.isfinite(start_base_yaw):
+        raise RuntimeError("invalid base yaw during carry probe")
     start_object = object_position()
     start_grippers = gripper_positions()
     if world_direction_x is None:
@@ -1891,22 +1908,62 @@ def _posture_locked_carry_probe(
     setattr(backend, "_update_held_crate_position", audited_legacy_update)
     setattr(backend, "_max_linear", requested_max_linear)
     navigation_reached = False
+    control_result = None
     try:
         with transport_attachment_audit(raw_env, _transport_module) as audit:
             legacy_active_before = legacy_transport_active()
             if not audit["active_before"] and not legacy_active_before:
-                navigation_reached = bool(
-                    backend.follow_path(
-                        [target_base_xy],
-                        max_steps=max(
-                            20,
-                            int(np.ceil(requested_distance / 0.001)) + 5,
+                if actuated_gripper_hold:
+                    control_result = _actuated_transport(
+                        backend,
+                        path=[target_base_xy],
+                        object_name=object_name,
+                        hold_yaw=start_base_yaw,
+                        minimum_object_z=(
+                            table_z
+                            + POSTURE_CARRY_THRESHOLDS["final_object_lift_m"]
                         ),
-                        waypoint_tolerance=1e-5,
-                        stop_on_collision=True,
-                        record_every=1,
+                        config=_physical_carry_config_factory(
+                            waypoint_tolerance=1e-4,
+                            max_steps=max(
+                                80,
+                                int(
+                                    np.ceil(
+                                        requested_distance
+                                        / (requested_max_linear * 0.05)
+                                    )
+                                )
+                                * 3,
+                            ),
+                            max_linear=requested_max_linear,
+                            max_angular=0.04,
+                            max_linear_delta=min(0.005, requested_max_linear),
+                            max_angular_delta=0.01,
+                            base_control_dt=0.05,
+                            max_planar_grasp_drift=(
+                                POSTURE_CARRY_THRESHOLDS[
+                                    "object_gripper_drift_m"
+                                ]
+                            ),
+                        ),
                     )
-                )
+                    navigation_reached = bool(
+                        isinstance(control_result, Mapping)
+                        and control_result.get("success", False)
+                    )
+                else:
+                    navigation_reached = bool(
+                        backend.follow_path(
+                            [target_base_xy],
+                            max_steps=max(
+                                20,
+                                int(np.ceil(requested_distance / 0.001)) + 5,
+                            ),
+                            waypoint_tolerance=1e-5,
+                            stop_on_collision=True,
+                            record_every=1,
+                        )
+                    )
             legacy_active_after = legacy_transport_active()
     finally:
         if recorder_was_local:
@@ -1976,6 +2033,12 @@ def _posture_locked_carry_probe(
         "posture_carry_success": success,
         "requested_distance_m": requested_distance,
         "max_linear_m_s": requested_max_linear,
+        "control_mode": (
+            "actuated_gripper_hold"
+            if actuated_gripper_hold
+            else "official_follow_path"
+        ),
+        "control_result": control_result,
         "world_direction": direction.tolist(),
         "target_base_xy": target_base_xy.tolist(),
         "navigation_reached": navigation_reached,
@@ -6049,6 +6112,9 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                         max_linear_m_s=(
                             args.posture_locked_carry_max_linear_m_s
                         ),
+                        actuated_gripper_hold=(
+                            args.posture_locked_carry_actuated_gripper_hold
+                        ),
                     )
                     for key in _POSTURE_CARRY_REQUIRED_FIELDS:
                         record[key] = probe[key]
@@ -6343,6 +6409,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--posture-locked-carry-max-linear-m-s",
         type=float,
         default=0.04,
+    )
+    parser.add_argument(
+        "--posture-locked-carry-actuated-gripper-hold",
+        action="store_true",
     )
     parser.add_argument("--posture-locked-carry-world-direction-x", type=float)
     parser.add_argument("--posture-locked-carry-world-direction-y", type=float)
