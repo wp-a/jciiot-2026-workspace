@@ -2530,39 +2530,53 @@ def _center_regrasp_probe(
                     ):
                         failure_stage = "squeeze_center_walls"
                     else:
-                        current = eef_positions()
-                        lift_targets = {
-                            arm: position + np.array([0.0, 0.0, 0.17])
-                            for arm, position in current.items()
-                        }
                         if not execute_stage(
-                            "lift_center_squeeze",
-                            lift_targets,
-                            max_steps=180,
-                            gripper_value=-1.0,
-                            stop_object_z_at_least=float(table_object_z) + 0.14,
+                            "close_center_grasp",
+                            eef_positions(),
+                            max_steps=80,
+                            gripper_value=1.0,
+                            close_schedule=True,
+                            stop_grasp_contact_steps=3,
                         ):
-                            failure_stage = "lift_center_squeeze"
+                            failure_stage = "close_center_grasp"
                         else:
-                            elevated_targets = eef_positions()
+                            current = eef_positions()
+                            lift_targets = {
+                                arm: position + np.array([0.0, 0.0, 0.17])
+                                for arm, position in current.items()
+                            }
                             if not execute_stage(
-                                "hold_center_squeeze",
-                                elevated_targets,
-                                max_steps=max(20, int(hold_steps)),
-                                gripper_value=-1.0,
-                                require_target=False,
+                                "lift_center_grasp",
+                                lift_targets,
+                                max_steps=180,
+                                gripper_value=1.0,
+                                stop_object_z_at_least=(
+                                    float(table_object_z) + 0.14
+                                ),
                             ):
-                                failure_stage = "hold_center_squeeze"
+                                failure_stage = "lift_center_grasp"
                             else:
-                                final_contacts = object_robot_contacts(
-                                    raw_env,
-                                    object_name,
-                                )
-                                failure_stage = (
-                                    None
-                                    if has_bilateral_object_contact(final_contacts)
-                                    else "final_contact"
-                                )
+                                elevated_targets = eef_positions()
+                                if not execute_stage(
+                                    "hold_center_grasp",
+                                    elevated_targets,
+                                    max_steps=max(20, int(hold_steps)),
+                                    gripper_value=1.0,
+                                    require_target=False,
+                                ):
+                                    failure_stage = "hold_center_grasp"
+                                else:
+                                    final_contacts = object_robot_contacts(
+                                        raw_env,
+                                        object_name,
+                                    )
+                                    failure_stage = (
+                                        None
+                                        if has_bilateral_object_contact(
+                                            final_contacts
+                                        )
+                                        else "final_contact"
+                                    )
 
     final_object_z = float(raw_env.sim.data.body_xpos[body_id][2])
     return {

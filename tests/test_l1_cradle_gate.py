@@ -1,9 +1,11 @@
+import inspect
 import unittest
 from types import SimpleNamespace
 
 import numpy as np
 
 from scripts.run_l1_cradle_gate import (
+    _center_regrasp_probe,
     allocate_segment_steps,
     closure_axis_error_degrees,
     cradle_gate_accepted,
@@ -98,6 +100,25 @@ class L1CradleGateTests(unittest.TestCase):
                 record[key] = value
                 self.assertFalse(cradle_gate_accepted(record))
                 self.assertIn(key, cradle_gate_failures(record))
+
+
+class CenterRegraspSequenceTests(unittest.TestCase):
+    def test_center_regrasp_closes_before_lift_and_stays_closed(self):
+        source = inspect.getsource(_center_regrasp_probe)
+
+        close_start = source.index('"close_center_grasp"')
+        lift_start = source.index('"lift_center_grasp"')
+        hold_start = source.index('"hold_center_grasp"')
+        self.assertLess(close_start, lift_start)
+        self.assertLess(lift_start, hold_start)
+
+        close_block = source[close_start:lift_start]
+        lift_block = source[lift_start:hold_start]
+        hold_block = source[hold_start:]
+        self.assertIn("close_schedule=True", close_block)
+        self.assertIn("stop_grasp_contact_steps=3", close_block)
+        self.assertIn("gripper_value=1.0", lift_block)
+        self.assertIn("gripper_value=1.0", hold_block)
 
     def test_missing_evidence_is_rejected(self):
         for key in VALID_RECORD:
