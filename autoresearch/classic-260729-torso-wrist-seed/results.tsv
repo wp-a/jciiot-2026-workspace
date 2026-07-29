@@ -1,0 +1,2 @@
+iteration	variant	seed	torso_margin_m	joint_seed_accepted	torso_start_m	torso_target_m	right_seed_error_deg	left_seed_error_deg	endpoint_position_error_m	path_drift_m	joint_seed_collision_frames	orientation_accepted	right_orientation_error_deg	left_orientation_error_deg	orientation_drift_m	orientation_collision_frames	bilateral_contact	lift_m	accepted	failure_stage	elapsed_s	status
+1	torso-margin-005	0	0.005	true	0.349748	0.300942	6.609927	9.931744	0.013295	0.017046	0	false	5.910150	9.201083	0.006856	0	false	0.0	false	align_closure_axes_high	154.297171	discard
