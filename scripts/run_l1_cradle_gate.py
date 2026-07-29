@@ -2436,6 +2436,31 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                         orientation_max_position_drift_m=(
                             args.orientation_max_position_drift_m
                         ),
+                        orientation_joint_seed=args.orientation_joint_seed,
+                        orientation_joint_seed_margin_rad=(
+                            args.orientation_joint_seed_margin_rad
+                        ),
+                        orientation_joint_seed_max_nfev=(
+                            args.orientation_joint_seed_max_nfev
+                        ),
+                        orientation_joint_seed_steps=(
+                            args.orientation_joint_seed_steps
+                        ),
+                        orientation_joint_seed_position_scale_m=(
+                            args.orientation_joint_seed_position_scale_m
+                        ),
+                        orientation_joint_seed_axis_scale=(
+                            args.orientation_joint_seed_axis_scale
+                        ),
+                        orientation_joint_seed_regularization=(
+                            args.orientation_joint_seed_regularization
+                        ),
+                        orientation_joint_seed_max_error_deg=(
+                            args.orientation_joint_seed_max_error_deg
+                        ),
+                        orientation_joint_seed_max_endpoint_position_error_m=(
+                            args.orientation_joint_seed_max_endpoint_position_error_m
+                        ),
                     )
                     record["mode"] = "table_assisted_center_regrasp"
                     record["physical_grasp"] = bool(probe.get("success", False))
@@ -2459,6 +2484,37 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                                 "orientation_collision_frames": alignment.get(
                                     "collision_frames"
                                 ),
+                            }
+                        )
+                    seed_evidence = probe.get("joint_seed")
+                    if isinstance(seed_evidence, Mapping):
+                        record.update(
+                            {
+                                "joint_seed_success": seed_evidence.get("success"),
+                                "joint_seed_right_error_deg": seed_evidence.get(
+                                    "right_error_deg"
+                                ),
+                                "joint_seed_left_error_deg": seed_evidence.get(
+                                    "left_error_deg"
+                                ),
+                                "joint_seed_max_endpoint_position_error_m": (
+                                    seed_evidence.get(
+                                        "max_endpoint_position_error_m"
+                                    )
+                                ),
+                                "joint_seed_max_path_position_drift_m": (
+                                    seed_evidence.get("max_path_position_drift_m")
+                                ),
+                                "joint_seed_min_bound_margin_rad": seed_evidence.get(
+                                    "min_bound_margin_rad"
+                                ),
+                                "joint_seed_collision_frames": seed_evidence.get(
+                                    "collision_frames"
+                                ),
+                                "joint_seed_rolled_back": seed_evidence.get(
+                                    "rolled_back"
+                                ),
+                                "joint_seed_failure": seed_evidence.get("failure"),
                             }
                         )
                 elif args.inward_probe_m > 0.0:
@@ -2513,6 +2569,9 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
     if args.center_regrasp and args.align_closure_axes:
         record["orientation_gate_failures"] = orientation_alignment_failures(record)
         record["orientation_accepted"] = not record["orientation_gate_failures"]
+    if args.center_regrasp and args.orientation_joint_seed:
+        record["joint_seed_gate_failures"] = joint_seed_failures(record)
+        record["joint_seed_accepted"] = not record["joint_seed_gate_failures"]
     _atomic_json(args.output.resolve(), record)
     return record
 
@@ -2546,6 +2605,47 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--orientation-max-position-drift-m",
         type=float,
         default=0.03,
+    )
+    parser.add_argument("--orientation-joint-seed", action="store_true")
+    parser.add_argument(
+        "--orientation-joint-seed-margin-rad",
+        type=float,
+        default=0.03,
+    )
+    parser.add_argument(
+        "--orientation-joint-seed-max-nfev",
+        type=int,
+        default=800,
+    )
+    parser.add_argument(
+        "--orientation-joint-seed-steps",
+        type=int,
+        default=240,
+    )
+    parser.add_argument(
+        "--orientation-joint-seed-position-scale-m",
+        type=float,
+        default=0.01,
+    )
+    parser.add_argument(
+        "--orientation-joint-seed-axis-scale",
+        type=float,
+        default=float(np.sin(np.deg2rad(5.0))),
+    )
+    parser.add_argument(
+        "--orientation-joint-seed-regularization",
+        type=float,
+        default=0.02,
+    )
+    parser.add_argument(
+        "--orientation-joint-seed-max-error-deg",
+        type=float,
+        default=JOINT_SEED_THRESHOLDS["error_deg"],
+    )
+    parser.add_argument(
+        "--orientation-joint-seed-max-endpoint-position-error-m",
+        type=float,
+        default=JOINT_SEED_THRESHOLDS["max_endpoint_position_error_m"],
     )
     parser.add_argument("--physical-push", action="store_true")
     parser.add_argument("--push-distance-m", type=float, default=0.50)

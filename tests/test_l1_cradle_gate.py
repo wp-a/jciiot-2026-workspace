@@ -20,6 +20,7 @@ from scripts.run_l1_cradle_gate import (
     opposed_wall_clearance_targets,
     opposed_wall_squeeze_targets,
     orientation_alignment_failures,
+    parse_args,
     push_gate_accepted,
     push_gate_failures,
     scheduled_orientation_action_limit,
@@ -234,6 +235,38 @@ class JointSeedMathTests(unittest.TestCase):
             with self.subTest(override=override):
                 with self.assertRaises(ValueError):
                     joint_seed_objective_residual(**{**common, **override})
+
+
+class JointSeedParserTests(unittest.TestCase):
+    def test_joint_seed_parser_defaults_are_strict_and_opt_in(self):
+        args = parse_args(
+            [
+                "--candidate-root",
+                "/tmp/candidate",
+                "--expected-official-commit",
+                "official-commit",
+                "--output",
+                "/tmp/result.json",
+                "--trajectory",
+                "/tmp/trajectory.json",
+            ]
+        )
+
+        self.assertFalse(args.orientation_joint_seed)
+        self.assertAlmostEqual(args.orientation_joint_seed_margin_rad, 0.03)
+        self.assertEqual(args.orientation_joint_seed_max_nfev, 800)
+        self.assertEqual(args.orientation_joint_seed_steps, 240)
+        self.assertAlmostEqual(args.orientation_joint_seed_position_scale_m, 0.01)
+        self.assertAlmostEqual(
+            args.orientation_joint_seed_axis_scale,
+            np.sin(np.deg2rad(5.0)),
+        )
+        self.assertAlmostEqual(args.orientation_joint_seed_regularization, 0.02)
+        self.assertAlmostEqual(args.orientation_joint_seed_max_error_deg, 10.0)
+        self.assertAlmostEqual(
+            args.orientation_joint_seed_max_endpoint_position_error_m,
+            0.015,
+        )
 
 
 class OrientationCommandTests(unittest.TestCase):
