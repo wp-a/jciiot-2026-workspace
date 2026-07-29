@@ -261,6 +261,61 @@ class FakePhysicalTransportDriver:
         return self.recover_success
 
 
+class FakeInchwormDriver:
+    def __init__(self):
+        self.base_xy = np.zeros(2, dtype=float)
+        self.object_pos = np.array([0.5, 0.0, 1.0], dtype=float)
+        self.grippers = {
+            "right": np.array([0.5, -0.2, 1.01], dtype=float),
+            "left": np.array([0.5, 0.2, 1.01], dtype=float),
+        }
+        self.steps = []
+
+    def capture_hold_targets(self, _backend):
+        return {}
+
+    def observe(self, _backend, _object_name):
+        return {
+            "base_xy": self.base_xy.copy(),
+            "base_yaw": 0.0,
+            "object_pos": self.object_pos.copy(),
+            "contacts": {"right": True, "left": True},
+            "gripper_positions": {
+                arm: position.copy() for arm, position in self.grippers.items()
+            },
+        }
+
+    def step(
+        self,
+        _backend,
+        *,
+        object_name,
+        base_command,
+        hold_targets,
+        arm_world_deltas=None,
+        gripper_value=1.0,
+        base_control_dt=0.05,
+    ):
+        del object_name, hold_targets, gripper_value
+        command = np.asarray(base_command, dtype=float)
+        base_step = command[:2] * float(base_control_dt)
+        deltas = {
+            arm: np.asarray((arm_world_deltas or {}).get(arm, np.zeros(3)), dtype=float)
+            for arm in ("right", "left")
+        }
+        self.steps.append({"base_step": base_step.copy(), "arm_deltas": deltas})
+        self.base_xy += base_step
+        for arm in ("right", "left"):
+            self.grippers[arm][:2] += base_step + deltas[arm][:2]
+            self.grippers[arm][2] += deltas[arm][2]
+        if not np.any(np.abs(base_step) > 0.0):
+            self.object_pos += np.mean(np.stack(list(deltas.values())), axis=0)
+        return {"collision": False}
+
+    def record_event(self, _backend, event, **payload):
+        return event, payload
+
+
 class PhysicalTransportRunnerTests(unittest.TestCase):
     def setUp(self):
         self.module = load_module()
@@ -518,6 +573,66 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
         np.testing.assert_allclose(action["base"], [0.1, -0.2, 0.03])
         np.testing.assert_allclose(action["right_gripper"], [1.0])
         np.testing.assert_allclose(action["left_gripper"], [1.0])
+
+
+class InchwormTransportRunnerTests(unittest.TestCase):
+    def test_one_macro_cycle_moves_object_then_resets_base(self):
+        module = load_module()
+        driver = FakeInchwormDriver()
+        config = module.InchwormCarryConfig(
+            stroke_distance=0.08,
+            stroke_vertical_feedforward=0.0,
+            reset_distance=0.08,
+            reset_max_linear=0.04,
+            max_cycles=2,
+        )
+
+        result = module.run_inchworm_transport(
+            object(),
+            object_name="box",
+            travel_direction=np.array([1.0, 0.0]),
+            travel_distance=0.05,
+            minimum_object_z=0.90,
+            config=config,
+            driver=driver,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["cycle_count"], 1)
+        self.assertGreaterEqual(result["object_progress_m"], 0.05)
+        self.assertAlmostEqual(result["base_translation_m"], 0.08, places=6)
+        self.assertTrue(
+            any(np.linalg.norm(step["base_step"]) == 0.0 for step in driver.steps)
+        )
+        self.assertTrue(
+            any(np.linalg.norm(step["base_step"]) > 0.0 for step in driver.steps)
+        )
+
+    def test_repeats_macro_cycles_until_measured_object_progress_reaches_target(self):
+        module = load_module()
+        driver = FakeInchwormDriver()
+        config = module.InchwormCarryConfig(
+            stroke_distance=0.08,
+            stroke_vertical_feedforward=0.0,
+            reset_distance=0.08,
+            reset_max_linear=0.04,
+            max_cycles=3,
+        )
+
+        result = module.run_inchworm_transport(
+            object(),
+            object_name="box",
+            travel_direction=np.array([1.0, 0.0]),
+            travel_distance=0.12,
+            minimum_object_z=0.90,
+            config=config,
+            driver=driver,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["cycle_count"], 2)
+        self.assertGreaterEqual(result["object_progress_m"], 0.12)
+        self.assertGreaterEqual(result["cycles"][1]["total_progress_m"], 0.12)
 
 
 class CradleTransferTests(unittest.TestCase):

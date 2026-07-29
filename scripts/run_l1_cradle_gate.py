@@ -1785,6 +1785,7 @@ def _center_regrasp_probe(
     center_carry_arm_stroke_m: float = 0.0,
     center_carry_arm_stroke_lift_m: float = 0.0,
     center_carry_base_reset_m: float = 0.0,
+    center_carry_inchworm_distance_m: float = 0.0,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import (
         OfficialScriptedGraspDriver,
@@ -1794,8 +1795,10 @@ def _center_regrasp_probe(
     )
     from robot_agent.skills.competition_transport import (
         OfficialPhysicalCarryDriver,
+        InchwormCarryConfig,
         PhysicalCarryConfig,
         _is_allowed_cradle_geom,
+        run_inchworm_transport,
         run_physical_transport,
         world_velocity_to_base_frame,
     )
@@ -3111,6 +3114,7 @@ def _center_regrasp_probe(
                                     if (
                                         physical_grasp
                                         and float(center_carry_corner_seat_m) > 0.0
+                                        and float(center_carry_inchworm_distance_m) <= 0.0
                                     ):
                                         seat_base_xy = np.asarray(
                                             backend.get_base_pose()[0], dtype=float
@@ -3167,6 +3171,7 @@ def _center_regrasp_probe(
                                     if (
                                         physical_grasp
                                         and float(center_carry_arm_stroke_m) > 0.0
+                                        and float(center_carry_inchworm_distance_m) <= 0.0
                                     ):
                                         stroke_base_xy = np.asarray(
                                             backend.get_base_pose()[0], dtype=float
@@ -3243,6 +3248,7 @@ def _center_regrasp_probe(
                                     if (
                                         physical_grasp
                                         and float(center_carry_base_reset_m) > 0.0
+                                        and float(center_carry_inchworm_distance_m) <= 0.0
                                     ):
                                         reset_driver = OfficialPhysicalCarryDriver()
                                         reset_start_base = np.asarray(
@@ -3441,6 +3447,85 @@ def _center_regrasp_probe(
                                             failure_stage = "inchworm_base_reset"
                                     if not physical_grasp:
                                         failure_stage = failure_stage or "final_contact"
+                                    elif float(center_carry_inchworm_distance_m) > 0.0:
+                                        transport_start_base_xy = np.asarray(
+                                            backend.get_base_pose()[0], dtype=float
+                                        )
+                                        transport_start_object_xy = np.asarray(
+                                            raw_env.sim.data.body_xpos[body_id][:2],
+                                            dtype=float,
+                                        ).copy()
+                                        inchworm_direction = (
+                                            transport_start_object_xy
+                                            - transport_start_base_xy
+                                        )
+                                        inchworm_distance = float(
+                                            center_carry_inchworm_distance_m
+                                        )
+                                        transport_result = run_inchworm_transport(
+                                            backend,
+                                            object_name=object_name,
+                                            travel_direction=inchworm_direction,
+                                            travel_distance=inchworm_distance,
+                                            minimum_object_z=(
+                                                float(table_object_z) + 0.10
+                                            ),
+                                            config=InchwormCarryConfig(
+                                                stroke_distance=0.08,
+                                                stroke_vertical_feedforward=0.015,
+                                                stroke_height_gain=0.75,
+                                                reset_distance=0.08,
+                                                reset_max_linear=0.04,
+                                                max_cycles=max(
+                                                    2,
+                                                    int(
+                                                        np.ceil(
+                                                            inchworm_distance / 0.02
+                                                        )
+                                                    )
+                                                    + 2,
+                                                ),
+                                            ),
+                                        )
+                                        transport_end_base_xy = np.asarray(
+                                            backend.get_base_pose()[0], dtype=float
+                                        )
+                                        transport_end_object_xy = np.asarray(
+                                            raw_env.sim.data.body_xpos[body_id][:2],
+                                            dtype=float,
+                                        ).copy()
+                                        transport_base_translation = float(
+                                            np.linalg.norm(
+                                                transport_end_base_xy
+                                                - transport_start_base_xy
+                                            )
+                                        )
+                                        transport_object_translation = float(
+                                            np.linalg.norm(
+                                                transport_end_object_xy
+                                                - transport_start_object_xy
+                                            )
+                                        )
+                                        stage_results.append(
+                                            {
+                                                "stage": "inchworm_transport",
+                                                **transport_result,
+                                                "requested_distance_m": (
+                                                    inchworm_distance
+                                                ),
+                                                "object_translation_m": (
+                                                    transport_object_translation
+                                                ),
+                                                "base_translation_m": (
+                                                    transport_base_translation
+                                                ),
+                                            }
+                                        )
+                                        failure_stage = (
+                                            None
+                                            if bool(transport_result.get("success"))
+                                            else "inchworm_transport"
+                                        )
                                     elif float(center_carry_distance_m) > 0.0:
                                         transport_start_base_xy, hold_yaw = (
                                             backend.get_base_pose()
@@ -3545,7 +3630,9 @@ def _center_regrasp_probe(
             if isinstance(transport_result, Mapping)
             else False
         ),
-        "requested_carry_distance_m": float(center_carry_distance_m),
+        "requested_carry_distance_m": float(
+            max(center_carry_distance_m, center_carry_inchworm_distance_m)
+        ),
         "object_translation_m": transport_object_translation,
         "transport_base_translation_m": transport_base_translation,
         "transport": transport_result,
@@ -3711,10 +3798,17 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                             args.center_carry_arm_stroke_lift_m
                         ),
                         center_carry_base_reset_m=args.center_carry_base_reset_m,
+                        center_carry_inchworm_distance_m=(
+                            args.center_carry_inchworm_distance_m
+                        ),
                     )
                     record["mode"] = (
                         "center_grasp_physical_transport"
-                        if args.center_carry_distance_m > 0.0
+                        if max(
+                            args.center_carry_distance_m,
+                            args.center_carry_inchworm_distance_m,
+                        )
+                        > 0.0
                         else "table_assisted_center_regrasp"
                     )
                     record["physical_grasp"] = bool(
@@ -3872,6 +3966,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--center-carry-arm-stroke-lift-m", type=float, default=0.0
     )
     parser.add_argument("--center-carry-base-reset-m", type=float, default=0.0)
+    parser.add_argument(
+        "--center-carry-inchworm-distance-m", type=float, default=0.0
+    )
     parser.add_argument("--align-closure-axes", action="store_true")
     parser.add_argument("--orientation-max-action", type=float, default=0.30)
     parser.add_argument("--orientation-fine-max-action", type=float)

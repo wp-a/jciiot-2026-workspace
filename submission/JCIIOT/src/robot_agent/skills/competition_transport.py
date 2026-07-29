@@ -304,6 +304,43 @@ class PhysicalCarryConfig:
         self.max_arm_action = float(max_arm_action)
 
 
+class InchwormCarryConfig:
+    """Quasi-static arm-stroke and base-reset transport parameters."""
+
+    def __init__(
+        self,
+        *,
+        stroke_distance: float = 0.08,
+        stroke_vertical_feedforward: float = 0.015,
+        stroke_height_gain: float = 0.75,
+        max_vertical_adjustment: float = 0.05,
+        arm_target_tolerance: float = 0.01,
+        arm_max_steps: int = 120,
+        reset_distance: float = 0.08,
+        reset_max_linear: float = 0.04,
+        reset_control_dt: float = 0.05,
+        reset_position_tolerance: float = 1e-4,
+        reset_max_gripper_drift: float = 0.03,
+        max_lateral_drift: float = 0.03,
+        minimum_macro_progress: float = 0.02,
+        max_cycles: int = 64,
+    ) -> None:
+        self.stroke_distance = float(stroke_distance)
+        self.stroke_vertical_feedforward = float(stroke_vertical_feedforward)
+        self.stroke_height_gain = float(stroke_height_gain)
+        self.max_vertical_adjustment = float(max_vertical_adjustment)
+        self.arm_target_tolerance = float(arm_target_tolerance)
+        self.arm_max_steps = int(arm_max_steps)
+        self.reset_distance = float(reset_distance)
+        self.reset_max_linear = float(reset_max_linear)
+        self.reset_control_dt = float(reset_control_dt)
+        self.reset_position_tolerance = float(reset_position_tolerance)
+        self.reset_max_gripper_drift = float(reset_max_gripper_drift)
+        self.max_lateral_drift = float(max_lateral_drift)
+        self.minimum_macro_progress = float(minimum_macro_progress)
+        self.max_cycles = int(max_cycles)
+
+
 def world_velocity_to_base_frame(world_xy, yaw: float) -> np.ndarray:
     """Rotate a planar world-frame command into the current base frame."""
     world_xy = np.asarray(world_xy, dtype=float).reshape(2)
@@ -864,6 +901,327 @@ def run_physical_transport(
         start_observation=start_observation,
         max_planar_grasp_drift_m=maximum_planar_grasp_drift,
     )
+
+
+def _inchworm_planar_motion(delta, direction) -> tuple[float, float]:
+    delta = np.asarray(delta, dtype=float).reshape(2)
+    direction = np.asarray(direction, dtype=float).reshape(2)
+    norm = float(np.linalg.norm(direction))
+    if norm <= 1e-12:
+        raise ValueError("travel_direction must be non-zero")
+    direction = direction / norm
+    progress = float(np.dot(delta, direction))
+    lateral = float(np.linalg.norm(delta - progress * direction))
+    return progress, lateral
+
+
+def run_inchworm_transport(
+    backend,
+    *,
+    object_name: str,
+    travel_direction,
+    travel_distance: float,
+    minimum_object_z: float,
+    config: InchwormCarryConfig | None = None,
+    driver=None,
+) -> dict:
+    """Repeat physical arm strokes and compensated base resets."""
+    config = config or InchwormCarryConfig()
+    driver = driver or OfficialPhysicalCarryDriver()
+    direction = np.asarray(travel_direction, dtype=float).reshape(2)
+    direction_norm = float(np.linalg.norm(direction))
+    if direction_norm <= 1e-12:
+        raise ValueError("travel_direction must be non-zero")
+    direction = direction / direction_norm
+    distance = float(travel_distance)
+    if not np.isfinite(distance) or distance < 0.0:
+        raise ValueError("travel_distance must be finite and non-negative")
+    positive_values = {
+        "stroke_distance": config.stroke_distance,
+        "arm_target_tolerance": config.arm_target_tolerance,
+        "reset_distance": config.reset_distance,
+        "reset_max_linear": config.reset_max_linear,
+        "reset_control_dt": config.reset_control_dt,
+        "reset_position_tolerance": config.reset_position_tolerance,
+        "reset_max_gripper_drift": config.reset_max_gripper_drift,
+        "max_lateral_drift": config.max_lateral_drift,
+        "minimum_macro_progress": config.minimum_macro_progress,
+    }
+    if any(not np.isfinite(value) or value <= 0.0 for value in positive_values.values()):
+        raise ValueError("inchworm distances, limits, and tolerances must be positive")
+    if config.arm_max_steps < 1 or config.max_cycles < 1:
+        raise ValueError("inchworm step and cycle budgets must be positive")
+
+    hold_targets = driver.capture_hold_targets(backend)
+    start = driver.observe(backend, object_name)
+    start_object = np.asarray(start["object_pos"], dtype=float).copy()
+    start_base = np.asarray(start["base_xy"], dtype=float).copy()
+    target_object_z = float(start_object[2])
+    minimum_observed_z = float(start_object[2])
+    cycles = []
+    steps = 0
+    failure_stage = "timeout"
+    success = distance == 0.0
+    driver.record_event(
+        backend,
+        "inchworm_transport_start",
+        object_name=object_name,
+        travel_distance=distance,
+    )
+
+    for cycle_index in range(config.max_cycles):
+        if success:
+            break
+        cycle_start = driver.observe(backend, object_name)
+        if next_contact_stability(cycle_start["contacts"], 0) == 0:
+            failure_stage = "contact"
+            break
+        cycle_start_object = np.asarray(cycle_start["object_pos"], dtype=float).copy()
+        cycle_start_grippers = {
+            arm: np.asarray(cycle_start["gripper_positions"][arm], dtype=float).copy()
+            for arm in ("right", "left")
+        }
+        height_error = target_object_z - float(cycle_start_object[2])
+        vertical_adjustment = float(
+            np.clip(
+                config.stroke_vertical_feedforward
+                + config.stroke_height_gain * height_error,
+                -config.max_vertical_adjustment,
+                config.max_vertical_adjustment,
+            )
+        )
+        arm_targets = {
+            arm: cycle_start_grippers[arm]
+            + np.array(
+                [
+                    direction[0] * config.stroke_distance,
+                    direction[1] * config.stroke_distance,
+                    vertical_adjustment,
+                ],
+                dtype=float,
+            )
+            for arm in ("right", "left")
+        }
+
+        arm_reached = False
+        cycle_collision = False
+        cycle_failure = None
+        arm_steps = 0
+        for _ in range(config.arm_max_steps):
+            observation = driver.observe(backend, object_name)
+            arm_deltas = {
+                arm: arm_targets[arm]
+                - np.asarray(observation["gripper_positions"][arm], dtype=float)
+                for arm in ("right", "left")
+            }
+            if max(float(np.linalg.norm(delta)) for delta in arm_deltas.values()) <= (
+                config.arm_target_tolerance
+            ):
+                arm_reached = True
+                break
+            step_info = driver.step(
+                backend,
+                object_name=object_name,
+                base_command=np.zeros(3, dtype=float),
+                hold_targets=hold_targets,
+                arm_world_deltas=arm_deltas,
+                gripper_value=1.0,
+                base_control_dt=config.reset_control_dt,
+            )
+            steps += 1
+            arm_steps += 1
+            observation = driver.observe(backend, object_name)
+            minimum_observed_z = min(
+                minimum_observed_z, float(observation["object_pos"][2])
+            )
+            cycle_collision = bool(step_info.get("collision", False))
+            if cycle_collision:
+                cycle_failure = "collision"
+                break
+            if next_contact_stability(observation["contacts"], 0) == 0:
+                cycle_failure = "contact"
+                break
+            if float(observation["object_pos"][2]) < float(minimum_object_z):
+                cycle_failure = "object_drop"
+                break
+
+        arm_end = driver.observe(backend, object_name)
+        arm_progress, arm_lateral = _inchworm_planar_motion(
+            np.asarray(arm_end["object_pos"], dtype=float)[:2]
+            - cycle_start_object[:2],
+            direction,
+        )
+        if cycle_failure is None and not arm_reached:
+            cycle_failure = "arm_timeout"
+        if cycle_failure is None and (
+            arm_progress < config.minimum_macro_progress
+            or arm_lateral > config.max_lateral_drift
+        ):
+            cycle_failure = "arm_progress"
+        if cycle_failure is not None:
+            failure_stage = cycle_failure
+            break
+
+        reset_start = driver.observe(backend, object_name)
+        reset_start_base = np.asarray(reset_start["base_xy"], dtype=float).copy()
+        reset_start_grippers = {
+            arm: np.asarray(reset_start["gripper_positions"][arm], dtype=float).copy()
+            for arm in ("right", "left")
+        }
+        reset_steps = 0
+        max_gripper_drift = 0.0
+        reset_translation = 0.0
+        reset_budget = int(
+            math.ceil(
+                config.reset_distance
+                / (config.reset_max_linear * config.reset_control_dt)
+            )
+        ) + 20
+        for _ in range(reset_budget):
+            observation = driver.observe(backend, object_name)
+            reset_translation = float(
+                np.dot(
+                    np.asarray(observation["base_xy"], dtype=float) - reset_start_base,
+                    direction,
+                )
+            )
+            remaining = max(0.0, config.reset_distance - reset_translation)
+            if remaining <= config.reset_position_tolerance:
+                break
+            speed = min(config.reset_max_linear, remaining / config.reset_control_dt)
+            world_velocity = direction * speed
+            base_velocity = world_velocity_to_base_frame(
+                world_velocity, float(observation["base_yaw"])
+            )
+            world_step = direction * speed * config.reset_control_dt
+            arm_deltas = {
+                arm: (
+                    reset_start_grippers[arm]
+                    - np.asarray(observation["gripper_positions"][arm], dtype=float)
+                    - np.array([world_step[0], world_step[1], 0.0], dtype=float)
+                )
+                for arm in ("right", "left")
+            }
+            step_info = driver.step(
+                backend,
+                object_name=object_name,
+                base_command=np.array(
+                    [base_velocity[0], base_velocity[1], 0.0], dtype=float
+                ),
+                hold_targets=hold_targets,
+                arm_world_deltas=arm_deltas,
+                gripper_value=1.0,
+                base_control_dt=config.reset_control_dt,
+            )
+            steps += 1
+            reset_steps += 1
+            observation = driver.observe(backend, object_name)
+            minimum_observed_z = min(
+                minimum_observed_z, float(observation["object_pos"][2])
+            )
+            max_gripper_drift = max(
+                max_gripper_drift,
+                max(
+                    float(
+                        np.linalg.norm(
+                            np.asarray(observation["gripper_positions"][arm])[:2]
+                            - reset_start_grippers[arm][:2]
+                        )
+                    )
+                    for arm in ("right", "left")
+                ),
+            )
+            if bool(step_info.get("collision", False)):
+                cycle_failure = "collision"
+                break
+            if next_contact_stability(observation["contacts"], 0) == 0:
+                cycle_failure = "contact"
+                break
+            if float(observation["object_pos"][2]) < float(minimum_object_z):
+                cycle_failure = "object_drop"
+                break
+            if max_gripper_drift > config.reset_max_gripper_drift:
+                cycle_failure = "reset_gripper_drift"
+                break
+
+        cycle_end = driver.observe(backend, object_name)
+        reset_translation = float(
+            np.dot(
+                np.asarray(cycle_end["base_xy"], dtype=float) - reset_start_base,
+                direction,
+            )
+        )
+        macro_progress, macro_lateral = _inchworm_planar_motion(
+            np.asarray(cycle_end["object_pos"], dtype=float)[:2]
+            - cycle_start_object[:2],
+            direction,
+        )
+        total_progress, total_lateral = _inchworm_planar_motion(
+            np.asarray(cycle_end["object_pos"], dtype=float)[:2]
+            - start_object[:2],
+            direction,
+        )
+        cycles.append(
+            {
+                "cycle": cycle_index + 1,
+                "arm_steps": arm_steps,
+                "reset_steps": reset_steps,
+                "vertical_adjustment_m": vertical_adjustment,
+                "arm_progress_m": arm_progress,
+                "macro_progress_m": macro_progress,
+                "total_progress_m": total_progress,
+                "macro_lateral_drift_m": macro_lateral,
+                "max_gripper_reset_drift_m": max_gripper_drift,
+                "base_reset_translation_m": reset_translation,
+            }
+        )
+        if cycle_failure is None and reset_translation < (
+            config.reset_distance - config.reset_position_tolerance
+        ):
+            cycle_failure = "reset_timeout"
+        if cycle_failure is None and (
+            macro_progress < config.minimum_macro_progress
+            or macro_lateral > config.max_lateral_drift
+            or total_lateral > config.max_lateral_drift
+        ):
+            cycle_failure = "macro_progress"
+        if cycle_failure is not None:
+            failure_stage = cycle_failure
+            break
+        if total_progress >= distance:
+            success = True
+            failure_stage = None
+            break
+
+    final = driver.observe(backend, object_name)
+    object_progress, lateral_drift = _inchworm_planar_motion(
+        np.asarray(final["object_pos"], dtype=float)[:2] - start_object[:2],
+        direction,
+    )
+    base_translation = float(
+        np.linalg.norm(np.asarray(final["base_xy"], dtype=float) - start_base)
+    )
+    driver.record_event(
+        backend,
+        "inchworm_transport_end",
+        object_name=object_name,
+        success=success,
+        failure_stage=failure_stage,
+        object_progress_m=object_progress,
+        cycle_count=len(cycles),
+    )
+    return {
+        "success": bool(success),
+        "failure_stage": failure_stage,
+        "steps": steps,
+        "cycle_count": len(cycles),
+        "object_progress_m": object_progress,
+        "lateral_drift_m": lateral_drift,
+        "base_translation_m": base_translation,
+        "minimum_object_z": minimum_observed_z,
+        "contacts": dict(final["contacts"]),
+        "cycles": cycles,
+    }
 
 
 class OfficialPhysicalCarryDriver:
