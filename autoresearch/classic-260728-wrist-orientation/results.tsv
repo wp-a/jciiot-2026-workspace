@@ -1,2 +1,5 @@
 iteration	variant	seed	orientation_max_action	right_error_deg	left_error_deg	stable_steps	max_position_drift_m	orientation_collision_frames	orientation_accepted	failure_stage	bilateral_contact	lift_m	accepted	elapsed_s	status
 1	fingerpad-position-boundary	0	0.20	56.899285	60.491779	0	0.030440	0	false	align_closure_axes_high	false	0.0	false	45.696942	discard
+2	gripsite-position-boundary	0	0.20	55.561675	59.204341	0	0.030291	0	false	align_closure_axes_high	false	0.0	false	46.318759	discard
+3	slow-orientation-a008	0	0.08	37.888680	41.579802	0	0.030335	0	false	align_closure_axes_high	false	0.0	false	46.755097	discard
+4	slow-orientation-a002	0	0.02	29.663353	33.336430	0	0.006204	0	false	align_closure_axes_high	false	0.0	false	76.928898	discard
