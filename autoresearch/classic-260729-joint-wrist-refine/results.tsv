@@ -1,0 +1,4 @@
+iteration	variant	seed	position_scale_m	joint_seed_accepted	right_seed_error_deg	left_seed_error_deg	endpoint_position_error_m	path_drift_m	joint_seed_collision_frames	orientation_accepted	right_orientation_error_deg	left_orientation_error_deg	orientation_drift_m	orientation_collision_frames	bilateral_contact	lift_m	accepted	failure_stage	elapsed_s	status
+1	direct-pos0185	0	0.0185	false	6.629695	9.934610	0.013324	0.033699	0	false	NA	NA	NA	NA	false	0.0	false	joint_space_wrist_seed	44.024567	discard
+2	continuation-24-node5deg	0	0.0185	false	2.701285	5.935214	0.007998	0.0	0	false	NA	NA	NA	NA	false	0.0	false	joint_space_wrist_seed	58.078471	discard
+3	continuation-24-node10deg	0	0.0185	true	6.629696	9.934606	0.013324	0.013324	0	false	5.976363	9.203848	0.006728	0	false	0.0	false	align_closure_axes_high	147.128867	keep
