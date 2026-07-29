@@ -970,6 +970,7 @@ class L1TableEdgeUndercutTests(unittest.TestCase):
         self.assertIn('"safe_unrotated_inset_plateau"', source)
         self.assertIn('"safe_unrotated_descent_plateau"', source)
         self.assertIn('"safe_unrotated_base_assisted_inset"', source)
+        self.assertIn("arm_world_deltas=base_follow_arm_deltas", source)
 
 
 class JointSeedMathTests(unittest.TestCase):

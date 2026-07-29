@@ -2529,6 +2529,9 @@ def _table_edge_undercut_probe(
                 )
             custom_direction /= direction_norm
         driver = OfficialPhysicalCarryDriver()
+        base_follow_arm_deltas = {
+            arm: np.zeros(3, dtype=float) for arm in ("right", "left")
+        }
         safety_failure = None
         success = False
         geometry_ready = open_fork_under_bottom_support_ready(
@@ -2572,7 +2575,7 @@ def _table_edge_undercut_probe(
                     [base_velocity[0], base_velocity[1], 0.0], dtype=float
                 ),
                 hold_targets=segment_hold_targets,
-                arm_world_deltas=None,
+                arm_world_deltas=base_follow_arm_deltas,
                 gripper_value=-1.0,
                 base_control_dt=control_dt,
             )
