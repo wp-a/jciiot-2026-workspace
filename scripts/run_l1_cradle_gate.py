@@ -2063,6 +2063,8 @@ def _table_edge_undercut_probe(
     torso_raise_orientation_max_action: float,
     torso_raise_base_correction_max_m: float,
     orient_before_descent: bool,
+    post_inset_world_direction_x: float | None,
+    post_inset_world_direction_y: float | None,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import OfficialScriptedGraspDriver
     from robot_agent.skills.competition_transport import (
@@ -2505,6 +2507,27 @@ def _table_edge_undercut_probe(
         segment_hold_targets = helpers["capture_hold_targets"](robot)
         control_dt = 0.05
         max_speed = 0.02
+        custom_direction = None
+        if (post_inset_world_direction_x is None) != (
+            post_inset_world_direction_y is None
+        ):
+            raise ValueError(
+                "post-inset world direction requires both x and y"
+            )
+        if post_inset_world_direction_x is not None:
+            custom_direction = np.array(
+                [
+                    float(post_inset_world_direction_x),
+                    float(post_inset_world_direction_y),
+                ],
+                dtype=float,
+            )
+            direction_norm = float(np.linalg.norm(custom_direction))
+            if not np.all(np.isfinite(custom_direction)) or direction_norm <= 1e-9:
+                raise ValueError(
+                    "post-inset world direction must be finite and nonzero"
+                )
+            custom_direction /= direction_norm
         driver = OfficialPhysicalCarryDriver()
         safety_failure = None
         success = False
@@ -2524,16 +2547,22 @@ def _table_edge_undercut_probe(
                 if not success:
                     safety_failure = "bottom_overlap_not_reached"
                 break
-            object_xy = np.asarray(
-                raw_env.sim.data.body_xpos[body_id][:2], dtype=float
-            )
-            world_velocity = bounded_base_advance_world_velocity(
-                base_xy=base_xy,
-                object_xy=object_xy,
-                remaining_m=remaining,
-                max_speed_m_s=max_speed,
-                control_dt_s=control_dt,
-            )
+            if custom_direction is None:
+                object_xy = np.asarray(
+                    raw_env.sim.data.body_xpos[body_id][:2], dtype=float
+                )
+                world_velocity = bounded_base_advance_world_velocity(
+                    base_xy=base_xy,
+                    object_xy=object_xy,
+                    remaining_m=remaining,
+                    max_speed_m_s=max_speed,
+                    control_dt_s=control_dt,
+                )
+            else:
+                world_velocity = custom_direction * min(
+                    max_speed,
+                    remaining / control_dt,
+                )
             _, base_yaw = backend.get_base_pose()
             base_velocity = world_velocity_to_base_frame(world_velocity, base_yaw)
             step_info = driver.step(
@@ -2613,6 +2642,9 @@ def _table_edge_undercut_probe(
                 "requested_translation_m": requested_distance,
                 "base_translation_m": final_translation,
                 "geometry_ready": geometry_ready,
+                "world_direction": (
+                    None if custom_direction is None else custom_direction.tolist()
+                ),
                 "final_eef_position": right_eef_position().tolist(),
                 "final_object_position": np.asarray(
                     raw_env.sim.data.body_xpos[body_id], dtype=float
@@ -3268,6 +3300,10 @@ def _table_edge_undercut_probe(
             torso_raise_base_correction_max_m
         ),
         "orient_before_descent": bool(orient_before_descent),
+        "post_inset_world_direction": [
+            post_inset_world_direction_x,
+            post_inset_world_direction_y,
+        ],
         "final_torso_position": torso_position(),
         "start_object_position": start_object.tolist(),
         "final_object_position": final_object.tolist(),
@@ -5662,6 +5698,12 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                     orient_before_descent=(
                         args.undercut_orient_before_descent
                     ),
+                    post_inset_world_direction_x=(
+                        args.undercut_post_inset_world_direction_x
+                    ),
+                    post_inset_world_direction_y=(
+                        args.undercut_post_inset_world_direction_y
+                    ),
                 )
                 record["mode"] = "table_edge_undercut_probe"
                 record["open_gripper"] = bool(probe.get("open_gripper", False))
@@ -6115,6 +6157,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--undercut-orient-before-descent",
         action="store_true",
+    )
+    parser.add_argument(
+        "--undercut-post-inset-world-direction-x",
+        type=float,
+    )
+    parser.add_argument(
+        "--undercut-post-inset-world-direction-y",
+        type=float,
     )
     parser.add_argument("--align-closure-axes", action="store_true")
     parser.add_argument("--orientation-max-action", type=float, default=0.30)

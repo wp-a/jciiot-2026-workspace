@@ -1289,6 +1289,8 @@ class JointSeedParserTests(unittest.TestCase):
             0.04,
         )
         self.assertFalse(args.undercut_orient_before_descent)
+        self.assertIsNone(args.undercut_post_inset_world_direction_x)
+        self.assertIsNone(args.undercut_post_inset_world_direction_y)
 
     def test_center_carry_speed_can_be_overridden_for_single_variable_probe(self):
         args = parse_args(
@@ -1380,6 +1382,10 @@ class JointSeedParserTests(unittest.TestCase):
                 "--undercut-torso-raise-base-correction-max-m",
                 "0.06",
                 "--undercut-orient-before-descent",
+                "--undercut-post-inset-world-direction-x",
+                "-1.0",
+                "--undercut-post-inset-world-direction-y",
+                "-0.25",
             ]
         )
 
@@ -1441,6 +1447,14 @@ class JointSeedParserTests(unittest.TestCase):
             0.06,
         )
         self.assertTrue(args.undercut_orient_before_descent)
+        self.assertAlmostEqual(
+            args.undercut_post_inset_world_direction_x,
+            -1.0,
+        )
+        self.assertAlmostEqual(
+            args.undercut_post_inset_world_direction_y,
+            -0.25,
+        )
 
 
 class OrientationCommandTests(unittest.TestCase):
