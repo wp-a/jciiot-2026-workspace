@@ -43,6 +43,36 @@ POSTURE_CARRY_THRESHOLDS = {
 }
 
 
+def directed_planar_progress(
+    *,
+    start_xy: object,
+    end_xy: object,
+    direction_xy: object,
+) -> tuple[float, float]:
+    """Return signed progress and absolute lateral drift along a 2-D direction."""
+    start = np.asarray(start_xy, dtype=float)
+    end = np.asarray(end_xy, dtype=float)
+    direction = np.asarray(direction_xy, dtype=float)
+    if any(value.shape != (2,) for value in (start, end, direction)):
+        raise ValueError("start, end, and direction must each be planar 2-vectors")
+    if not all(np.all(np.isfinite(value)) for value in (start, end, direction)):
+        raise ValueError("start, end, and direction must be finite")
+    direction_norm = float(np.linalg.norm(direction))
+    if direction_norm <= 0.0:
+        raise ValueError("direction must be nonzero")
+
+    unit_direction = direction / direction_norm
+    displacement = end - start
+    progress = float(np.dot(displacement, unit_direction))
+    lateral = abs(
+        float(
+            unit_direction[0] * displacement[1]
+            - unit_direction[1] * displacement[0]
+        )
+    )
+    return progress, lateral
+
+
 @contextmanager
 def transport_attachment_audit(raw_env: object, transport_module: object):
     """Count transport attachment and direct object-pose operations in a scope."""
@@ -216,6 +246,7 @@ _POSTURE_CARRY_REQUIRED_FIELDS = (
     "terminal_bilateral_contact",
     "collision_frames",
     "attachment_activations",
+    "legacy_teleport_activations",
     "object_pose_writes",
     "infrastructure_error",
 )
@@ -254,7 +285,12 @@ def posture_carry_failures(record: Mapping[str, object]) -> list[str]:
         failures.append("final_object_lift_m")
     if record.get("terminal_bilateral_contact") is not True:
         failures.append("terminal_bilateral_contact")
-    for key in ("collision_frames", "attachment_activations", "object_pose_writes"):
+    for key in (
+        "collision_frames",
+        "attachment_activations",
+        "legacy_teleport_activations",
+        "object_pose_writes",
+    ):
         value = numeric(key)
         if value is None or value != 0.0:
             failures.append(key)
@@ -1731,6 +1767,231 @@ def geometry_snapshot(raw_env, object_name: str) -> dict[str, Any]:
     return {
         "object_position": np.asarray(data.body_xpos[body_id], dtype=float).tolist(),
         "geometries": selected,
+    }
+
+
+def _posture_locked_carry_probe(
+    backend,
+    object_name: str,
+    *,
+    distance_m: float,
+    world_direction_x: float | None,
+    world_direction_y: float | None,
+    table_object_z: float,
+    _transport_module=None,
+    _gripper_position=None,
+    _contact_reader=object_robot_contacts,
+) -> dict[str, Any]:
+    """Measure one attachment-free physical carry under posture-locked navigation."""
+    requested_distance = float(distance_m)
+    table_z = float(table_object_z)
+    if (
+        not np.isfinite(requested_distance)
+        or requested_distance <= 0.0
+        or not np.isfinite(table_z)
+    ):
+        raise ValueError("carry distance must be positive and table height finite")
+    if (world_direction_x is None) != (world_direction_y is None):
+        raise ValueError("both world direction components must be provided together")
+
+    if _transport_module is None:
+        from robosuite.environments.factory_sorting import (
+            transport_attachment as _transport_module,
+        )
+    if _gripper_position is None:
+        from robot_agent.skills.competition_grasp import OfficialScriptedGraspDriver
+
+        _gripper_position = OfficialScriptedGraspDriver._helpers()[
+            "gripper_position"
+        ]
+
+    raw_env = backend.env
+    robot = raw_env.robots[0]
+    body_id = raw_env.obj_body_id[object_name]
+
+    def object_position() -> np.ndarray:
+        position = np.asarray(
+            raw_env.sim.data.body_xpos[body_id],
+            dtype=float,
+        )
+        if position.shape != (3,) or not np.all(np.isfinite(position)):
+            raise RuntimeError("invalid object position during carry probe")
+        return position.copy()
+
+    def gripper_positions() -> dict[str, np.ndarray]:
+        positions = {
+            arm: np.asarray(
+                _gripper_position(raw_env, robot, arm),
+                dtype=float,
+            )
+            for arm in ("right", "left")
+        }
+        if any(
+            position.shape != (3,) or not np.all(np.isfinite(position))
+            for position in positions.values()
+        ):
+            raise RuntimeError("invalid gripper position during carry probe")
+        return {arm: position.copy() for arm, position in positions.items()}
+
+    def legacy_transport_active() -> bool:
+        return bool(
+            getattr(backend, "_held_crate_name", None) is not None
+            or getattr(backend, "_held_crate_body_id", None) is not None
+        )
+
+    start_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
+    if start_base_xy.shape != (2,) or not np.all(np.isfinite(start_base_xy)):
+        raise RuntimeError("invalid base position during carry probe")
+    start_object = object_position()
+    start_grippers = gripper_positions()
+    if world_direction_x is None:
+        direction = start_object[:2] - start_base_xy
+    else:
+        direction = np.array(
+            [float(world_direction_x), float(world_direction_y)],
+            dtype=float,
+        )
+    _, _ = directed_planar_progress(
+        start_xy=start_base_xy,
+        end_xy=start_base_xy,
+        direction_xy=direction,
+    )
+    direction /= float(np.linalg.norm(direction))
+    target_base_xy = start_base_xy + direction * requested_distance
+
+    object_heights = [float(start_object[2])]
+    original_recorder = getattr(backend, "_record_trajectory_frame")
+    original_legacy_update = getattr(backend, "_update_held_crate_position")
+    backend_dict = getattr(backend, "__dict__", {})
+    recorder_was_local = "_record_trajectory_frame" in backend_dict
+    legacy_update_was_local = "_update_held_crate_position" in backend_dict
+    local_recorder = backend_dict.get("_record_trajectory_frame")
+    local_legacy_update = backend_dict.get("_update_held_crate_position")
+    legacy_calls = 0
+
+    def record_and_sample(*args: object, **kwargs: object):
+        result = original_recorder(*args, **kwargs)
+        object_heights.append(float(object_position()[2]))
+        return result
+
+    def audited_legacy_update(*args: object, **kwargs: object):
+        nonlocal legacy_calls
+        if legacy_transport_active():
+            legacy_calls += 1
+        return original_legacy_update(*args, **kwargs)
+
+    setattr(backend, "_record_trajectory_frame", record_and_sample)
+    setattr(backend, "_update_held_crate_position", audited_legacy_update)
+    navigation_reached = False
+    try:
+        with transport_attachment_audit(raw_env, _transport_module) as audit:
+            legacy_active_before = legacy_transport_active()
+            if not audit["active_before"] and not legacy_active_before:
+                navigation_reached = bool(
+                    backend.follow_path(
+                        [target_base_xy],
+                        max_steps=max(
+                            20,
+                            int(np.ceil(requested_distance / 0.001)) + 5,
+                        ),
+                        waypoint_tolerance=1e-5,
+                        stop_on_collision=True,
+                        record_every=1,
+                    )
+                )
+            legacy_active_after = legacy_transport_active()
+    finally:
+        if recorder_was_local:
+            setattr(backend, "_record_trajectory_frame", local_recorder)
+        else:
+            delattr(backend, "_record_trajectory_frame")
+        if legacy_update_was_local:
+            setattr(backend, "_update_held_crate_position", local_legacy_update)
+        else:
+            delattr(backend, "_update_held_crate_position")
+
+    end_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
+    end_object = object_position()
+    end_grippers = gripper_positions()
+    base_progress, _ = directed_planar_progress(
+        start_xy=start_base_xy,
+        end_xy=end_base_xy,
+        direction_xy=direction,
+    )
+    object_progress, lateral_drift = directed_planar_progress(
+        start_xy=start_object[:2],
+        end_xy=end_object[:2],
+        direction_xy=direction,
+    )
+    gripper_drift = max(
+        float(
+            np.linalg.norm(
+                (end_grippers[arm][:2] - end_object[:2])
+                - (start_grippers[arm][:2] - start_object[:2])
+            )
+        )
+        for arm in ("right", "left")
+    )
+    contacts = _contact_reader(raw_env, object_name)
+    bilateral_contact = has_bilateral_object_contact(contacts)
+    collision = bool(getattr(raw_env, "has_judge_collision", False))
+    attachment_activations = int(audit["attachment_activations"]) + int(
+        bool(audit["active_before"])
+    ) + int(bool(audit["active_after"]))
+    legacy_teleport_activations = (
+        int(legacy_calls)
+        + int(legacy_active_before)
+        + int(legacy_active_after)
+    )
+    object_pose_writes = int(audit["object_pose_writes"]) + int(legacy_calls)
+    final_lift = float(end_object[2] - table_z)
+    translation_reached = bool(
+        navigation_reached or base_progress >= requested_distance - 1e-4
+    )
+    success = bool(
+        translation_reached
+        and object_progress >= POSTURE_CARRY_THRESHOLDS[
+            "projected_object_progress_m"
+        ]
+        and lateral_drift <= POSTURE_CARRY_THRESHOLDS["lateral_object_drift_m"]
+        and gripper_drift <= POSTURE_CARRY_THRESHOLDS["object_gripper_drift_m"]
+        and final_lift >= POSTURE_CARRY_THRESHOLDS["final_object_lift_m"]
+        and bilateral_contact
+        and not collision
+        and attachment_activations == 0
+        and legacy_teleport_activations == 0
+        and object_pose_writes == 0
+    )
+
+    return {
+        "posture_carry_success": success,
+        "requested_distance_m": requested_distance,
+        "world_direction": direction.tolist(),
+        "target_base_xy": target_base_xy.tolist(),
+        "navigation_reached": navigation_reached,
+        "base_progress_m": base_progress,
+        "projected_object_progress_m": object_progress,
+        "lateral_object_drift_m": lateral_drift,
+        "object_gripper_drift_m": gripper_drift,
+        "final_object_lift_m": final_lift,
+        "minimum_object_lift_m": float(min(object_heights) - table_z),
+        "terminal_bilateral_contact": bilateral_contact,
+        "terminal_contacts": {
+            arm: list(names) for arm, names in contacts.items()
+        },
+        "collision_frames": int(collision),
+        "attachment_activations": attachment_activations,
+        "transport_attachment_active_before": bool(audit["active_before"]),
+        "transport_attachment_active_after": bool(audit["active_after"]),
+        "legacy_teleport_activations": legacy_teleport_activations,
+        "legacy_transport_active_before": legacy_active_before,
+        "legacy_transport_active_after": legacy_active_after,
+        "object_pose_writes": object_pose_writes,
+        "infrastructure_error": None,
+        "start_base_xy": start_base_xy.tolist(),
+        "end_base_xy": end_base_xy.tolist(),
+        "start_object_position": start_object.tolist(),
+        "end_object_position": end_object.tolist(),
     }
 
 
@@ -5762,7 +6023,23 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                 )
                 record["hold_probe"] = probe
             elif record["physical_grasp"]:
-                if args.physical_push:
+                if args.posture_locked_carry_distance_m > 0.0:
+                    record["mode"] = "posture_locked_physical_carry"
+                    probe = _posture_locked_carry_probe(
+                        backend,
+                        object_name,
+                        distance_m=args.posture_locked_carry_distance_m,
+                        world_direction_x=(
+                            args.posture_locked_carry_world_direction_x
+                        ),
+                        world_direction_y=(
+                            args.posture_locked_carry_world_direction_y
+                        ),
+                        table_object_z=pre_grasp_z,
+                    )
+                    for key in _POSTURE_CARRY_REQUIRED_FIELDS:
+                        record[key] = probe[key]
+                elif args.physical_push:
                     probe = _physical_push_probe(
                         backend,
                         object_name,
@@ -6010,6 +6287,8 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
     record["elapsed_s"] = round(time.perf_counter() - started, 6)
     if record.get("mode") == "table_edge_undercut_probe":
         record["gate_failures"] = undercut_gate_failures(record)
+    elif record.get("mode") == "posture_locked_physical_carry":
+        record["gate_failures"] = posture_carry_failures(record)
     elif record.get("mode") == "physical_push_probe":
         record["gate_failures"] = push_gate_failures(record)
     elif record.get("mode") == "center_grasp_physical_transport":
@@ -6042,6 +6321,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--regrasp-wall-clearance-m", type=float, default=0.10)
     parser.add_argument("--regrasp-wall-squeeze-m", type=float, default=0.025)
     parser.add_argument("--regrasp-base-advance-m", type=float, default=0.0)
+    parser.add_argument(
+        "--posture-locked-carry-distance-m",
+        type=float,
+        default=0.0,
+    )
+    parser.add_argument("--posture-locked-carry-world-direction-x", type=float)
+    parser.add_argument("--posture-locked-carry-world-direction-y", type=float)
     parser.add_argument("--center-carry-distance-m", type=float, default=0.0)
     parser.add_argument("--center-carry-max-linear", type=float, default=0.04)
     parser.add_argument("--center-carry-away-from-object", action="store_true")

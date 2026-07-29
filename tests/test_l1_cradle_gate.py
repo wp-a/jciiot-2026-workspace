@@ -123,6 +123,7 @@ VALID_POSTURE_CARRY_RECORD = {
     "terminal_bilateral_contact": True,
     "collision_frames": 0,
     "attachment_activations": 0,
+    "legacy_teleport_activations": 0,
     "object_pose_writes": 0,
     "infrastructure_error": None,
 }
@@ -151,6 +152,7 @@ class PostureCarryGateTests(unittest.TestCase):
             "terminal_bilateral_contact": False,
             "collision_frames": 1,
             "attachment_activations": 1,
+            "legacy_teleport_activations": 1,
             "object_pose_writes": 1,
             "infrastructure_error": "RuntimeError: failed",
         }
@@ -179,6 +181,7 @@ class PostureCarryGateTests(unittest.TestCase):
             "final_object_lift_m",
             "collision_frames",
             "attachment_activations",
+            "legacy_teleport_activations",
             "object_pose_writes",
         )
         for key in numeric_fields:
@@ -259,6 +262,184 @@ class TransportAttachmentAuditTests(unittest.TestCase):
 
         self.assertIs(module.capture_transport_attachment, original_capture)
         self.assertIs(module.set_object_qpos, original_write)
+
+
+class DirectedPlanarProgressTests(unittest.TestCase):
+    def test_normalizes_direction_and_reports_forward_progress(self):
+        progress, lateral = gate_module.directed_planar_progress(
+            start_xy=[1.0, 2.0],
+            end_xy=[1.06, 2.08],
+            direction_xy=[3.0, 4.0],
+        )
+
+        self.assertAlmostEqual(progress, 0.10)
+        self.assertAlmostEqual(lateral, 0.0)
+
+    def test_reports_signed_progress_and_unsigned_lateral_drift(self):
+        progress, lateral = gate_module.directed_planar_progress(
+            start_xy=[0.0, 0.0],
+            end_xy=[0.06, 0.13],
+            direction_xy=[3.0, 4.0],
+        )
+        reverse, reverse_lateral = gate_module.directed_planar_progress(
+            start_xy=[0.06, 0.08],
+            end_xy=[0.0, 0.0],
+            direction_xy=[3.0, 4.0],
+        )
+
+        self.assertAlmostEqual(progress, 0.14)
+        self.assertAlmostEqual(lateral, 0.03)
+        self.assertAlmostEqual(reverse, -0.10)
+        self.assertAlmostEqual(reverse_lateral, 0.0)
+
+    def test_rejects_invalid_points_and_direction(self):
+        invalid = (
+            ([0.0], [0.0, 0.0], [1.0, 0.0]),
+            ([0.0, 0.0], [0.0, 0.0, 0.0], [1.0, 0.0]),
+            ([0.0, 0.0], [0.0, 0.0], [0.0, 0.0]),
+            ([0.0, 0.0], [float("nan"), 0.0], [1.0, 0.0]),
+            ([0.0, 0.0], [0.0, 0.0], [float("inf"), 0.0]),
+        )
+        for start_xy, end_xy, direction_xy in invalid:
+            with self.subTest(
+                start_xy=start_xy,
+                end_xy=end_xy,
+                direction_xy=direction_xy,
+            ):
+                with self.assertRaises(ValueError):
+                    gate_module.directed_planar_progress(
+                        start_xy=start_xy,
+                        end_xy=end_xy,
+                        direction_xy=direction_xy,
+                    )
+
+
+class PostureLockedCarryProbeTests(unittest.TestCase):
+    class FakeBackend:
+        def __init__(self, *, legacy_held=False):
+            self.base_xy = np.array([-1.0, 0.0], dtype=float)
+            self.grippers = {
+                "right": np.array([-0.10, -0.15, 1.25], dtype=float),
+                "left": np.array([-0.10, 0.15, 1.25], dtype=float),
+            }
+            self.env = SimpleNamespace(
+                obj_body_id={"box": 0},
+                sim=SimpleNamespace(
+                    data=SimpleNamespace(
+                        body_xpos=np.array([[0.0, 0.0, 1.20]], dtype=float)
+                    )
+                ),
+                robots=[SimpleNamespace()],
+                _transport_attachment={"active": False},
+                has_judge_collision=False,
+            )
+            self._held_crate_name = "box" if legacy_held else None
+            self._held_crate_body_id = 0 if legacy_held else None
+            self.follow_calls = []
+            self.record_calls = 0
+
+        def get_base_pose(self):
+            return self.base_xy.copy(), 0.0
+
+        def _record_trajectory_frame(self, *args, **kwargs):
+            del args, kwargs
+            self.record_calls += 1
+
+        def _update_held_crate_position(self):
+            if self._held_crate_name is not None:
+                self.env.sim.data.body_xpos[0] = np.array(
+                    [self.base_xy[0], self.base_xy[1], 1.20], dtype=float
+                )
+
+        def follow_path(self, path, **kwargs):
+            self.follow_calls.append((path, kwargs))
+            self.base_xy = np.asarray(path[0], dtype=float).copy()
+            displacement = np.array([0.09, 0.0, 0.0], dtype=float)
+            self.env.sim.data.body_xpos[0] += displacement
+            for arm in self.grippers:
+                self.grippers[arm] += displacement
+            self._record_trajectory_frame(_env=self.env)
+            return True
+
+    @staticmethod
+    def fake_transport_module():
+        return SimpleNamespace(
+            TRANSPORT_ATTACHMENT_ATTR="_transport_attachment",
+            capture_transport_attachment=lambda *args, **kwargs: None,
+            set_object_qpos=lambda *args, **kwargs: None,
+        )
+
+    @staticmethod
+    def contacts(*args, **kwargs):
+        del args, kwargs
+        return {"right": ("right_pad",), "left": ("left_pad",)}
+
+    @staticmethod
+    def gripper_position(backend):
+        return lambda raw_env, robot, arm: backend.grippers[arm].copy()
+
+    def test_probe_accepts_one_scene_relative_physical_waypoint(self):
+        backend = self.FakeBackend()
+
+        result = gate_module._posture_locked_carry_probe(
+            backend,
+            "box",
+            distance_m=0.10,
+            world_direction_x=None,
+            world_direction_y=None,
+            table_object_z=1.0,
+            _transport_module=self.fake_transport_module(),
+            _gripper_position=self.gripper_position(backend),
+            _contact_reader=self.contacts,
+        )
+
+        self.assertEqual(len(backend.follow_calls), 1)
+        np.testing.assert_allclose(backend.follow_calls[0][0][0], [-0.9, 0.0])
+        self.assertAlmostEqual(result["projected_object_progress_m"], 0.09)
+        self.assertAlmostEqual(result["lateral_object_drift_m"], 0.0)
+        self.assertAlmostEqual(result["object_gripper_drift_m"], 0.0)
+        self.assertAlmostEqual(result["final_object_lift_m"], 0.20)
+        self.assertTrue(result["terminal_bilateral_contact"])
+        self.assertTrue(result["posture_carry_success"])
+        self.assertTrue(gate_module.posture_carry_accepted(result))
+
+    def test_probe_rejects_legacy_held_crate_teleport_state(self):
+        backend = self.FakeBackend(legacy_held=True)
+
+        result = gate_module._posture_locked_carry_probe(
+            backend,
+            "box",
+            distance_m=0.10,
+            world_direction_x=1.0,
+            world_direction_y=0.0,
+            table_object_z=1.0,
+            _transport_module=self.fake_transport_module(),
+            _gripper_position=self.gripper_position(backend),
+            _contact_reader=self.contacts,
+        )
+
+        self.assertEqual(backend.follow_calls, [])
+        self.assertFalse(result["posture_carry_success"])
+        self.assertGreater(result["legacy_teleport_activations"], 0)
+        self.assertIn(
+            "legacy_teleport_activations",
+            gate_module.posture_carry_failures(result),
+        )
+
+    def test_runner_selects_probe_after_physical_grasp_and_uses_its_gate(self):
+        source = inspect.getsource(gate_module.run_probe)
+
+        posture_index = source.index(
+            "if args.posture_locked_carry_distance_m > 0.0"
+        )
+        push_index = source.index("elif args.physical_push")
+        self.assertLess(posture_index, push_index)
+        self.assertIn('record["mode"] = "posture_locked_physical_carry"', source)
+        self.assertIn("_posture_locked_carry_probe(", source)
+        self.assertIn(
+            'record["gate_failures"] = posture_carry_failures(record)',
+            source,
+        )
 
 
 class FingerpadBracketTests(unittest.TestCase):
@@ -1436,6 +1617,9 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertFalse(args.orientation_joint_seed_include_torso)
         self.assertAlmostEqual(args.orientation_joint_seed_torso_margin_m, 0.005)
         self.assertAlmostEqual(args.regrasp_base_advance_m, 0.0)
+        self.assertAlmostEqual(args.posture_locked_carry_distance_m, 0.0)
+        self.assertIsNone(args.posture_locked_carry_world_direction_x)
+        self.assertIsNone(args.posture_locked_carry_world_direction_y)
         self.assertAlmostEqual(args.center_carry_distance_m, 0.0)
         self.assertFalse(args.center_carry_away_from_object)
         self.assertAlmostEqual(args.center_carry_max_linear, 0.04)
@@ -1511,6 +1695,12 @@ class JointSeedParserTests(unittest.TestCase):
                 "/tmp/trajectory.json",
                 "--center-carry-max-linear",
                 "0.005",
+                "--posture-locked-carry-distance-m",
+                "0.10",
+                "--posture-locked-carry-world-direction-x",
+                "-1.0",
+                "--posture-locked-carry-world-direction-y",
+                "0.25",
                 "--center-carry-away-from-object",
                 "--center-carry-corner-seat-m",
                 "0.08",
@@ -1596,6 +1786,15 @@ class JointSeedParserTests(unittest.TestCase):
         )
 
         self.assertAlmostEqual(args.center_carry_max_linear, 0.005)
+        self.assertAlmostEqual(args.posture_locked_carry_distance_m, 0.10)
+        self.assertAlmostEqual(
+            args.posture_locked_carry_world_direction_x,
+            -1.0,
+        )
+        self.assertAlmostEqual(
+            args.posture_locked_carry_world_direction_y,
+            0.25,
+        )
         self.assertTrue(args.center_carry_away_from_object)
         self.assertAlmostEqual(args.center_carry_corner_seat_m, 0.08)
         self.assertAlmostEqual(args.center_carry_arm_stroke_m, 0.07)
