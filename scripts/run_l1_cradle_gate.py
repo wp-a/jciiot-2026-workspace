@@ -2672,7 +2672,6 @@ def _center_regrasp_probe(
                     approach_targets,
                     max_steps=220,
                     gripper_value=-1.0,
-                    stop_bilateral_contact_steps=1,
                 ):
                     failure_stage = "approach_center_walls"
                 else:
