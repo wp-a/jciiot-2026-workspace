@@ -30,3 +30,10 @@ improved the outside-stage `x` plateau from `7.483` to `7.372`. It still stopped
 `0.113 m` short of the requested `x=7.259`, with zero contact or collision. The
 response was approximately one-for-one with base advance, so the next trial
 changes only base advance from `0.10 m` to `0.20 m`.
+
+Iteration 3 was stopped at `0.150 m` of the requested `0.20 m` advance when the
+open left fingers first touched the container. There was no judge collision or
+meaningful object movement. Rather than advancing into the object, the next
+trial restores the safe `0.10 m` base advance and changes only the target point
+from object-local `x=+0.20 m` to `x=+0.31 m`. The hand collision width still
+overlaps the bottom footprint while making the target reachable.

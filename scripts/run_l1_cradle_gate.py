@@ -1894,6 +1894,7 @@ def _table_edge_undercut_probe(
     edge_clearance_m: float,
     above_clearance_m: float,
     base_advance_m: float,
+    object_offset_x_m: float,
     raise_above_bottom_m: float,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import OfficialScriptedGraspDriver
@@ -1921,7 +1922,7 @@ def _table_edge_undercut_probe(
         table_edge_y=table_edge_y,
         outside_clearance_m=outside_clearance_m,
         edge_clearance_m=edge_clearance_m,
-        object_offset_x_m=0.20,
+        object_offset_x_m=object_offset_x_m,
         above_clearance_m=above_clearance_m,
         below_bottom_clearance_m=0.05,
         raise_above_bottom_m=raise_above_bottom_m,
@@ -4547,6 +4548,7 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                     edge_clearance_m=args.undercut_edge_clearance_m,
                     above_clearance_m=args.undercut_above_clearance_m,
                     base_advance_m=args.undercut_base_advance_m,
+                    object_offset_x_m=args.undercut_object_offset_x_m,
                     raise_above_bottom_m=(
                         args.undercut_raise_above_bottom_m
                     ),
@@ -4917,6 +4919,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--undercut-base-advance-m",
         type=float,
         default=0.0,
+    )
+    parser.add_argument(
+        "--undercut-object-offset-x-m",
+        type=float,
+        default=0.20,
     )
     parser.add_argument(
         "--undercut-raise-above-bottom-m",
