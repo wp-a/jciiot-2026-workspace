@@ -1111,6 +1111,10 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.undercut_raise_above_bottom_m, 0.12)
         self.assertFalse(args.undercut_horizontal_fork)
         self.assertAlmostEqual(args.undercut_orientation_max_action, 0.08)
+        self.assertAlmostEqual(
+            args.undercut_orientation_position_max_action,
+            0.30,
+        )
         self.assertAlmostEqual(args.undercut_orientation_tolerance_deg, 3.0)
         self.assertEqual(args.undercut_orientation_stable_steps, 5)
         self.assertEqual(args.undercut_orientation_max_steps, 240)
@@ -1180,6 +1184,8 @@ class JointSeedParserTests(unittest.TestCase):
                 "--undercut-horizontal-fork",
                 "--undercut-orientation-max-action",
                 "0.06",
+                "--undercut-orientation-position-max-action",
+                "0.25",
                 "--undercut-orientation-tolerance-deg",
                 "2.0",
                 "--undercut-orientation-stable-steps",
@@ -1219,6 +1225,10 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.undercut_raise_above_bottom_m, 0.14)
         self.assertTrue(args.undercut_horizontal_fork)
         self.assertAlmostEqual(args.undercut_orientation_max_action, 0.06)
+        self.assertAlmostEqual(
+            args.undercut_orientation_position_max_action,
+            0.25,
+        )
         self.assertAlmostEqual(args.undercut_orientation_tolerance_deg, 2.0)
         self.assertEqual(args.undercut_orientation_stable_steps, 7)
         self.assertEqual(args.undercut_orientation_max_steps, 300)

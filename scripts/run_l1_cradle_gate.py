@@ -1935,6 +1935,7 @@ def _table_edge_undercut_probe(
     raise_above_bottom_m: float,
     horizontal_fork: bool,
     orientation_max_action: float,
+    orientation_position_max_action: float,
     orientation_tolerance_deg: float,
     orientation_stable_steps: int,
     orientation_max_steps: int,
@@ -2249,6 +2250,12 @@ def _table_edge_undercut_probe(
             0.0 < float(orientation_max_action) <= 1.0
         ):
             raise ValueError("orientation_max_action must be in (0, 1]")
+        if not np.isfinite(float(orientation_position_max_action)) or not (
+            0.0 < float(orientation_position_max_action) <= 1.0
+        ):
+            raise ValueError(
+                "orientation_position_max_action must be in (0, 1]"
+            )
         if not np.isfinite(float(orientation_tolerance_deg)) or float(
             orientation_tolerance_deg
         ) < 0.0:
@@ -2296,7 +2303,7 @@ def _table_edge_undercut_probe(
                 robot,
                 "right",
                 controller_delta,
-                0.12,
+                float(orientation_position_max_action),
             )
             world_rotation_delta = target_rotation @ current_orientation.T
             orientation_action = normalized_osc_orientation_command(
@@ -4859,6 +4866,9 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                     orientation_max_action=(
                         args.undercut_orientation_max_action
                     ),
+                    orientation_position_max_action=(
+                        args.undercut_orientation_position_max_action
+                    ),
                     orientation_tolerance_deg=(
                         args.undercut_orientation_tolerance_deg
                     ),
@@ -5257,6 +5267,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--undercut-orientation-max-action",
         type=float,
         default=0.08,
+    )
+    parser.add_argument(
+        "--undercut-orientation-position-max-action",
+        type=float,
+        default=0.30,
     )
     parser.add_argument(
         "--undercut-orientation-tolerance-deg",
