@@ -10,3 +10,5 @@ iteration	variant	arm_stroke_m	arm_lift_m	projected_object_progress_m	lateral_ob
 9	toward-base-inchworm-extraction	0.08	dynamic	0.100188	0.001396	0.06	0.060000	-	0.016239	false	false	0	discard:first macro passed; second arm lost left contact and object dropped
 10	direct-base-pull-extraction	-	dynamic	0.003829	-	-	0.041002	0.040496	-	true	false	0	discard:grippers moved but object stayed; planar grasp drift gate rejected slip
 11	small-cycle-toward-base-extraction	0.06	dynamic	0.066971	0.003548	0.04	0.068001	-	0.014261	false	false	0	discard:two arm strokes passed; second reset lost right contact and object dropped
+12	seated-toward-base-extraction	0.08	dynamic	0.045925	0.003272	0.06	0.044000	-	0.016482	false	false	0	discard:seat moved object 0.077857 m but extraction still lost left contact
+13	long-away-transport	0.08	dynamic	0.240537	0.003645	0.06	0.231549	-	0.022896	true	true	2	discard:torso collided with production_line_5 during fourth reset

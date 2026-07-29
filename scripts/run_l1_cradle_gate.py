@@ -287,6 +287,28 @@ def forward_carry_target(
     return base + direction * (distance / direction_norm)
 
 
+def resolve_inchworm_direction(
+    *,
+    base_xy: object,
+    object_xy: object,
+    toward_base: bool,
+    world_direction: object | None = None,
+) -> np.ndarray:
+    """Resolve and normalize the requested world-frame transport direction."""
+    base = np.asarray(base_xy, dtype=float).reshape(2)
+    target = np.asarray(object_xy, dtype=float).reshape(2)
+    if world_direction is None:
+        direction = target - base
+        if toward_base:
+            direction = -direction
+    else:
+        direction = np.asarray(world_direction, dtype=float).reshape(2)
+    norm = float(np.linalg.norm(direction))
+    if not np.all(np.isfinite(direction)) or norm <= 1e-12:
+        raise ValueError("inchworm direction must be finite and non-zero")
+    return direction / norm
+
+
 def trailing_corner_seat_targets(
     current: Mapping[str, object],
     *,
@@ -1793,6 +1815,8 @@ def _center_regrasp_probe(
     center_carry_inchworm_toward_base: bool = False,
     center_carry_inchworm_stroke_m: float = 0.08,
     center_carry_inchworm_reset_m: float = 0.06,
+    center_carry_inchworm_world_direction_x: float | None = None,
+    center_carry_inchworm_world_direction_y: float | None = None,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import (
         OfficialScriptedGraspDriver,
@@ -3464,11 +3488,27 @@ def _center_regrasp_probe(
                                             dtype=float,
                                         ).copy()
                                         inchworm_direction = (
-                                            transport_start_object_xy
-                                            - transport_start_base_xy
+                                            None
+                                            if center_carry_inchworm_world_direction_x
+                                            is None
+                                            and center_carry_inchworm_world_direction_y
+                                            is None
+                                            else np.array(
+                                                [
+                                                    center_carry_inchworm_world_direction_x,
+                                                    center_carry_inchworm_world_direction_y,
+                                                ],
+                                                dtype=float,
+                                            )
                                         )
-                                        if center_carry_inchworm_toward_base:
-                                            inchworm_direction = -inchworm_direction
+                                        inchworm_direction = resolve_inchworm_direction(
+                                            base_xy=transport_start_base_xy,
+                                            object_xy=transport_start_object_xy,
+                                            toward_base=(
+                                                center_carry_inchworm_toward_base
+                                            ),
+                                            world_direction=inchworm_direction,
+                                        )
                                         inchworm_distance = float(
                                             center_carry_inchworm_distance_m
                                         )
@@ -3830,6 +3870,12 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                         center_carry_inchworm_reset_m=(
                             args.center_carry_inchworm_reset_m
                         ),
+                        center_carry_inchworm_world_direction_x=(
+                            args.center_carry_inchworm_world_direction_x
+                        ),
+                        center_carry_inchworm_world_direction_y=(
+                            args.center_carry_inchworm_world_direction_y
+                        ),
                     )
                     record["mode"] = (
                         "center_grasp_physical_transport"
@@ -4008,6 +4054,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--center-carry-inchworm-reset-m", type=float, default=0.06
     )
+    parser.add_argument("--center-carry-inchworm-world-direction-x", type=float)
+    parser.add_argument("--center-carry-inchworm-world-direction-y", type=float)
     parser.add_argument("--align-closure-axes", action="store_true")
     parser.add_argument("--orientation-max-action", type=float, default=0.30)
     parser.add_argument("--orientation-fine-max-action", type=float)
