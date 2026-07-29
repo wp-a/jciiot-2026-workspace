@@ -9,7 +9,10 @@ from scripts.run_l1_cradle_gate import (
     cradle_gate_failures,
     eef_site_pose,
     has_bilateral_object_contact,
+    interior_joint_bounds,
+    joint_seed_objective_residual,
     minimum_undirected_axis_rotation,
+    nearest_directed_axis_target,
     next_orientation_alignment_state,
     normalized_osc_orientation_command,
     opposed_wall_clearance_targets,
@@ -122,6 +125,101 @@ class L1PhysicalPushGateTests(unittest.TestCase):
                 record[key] = value
                 self.assertFalse(push_gate_accepted(record))
                 self.assertIn(key, push_gate_failures(record))
+
+
+class JointSeedMathTests(unittest.TestCase):
+    def test_interior_joint_bounds_move_both_limits_inward(self):
+        lower, upper = interior_joint_bounds(
+            [-1.0, -2.0],
+            [1.0, 3.0],
+            margin_rad=0.05,
+        )
+
+        np.testing.assert_allclose(lower, [-0.95, -1.95])
+        np.testing.assert_allclose(upper, [0.95, 2.95])
+
+    def test_interior_joint_bounds_reject_invalid_ranges(self):
+        invalid = (
+            ([-1.0], [1.0, 2.0], 0.01),
+            ([float("nan")], [1.0], 0.01),
+            ([-1.0], [float("inf")], 0.01),
+            ([-1.0], [1.0], -0.01),
+            ([-0.01], [0.01], 0.01),
+        )
+        for lower, upper, margin in invalid:
+            with self.subTest(lower=lower, upper=upper, margin=margin):
+                with self.assertRaises(ValueError):
+                    interior_joint_bounds(lower, upper, margin_rad=margin)
+
+    @staticmethod
+    def seed_inputs():
+        return {
+            "current_positions": {
+                "right": np.array([1.0, 2.0, 3.0]),
+                "left": np.array([4.0, 5.0, 6.0]),
+            },
+            "target_positions": {
+                "right": np.array([1.0, 2.0, 3.0]),
+                "left": np.array([4.0, 5.0, 6.0]),
+            },
+            "current_axes": {
+                "right": np.array([0.0, 1.0, 0.0]),
+                "left": np.array([0.0, -1.0, 0.0]),
+            },
+            "target_axes": {
+                "right": np.array([0.0, 1.0, 0.0]),
+                "left": np.array([0.0, -1.0, 0.0]),
+            },
+            "joints": np.zeros(12),
+            "start_joints": np.zeros(12),
+            "joint_ranges": np.full(12, 2.0),
+            "position_scale_m": 0.01,
+            "axis_scale": np.sin(np.deg2rad(5.0)),
+            "regularization": 0.02,
+        }
+
+    def test_joint_seed_objective_is_zero_at_the_target_start(self):
+        residual = joint_seed_objective_residual(**self.seed_inputs())
+
+        self.assertEqual(residual.shape, (24,))
+        np.testing.assert_allclose(residual, np.zeros(24), atol=1e-12)
+
+    def test_joint_seed_objective_scales_position_axis_and_joint_terms(self):
+        values = self.seed_inputs()
+        values["current_positions"]["right"][0] += 0.01
+        values["current_axes"]["left"] = np.array([0.0, 0.0, -1.0])
+        values["joints"][0] = 1.0
+
+        residual = joint_seed_objective_residual(**values)
+
+        self.assertAlmostEqual(residual[0], 1.0)
+        np.testing.assert_allclose(
+            residual[9:12],
+            np.array([0.0, 1.0, -1.0]) / np.sin(np.deg2rad(5.0)),
+        )
+        self.assertAlmostEqual(residual[12], 0.01)
+
+    def test_nearest_directed_axis_target_fixes_the_closer_sign(self):
+        np.testing.assert_allclose(
+            nearest_directed_axis_target([0.0, -1.0, 0.0], [0.0, 2.0, 0.0]),
+            [0.0, -1.0, 0.0],
+        )
+
+    def test_joint_seed_objective_rejects_invalid_inputs(self):
+        overrides = (
+            {"current_positions": {"right": np.zeros(3)}},
+            {"current_axes": {"right": np.zeros(3), "left": np.ones(3)}},
+            {"joints": np.zeros(11)},
+            {"joint_ranges": np.r_[np.ones(11), 0.0]},
+            {"position_scale_m": 0.0},
+            {"axis_scale": float("nan")},
+            {"regularization": -0.01},
+        )
+        common = self.seed_inputs()
+        for override in overrides:
+            with self.subTest(override=override):
+                with self.assertRaises(ValueError):
+                    joint_seed_objective_residual(**{**common, **override})
 
 
 class OrientationCommandTests(unittest.TestCase):

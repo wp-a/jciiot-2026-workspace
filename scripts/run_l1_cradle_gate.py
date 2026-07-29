@@ -144,6 +144,33 @@ def push_gate_accepted(record: Mapping[str, object]) -> bool:
     return not push_gate_failures(record)
 
 
+def interior_joint_bounds(
+    lower: object,
+    upper: object,
+    *,
+    margin_rad: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Move finite joint limits inward by a fixed angular margin."""
+    minimum = np.asarray(lower, dtype=float)
+    maximum = np.asarray(upper, dtype=float)
+    margin = float(margin_rad)
+    if (
+        minimum.ndim != 1
+        or maximum.shape != minimum.shape
+        or minimum.size == 0
+        or not np.all(np.isfinite(minimum))
+        or not np.all(np.isfinite(maximum))
+    ):
+        raise ValueError("joint bounds must be finite matching vectors")
+    if not np.isfinite(margin) or margin < 0.0:
+        raise ValueError("joint margin must be finite and non-negative")
+    interior_lower = minimum + margin
+    interior_upper = maximum - margin
+    if np.any(interior_lower >= interior_upper):
+        raise ValueError("joint margin leaves an empty interior interval")
+    return interior_lower, interior_upper
+
+
 def _normalized_axis(value: object, *, name: str) -> np.ndarray:
     axis = np.asarray(value, dtype=float)
     if axis.shape != (3,) or not np.all(np.isfinite(axis)):
@@ -152,6 +179,85 @@ def _normalized_axis(value: object, *, name: str) -> np.ndarray:
     if norm <= 1e-12:
         raise ValueError(f"{name} must be non-zero")
     return axis / norm
+
+
+def nearest_directed_axis_target(
+    source_axis: object,
+    target_axis: object,
+) -> np.ndarray:
+    """Fix the sign of an undirected target nearest to the source axis."""
+    source = _normalized_axis(source_axis, name="source_axis")
+    target = _normalized_axis(target_axis, name="target_axis")
+    return target if float(np.dot(source, target)) >= 0.0 else -target
+
+
+def joint_seed_objective_residual(
+    *,
+    current_positions: Mapping[str, object],
+    target_positions: Mapping[str, object],
+    current_axes: Mapping[str, object],
+    target_axes: Mapping[str, object],
+    joints: object,
+    start_joints: object,
+    joint_ranges: object,
+    position_scale_m: float,
+    axis_scale: float,
+    regularization: float,
+) -> np.ndarray:
+    """Build the normalized simultaneous two-arm wrist-seed residual."""
+    arms = ("right", "left")
+
+    def position(mapping: Mapping[str, object], arm: str, name: str) -> np.ndarray:
+        if not isinstance(mapping, Mapping) or arm not in mapping:
+            raise ValueError(f"{name} must contain both arms")
+        value = np.asarray(mapping[arm], dtype=float)
+        if value.shape != (3,) or not np.all(np.isfinite(value)):
+            raise ValueError(f"{name}[{arm}] must be a finite three-vector")
+        return value
+
+    current = np.asarray(joints, dtype=float)
+    start = np.asarray(start_joints, dtype=float)
+    ranges = np.asarray(joint_ranges, dtype=float)
+    if (
+        current.ndim != 1
+        or current.size == 0
+        or start.shape != current.shape
+        or ranges.shape != current.shape
+        or not np.all(np.isfinite(current))
+        or not np.all(np.isfinite(start))
+        or not np.all(np.isfinite(ranges))
+        or np.any(ranges <= 0.0)
+    ):
+        raise ValueError("joint vectors must be finite, matching, and non-empty")
+    position_scale = float(position_scale_m)
+    orientation_scale = float(axis_scale)
+    joint_weight = float(regularization)
+    if not np.isfinite(position_scale) or position_scale <= 0.0:
+        raise ValueError("position_scale_m must be finite and positive")
+    if not np.isfinite(orientation_scale) or orientation_scale <= 0.0:
+        raise ValueError("axis_scale must be finite and positive")
+    if not np.isfinite(joint_weight) or joint_weight < 0.0:
+        raise ValueError("regularization must be finite and non-negative")
+
+    position_errors = []
+    axis_errors = []
+    for arm in arms:
+        position_errors.append(
+            (
+                position(current_positions, arm, "current_positions")
+                - position(target_positions, arm, "target_positions")
+            )
+            / position_scale
+        )
+        axis_errors.append(
+            (
+                _normalized_axis(current_axes.get(arm), name=f"current_axes[{arm}]")
+                - _normalized_axis(target_axes.get(arm), name=f"target_axes[{arm}]")
+            )
+            / orientation_scale
+        )
+    joint_error = joint_weight * (current - start) / ranges
+    return np.concatenate([*position_errors, *axis_errors, joint_error])
 
 
 def minimum_undirected_axis_rotation(
