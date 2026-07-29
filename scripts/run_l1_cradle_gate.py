@@ -164,6 +164,43 @@ def joint_seed_joint_names(*, include_torso: bool) -> tuple[str, ...]:
     return names
 
 
+def bounded_base_advance_world_velocity(
+    *,
+    base_xy: object,
+    object_xy: object,
+    remaining_m: float,
+    max_speed_m_s: float,
+    control_dt_s: float,
+) -> np.ndarray:
+    """Return a bounded planar velocity from the base toward the object."""
+    base = np.asarray(base_xy, dtype=float)
+    target = np.asarray(object_xy, dtype=float)
+    if (
+        base.shape != (2,)
+        or target.shape != (2,)
+        or not np.all(np.isfinite(base))
+        or not np.all(np.isfinite(target))
+    ):
+        raise ValueError("base_xy and object_xy must be finite planar vectors")
+    remaining = float(remaining_m)
+    max_speed = float(max_speed_m_s)
+    control_dt = float(control_dt_s)
+    if not np.isfinite(remaining) or remaining < 0.0:
+        raise ValueError("remaining_m must be finite and non-negative")
+    if not np.isfinite(max_speed) or max_speed <= 0.0:
+        raise ValueError("max_speed_m_s must be finite and positive")
+    if not np.isfinite(control_dt) or control_dt <= 0.0:
+        raise ValueError("control_dt_s must be finite and positive")
+    if remaining == 0.0:
+        return np.zeros(2, dtype=float)
+    direction = target - base
+    distance = float(np.linalg.norm(direction))
+    if distance <= 1e-12:
+        raise ValueError("base and object positions must differ")
+    speed = min(max_speed, remaining / control_dt)
+    return direction * (speed / distance)
+
+
 def allocate_segment_steps(*, total_steps: int, segment_count: int) -> tuple[int, ...]:
     """Distribute a fixed positive waypoint budget across path segments."""
     if (
@@ -951,7 +988,11 @@ def geometry_snapshot(raw_env, object_name: str) -> dict[str, Any]:
 
 def _hold_probe(backend, object_name: str, *, steps: int) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import OfficialScriptedGraspDriver
-    from robot_agent.skills.competition_transport import _is_allowed_cradle_geom
+    from robot_agent.skills.competition_transport import (
+        OfficialPhysicalCarryDriver,
+        _is_allowed_cradle_geom,
+        world_velocity_to_base_frame,
+    )
 
     helpers = OfficialScriptedGraspDriver._helpers()
     raw_env = backend.env
@@ -1396,6 +1437,7 @@ def _center_regrasp_probe(
     center_shift_m: float,
     wall_clearance_m: float,
     wall_squeeze_m: float,
+    base_advance_m: float,
     hold_steps: int,
     align_closure_axes: bool,
     orientation_max_action: float,
@@ -1457,6 +1499,109 @@ def _center_regrasp_probe(
             arm: eef_site_pose(raw_env, robot, arm)
             for arm in ("right", "left")
         }
+
+    def execute_base_advance(distance_m: float) -> bool:
+        nonlocal collision_steps
+        requested_distance = float(distance_m)
+        if not np.isfinite(requested_distance) or requested_distance < 0.0:
+            raise ValueError("base advance distance must be finite and non-negative")
+        if requested_distance == 0.0:
+            return True
+        control_dt = 0.05
+        max_speed = 0.04
+        start_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
+        driver = OfficialPhysicalCarryDriver()
+        success = False
+        collision = False
+        premature_contact = False
+        max_steps = int(np.ceil(requested_distance / (max_speed * control_dt))) + 5
+        for local_step in range(max_steps):
+            base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
+            translation = float(np.linalg.norm(base_xy - start_base_xy))
+            remaining = max(0.0, requested_distance - translation)
+            if remaining <= 1e-6:
+                success = True
+                break
+            object_xy = np.asarray(
+                raw_env.sim.data.body_xpos[body_id][:2],
+                dtype=float,
+            )
+            world_velocity = bounded_base_advance_world_velocity(
+                base_xy=base_xy,
+                object_xy=object_xy,
+                remaining_m=remaining,
+                max_speed_m_s=max_speed,
+                control_dt_s=control_dt,
+            )
+            _, base_yaw = backend.get_base_pose()
+            base_velocity = world_velocity_to_base_frame(
+                world_velocity,
+                base_yaw,
+            )
+            step_info = driver.step(
+                backend,
+                object_name=object_name,
+                base_command=np.array(
+                    [base_velocity[0], base_velocity[1], 0.0],
+                    dtype=float,
+                ),
+                hold_targets=hold_targets,
+                arm_world_deltas=None,
+                gripper_value=-1.0,
+                base_control_dt=control_dt,
+            )
+            collision = bool(step_info.get("collision", False))
+            collision_steps += int(collision)
+            contacts = object_robot_contacts(raw_env, object_name)
+            premature_contact = any(bool(names) for names in contacts.values())
+            measured_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
+            translation = float(
+                np.linalg.norm(measured_base_xy - start_base_xy)
+            )
+            observations.append(
+                {
+                    "stage": "advance_base_for_regrasp",
+                    "step": local_step + 1,
+                    "base_xy": measured_base_xy.tolist(),
+                    "base_translation_m": translation,
+                    "object_position": np.asarray(
+                        raw_env.sim.data.body_xpos[body_id],
+                        dtype=float,
+                    ).tolist(),
+                    "eef_positions": {
+                        arm: position.tolist()
+                        for arm, position in eef_positions().items()
+                    },
+                    "contacts": {
+                        arm: list(names) for arm, names in contacts.items()
+                    },
+                    "judge_collision": collision,
+                }
+            )
+            if collision or premature_contact:
+                break
+        final_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
+        final_translation = float(np.linalg.norm(final_base_xy - start_base_xy))
+        if final_translation >= requested_distance - 1e-6:
+            success = success or not collision and not premature_contact
+        stage_results.append(
+            {
+                "stage": "advance_base_for_regrasp",
+                "success": bool(success and not collision and not premature_contact),
+                "collision": collision,
+                "premature_object_contact": premature_contact,
+                "steps": sum(
+                    1
+                    for item in observations
+                    if item["stage"] == "advance_base_for_regrasp"
+                ),
+                "requested_translation_m": requested_distance,
+                "base_translation_m": final_translation,
+                "start_base_xy": start_base_xy.tolist(),
+                "final_base_xy": final_base_xy.tolist(),
+            }
+        )
+        return bool(success and not collision and not premature_contact)
 
     def execute_joint_orientation_seed(target_axis: np.ndarray) -> dict[str, object]:
         nonlocal collision_steps
@@ -2459,6 +2604,17 @@ def _center_regrasp_probe(
                     "stages": stage_results,
                     "observations": observations,
                 }
+        if not execute_base_advance(base_advance_m):
+            return {
+                "success": False,
+                "failure_stage": "advance_base_for_regrasp",
+                "support_contact_steps": maximum_support_steps,
+                "collision_steps": collision_steps,
+                "joint_seed": joint_seed,
+                "orientation_alignment": orientation_alignment,
+                "stages": stage_results,
+                "observations": observations,
+            }
         current = eef_positions()
         retreat_targets = opposed_wall_clearance_targets(
             current,
@@ -2687,6 +2843,7 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                         center_shift_m=args.regrasp_center_shift_m,
                         wall_clearance_m=args.regrasp_wall_clearance_m,
                         wall_squeeze_m=args.regrasp_wall_squeeze_m,
+                        base_advance_m=args.regrasp_base_advance_m,
                         hold_steps=args.hold_steps,
                         align_closure_axes=args.align_closure_axes,
                         orientation_max_action=args.orientation_max_action,
@@ -2865,6 +3022,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--regrasp-center-shift-m", type=float, default=0.24)
     parser.add_argument("--regrasp-wall-clearance-m", type=float, default=0.10)
     parser.add_argument("--regrasp-wall-squeeze-m", type=float, default=0.025)
+    parser.add_argument("--regrasp-base-advance-m", type=float, default=0.0)
     parser.add_argument("--align-closure-axes", action="store_true")
     parser.add_argument("--orientation-max-action", type=float, default=0.30)
     parser.add_argument("--orientation-fine-max-action", type=float)

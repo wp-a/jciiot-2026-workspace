@@ -7,6 +7,7 @@ import numpy as np
 from scripts.run_l1_cradle_gate import (
     _center_regrasp_probe,
     allocate_segment_steps,
+    bounded_base_advance_world_velocity,
     closure_axis_error_degrees,
     cradle_gate_accepted,
     cradle_gate_failures,
@@ -186,6 +187,61 @@ class JointSeedMathTests(unittest.TestCase):
     def test_joint_seed_joint_names_require_a_boolean_option(self):
         with self.assertRaises(ValueError):
             joint_seed_joint_names(include_torso=1)
+
+
+class BaseAdvanceMathTests(unittest.TestCase):
+    def test_base_advance_velocity_points_to_object_and_respects_speed(self):
+        velocity = bounded_base_advance_world_velocity(
+            base_xy=[8.0, 4.6],
+            object_xy=[7.0, 4.6],
+            remaining_m=0.10,
+            max_speed_m_s=0.04,
+            control_dt_s=0.05,
+        )
+
+        np.testing.assert_allclose(velocity, [-0.04, 0.0], atol=1e-12)
+
+    def test_base_advance_velocity_clips_the_final_step(self):
+        velocity = bounded_base_advance_world_velocity(
+            base_xy=[8.0, 4.6],
+            object_xy=[7.0, 4.6],
+            remaining_m=0.001,
+            max_speed_m_s=0.04,
+            control_dt_s=0.05,
+        )
+
+        np.testing.assert_allclose(velocity, [-0.02, 0.0], atol=1e-12)
+        np.testing.assert_allclose(
+            bounded_base_advance_world_velocity(
+                base_xy=[8.0, 4.6],
+                object_xy=[7.0, 4.6],
+                remaining_m=0.0,
+                max_speed_m_s=0.04,
+                control_dt_s=0.05,
+            ),
+            np.zeros(2),
+        )
+
+    def test_base_advance_velocity_rejects_invalid_inputs(self):
+        common = {
+            "base_xy": [8.0, 4.6],
+            "object_xy": [7.0, 4.6],
+            "remaining_m": 0.10,
+            "max_speed_m_s": 0.04,
+            "control_dt_s": 0.05,
+        }
+        invalid = (
+            {"base_xy": [8.0]},
+            {"object_xy": [float("nan"), 4.6]},
+            {"remaining_m": -0.01},
+            {"max_speed_m_s": 0.0},
+            {"control_dt_s": float("inf")},
+            {"object_xy": [8.0, 4.6]},
+        )
+        for override in invalid:
+            with self.subTest(override=override):
+                with self.assertRaises(ValueError):
+                    bounded_base_advance_world_velocity(**{**common, **override})
 
     def test_allocate_segment_steps_preserves_total_and_balance(self):
         allocation = allocate_segment_steps(total_steps=10, segment_count=3)
@@ -371,6 +427,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertEqual(args.orientation_joint_seed_continuation_nodes, 1)
         self.assertFalse(args.orientation_joint_seed_include_torso)
         self.assertAlmostEqual(args.orientation_joint_seed_torso_margin_m, 0.005)
+        self.assertAlmostEqual(args.regrasp_base_advance_m, 0.0)
 
 
 class OrientationCommandTests(unittest.TestCase):
