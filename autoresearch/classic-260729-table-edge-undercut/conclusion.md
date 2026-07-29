@@ -43,3 +43,9 @@ with zero contact or collision. The descent then saturated at `z=1.173`, about
 `0.173 m` above the container bottom. The recorded torso joint remained fixed at
 its `0.35 m` upper limit. The next trial changes only the torso hold target after
 the outside stage to `0.15 m`; all world-space hand targets remain unchanged.
+
+Iteration 5 reached torso `0.150001 m` and right EEF `z=0.972`, already about
+`0.028 m` below the collision bottom, without contact or collision. It missed
+the unnecessarily deep `z=0.950` target by `0.022 m`. The next trial changes
+only the below-bottom clearance from `0.05 m` to `0.03 m`, matching the measured
+safe reach while preserving real geometric clearance.
