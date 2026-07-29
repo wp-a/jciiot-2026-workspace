@@ -210,6 +210,119 @@ def push_gate_accepted(record: Mapping[str, object]) -> bool:
     return not push_gate_failures(record)
 
 
+_UNDERCUT_REQUIRED_FIELDS = (
+    "open_gripper",
+    "support_contact_steps",
+    "object_lift_m",
+    "attachment_calls",
+    "object_pose_writes",
+    "collision_frames",
+    "infrastructure_error",
+)
+
+
+def undercut_gate_failures(record: Mapping[str, object]) -> list[str]:
+    """Return failed evidence fields for the open-gripper undercut gate."""
+    failures = [key for key in _UNDERCUT_REQUIRED_FIELDS if key not in record]
+
+    def numeric(key: str) -> float | None:
+        if key not in record or isinstance(record[key], bool):
+            return None
+        try:
+            value = float(record[key])
+        except (TypeError, ValueError):
+            return None
+        return value if np.isfinite(value) else None
+
+    if record.get("open_gripper") is not True:
+        failures.append("open_gripper")
+    support_steps = numeric("support_contact_steps")
+    if support_steps is None or support_steps < 5.0:
+        failures.append("support_contact_steps")
+    object_lift = numeric("object_lift_m")
+    if object_lift is None or object_lift < 0.02:
+        failures.append("object_lift_m")
+    for key in ("attachment_calls", "object_pose_writes", "collision_frames"):
+        value = numeric(key)
+        if value is None or value != 0.0:
+            failures.append(key)
+    if record.get("infrastructure_error") is not None:
+        failures.append("infrastructure_error")
+    return list(dict.fromkeys(failures))
+
+
+def undercut_gate_accepted(record: Mapping[str, object]) -> bool:
+    """Accept only measured, collision-free open-gripper support evidence."""
+    return not undercut_gate_failures(record)
+
+
+def table_edge_undercut_targets(
+    *,
+    object_center: object,
+    object_half_depth_m: float,
+    object_half_height_m: float,
+    table_edge_y: float,
+    outside_clearance_m: float,
+    edge_clearance_m: float,
+    object_offset_x_m: float,
+    above_clearance_m: float,
+    below_bottom_clearance_m: float,
+    raise_above_bottom_m: float,
+) -> dict[str, np.ndarray]:
+    """Build an outside-down-in-up path through a measured table overhang."""
+    center = np.asarray(object_center, dtype=float)
+    if center.shape != (3,) or not np.all(np.isfinite(center)):
+        raise ValueError("object_center must be a finite three-vector")
+    values = {
+        "object_half_depth_m": object_half_depth_m,
+        "object_half_height_m": object_half_height_m,
+        "table_edge_y": table_edge_y,
+        "outside_clearance_m": outside_clearance_m,
+        "edge_clearance_m": edge_clearance_m,
+        "object_offset_x_m": object_offset_x_m,
+        "above_clearance_m": above_clearance_m,
+        "below_bottom_clearance_m": below_bottom_clearance_m,
+        "raise_above_bottom_m": raise_above_bottom_m,
+    }
+    for name, value in values.items():
+        if not np.isfinite(float(value)):
+            raise ValueError(f"{name} must be finite")
+    for name in (
+        "object_half_depth_m",
+        "object_half_height_m",
+        "outside_clearance_m",
+        "edge_clearance_m",
+        "above_clearance_m",
+        "below_bottom_clearance_m",
+        "raise_above_bottom_m",
+    ):
+        if float(values[name]) < 0.0:
+            raise ValueError(f"{name} must be non-negative")
+    if float(object_half_depth_m) == 0.0 or float(object_half_height_m) == 0.0:
+        raise ValueError("object half extents must be positive")
+
+    outer_y = float(center[1]) + float(object_half_depth_m)
+    outside_y = outer_y + float(outside_clearance_m)
+    undercut_y = float(table_edge_y) + float(edge_clearance_m)
+    if undercut_y >= outer_y:
+        raise ValueError("configured table edge leaves no exposed bottom")
+    bottom_z = float(center[2]) - float(object_half_height_m)
+    target_x = float(center[0]) + float(object_offset_x_m)
+    high_z = float(center[2]) + float(object_half_height_m) + float(
+        above_clearance_m
+    )
+    below_z = bottom_z - float(below_bottom_clearance_m)
+    return {
+        "outside": np.array([target_x, outside_y, high_z], dtype=float),
+        "below": np.array([target_x, outside_y, below_z], dtype=float),
+        "undercut": np.array([target_x, undercut_y, below_z], dtype=float),
+        "raise": np.array(
+            [target_x, undercut_y, bottom_z + float(raise_above_bottom_m)],
+            dtype=float,
+        ),
+    }
+
+
 def joint_seed_joint_names(*, include_torso: bool) -> tuple[str, ...]:
     """Return the ordered Tiago joints controlled by the wrist seed solver."""
     if not isinstance(include_torso, (bool, np.bool_)):
@@ -1767,6 +1880,215 @@ def _physical_push_probe(
         "base_translation_m": base_translation,
         "collision_steps": collision_steps,
         "push_direction": direction.tolist(),
+        "observations": observations,
+        "final_geometry": geometry_snapshot(raw_env, object_name),
+    }
+
+
+def _table_edge_undercut_probe(
+    backend,
+    object_name: str,
+    *,
+    table_edge_y: float,
+    outside_clearance_m: float,
+    edge_clearance_m: float,
+    raise_above_bottom_m: float,
+) -> dict[str, Any]:
+    from robot_agent.skills.competition_grasp import OfficialScriptedGraspDriver
+    from robot_agent.skills.competition_transport import _is_allowed_cradle_geom
+
+    helpers = OfficialScriptedGraspDriver._helpers()
+    raw_env = backend.env
+    robot = raw_env.robots[0]
+    body_id = raw_env.obj_body_id[object_name]
+    hold_targets = helpers["capture_hold_targets"](robot)
+    start_object = np.asarray(
+        raw_env.sim.data.body_xpos[body_id], dtype=float
+    ).copy()
+    targets = table_edge_undercut_targets(
+        object_center=start_object,
+        object_half_depth_m=0.20,
+        object_half_height_m=0.125,
+        table_edge_y=table_edge_y,
+        outside_clearance_m=outside_clearance_m,
+        edge_clearance_m=edge_clearance_m,
+        object_offset_x_m=0.20,
+        above_clearance_m=0.15,
+        below_bottom_clearance_m=0.05,
+        raise_above_bottom_m=raise_above_bottom_m,
+    )
+    observations: list[dict[str, Any]] = []
+    stages: list[dict[str, Any]] = []
+    collision_steps = 0
+    maximum_support_steps = 0
+
+    def right_eef_position() -> np.ndarray:
+        return np.asarray(
+            helpers["gripper_position"](raw_env, robot, "right"),
+            dtype=float,
+        )
+
+    def execute_stage(
+        stage: str,
+        target: np.ndarray,
+        *,
+        allow_object_contact: bool,
+        require_support: bool = False,
+        max_steps: int = 180,
+    ) -> bool:
+        nonlocal collision_steps, maximum_support_steps
+        stable_support_steps = 0
+        safety_failure = None
+        success = False
+        for local_step in range(int(max_steps)):
+            robot.composite_controller.update_state()
+            current = right_eef_position()
+            controller_delta = helpers["world_delta"](
+                robot,
+                "right",
+                np.asarray(target, dtype=float) - current,
+            )
+            arm_action = helpers["arm_action"](
+                robot,
+                "right",
+                controller_delta,
+                0.12,
+            )
+            action = helpers["build_action"](
+                robot,
+                arm_actions={"right": arm_action},
+                gripper_value=-1.0,
+                hold_targets=hold_targets,
+            )
+            _, _, _, info = raw_env.step(action)
+            recorder = getattr(backend, "_record_trajectory_frame", None)
+            if callable(recorder):
+                recorder(_env=raw_env)
+            measured_eef = right_eef_position()
+            object_position = np.asarray(
+                raw_env.sim.data.body_xpos[body_id], dtype=float
+            )
+            contacts = object_robot_contacts(raw_env, object_name)
+            right_support = any(
+                _is_allowed_cradle_geom(geom, "right")
+                for geom in contacts["right"]
+            )
+            object_lift_m = float(object_position[2] - start_object[2])
+            stable_support_steps = (
+                stable_support_steps + 1
+                if right_support and object_lift_m >= 0.02
+                else 0
+            )
+            maximum_support_steps = max(
+                maximum_support_steps,
+                stable_support_steps,
+            )
+            collision = bool((info or {}).get("has_judge_collision", False))
+            collision_steps += int(collision)
+            observation = {
+                "stage": stage,
+                "step": local_step + 1,
+                "target_eef_position": np.asarray(target, dtype=float).tolist(),
+                "eef_position": measured_eef.tolist(),
+                "object_position": object_position.tolist(),
+                "object_lift_m": object_lift_m,
+                "contacts": {
+                    arm: list(names) for arm, names in contacts.items()
+                },
+                "right_support": right_support,
+                "stable_support_steps": stable_support_steps,
+                "judge_collision": collision,
+            }
+            observations.append(observation)
+            if collision:
+                from robot_agent.environments.robosuite_backend import (
+                    _navigation_collisions,
+                )
+
+                observation["judge_collision_pairs"] = [
+                    list(pair)
+                    for pair in _navigation_collisions(
+                        raw_env,
+                        robot,
+                        getattr(backend, "_ignore_collision_geom", ()),
+                    )
+                ]
+                safety_failure = "collision"
+                break
+            if not allow_object_contact and any(contacts.values()):
+                safety_failure = "premature_object_contact"
+                break
+            if require_support and stable_support_steps >= 5:
+                success = True
+                break
+            if float(np.linalg.norm(np.asarray(target) - measured_eef)) <= 0.012:
+                success = not require_support
+                if require_support:
+                    safety_failure = "target_without_support"
+                break
+        if not success and safety_failure is None:
+            safety_failure = "timeout"
+        stages.append(
+            {
+                "stage": stage,
+                "success": success,
+                "steps": sum(1 for item in observations if item["stage"] == stage),
+                "safety_failure": safety_failure,
+                "final_eef_position": right_eef_position().tolist(),
+                "final_object_position": np.asarray(
+                    raw_env.sim.data.body_xpos[body_id], dtype=float
+                ).tolist(),
+                "final_contacts": {
+                    arm: list(names)
+                    for arm, names in object_robot_contacts(
+                        raw_env, object_name
+                    ).items()
+                },
+            }
+        )
+        return success
+
+    initial_eef = right_eef_position()
+    clearance_target = initial_eef.copy()
+    clearance_target[2] = max(clearance_target[2], float(targets["outside"][2]))
+    sequence = (
+        (
+            "raise_open_clearance",
+            clearance_target,
+            False,
+            False,
+        ),
+        ("move_open_outside", targets["outside"], False, False),
+        ("descend_open_outside", targets["below"], False, False),
+        ("inset_open_under_overhang", targets["undercut"], False, False),
+        ("raise_open_into_support", targets["raise"], True, True),
+    )
+    success = True
+    failure_stage = None
+    for stage, target, allow_contact, require_support in sequence:
+        if not execute_stage(
+            stage,
+            target,
+            allow_object_contact=allow_contact,
+            require_support=require_support,
+        ):
+            success = False
+            failure_stage = stage
+            break
+    final_object = np.asarray(
+        raw_env.sim.data.body_xpos[body_id], dtype=float
+    ).copy()
+    return {
+        "success": success,
+        "failure_stage": failure_stage,
+        "open_gripper": True,
+        "support_contact_steps": maximum_support_steps,
+        "object_lift_m": float(final_object[2] - start_object[2]),
+        "collision_steps": collision_steps,
+        "start_object_position": start_object.tolist(),
+        "final_object_position": final_object.tolist(),
+        "targets": {name: target.tolist() for name, target in targets.items()},
+        "stages": stages,
         "observations": observations,
         "final_geometry": geometry_snapshot(raw_env, object_name),
     }
@@ -4076,7 +4398,16 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
         if moved:
             pre_grasp_z = float(backend.env.sim.data.body_xpos[body_id][2])
             pre_grasp_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
-            grasp = driver.grasp(str(task["source"]), object_name)
+            grasp = (
+                driver.grasp(str(task["source"]), object_name)
+                if not args.table_edge_undercut
+                else {
+                    "source": "table_edge_undercut_no_grasp",
+                    "success": False,
+                    "lift_success": False,
+                    "contacts": {},
+                }
+            )
             post_grasp_z = float(backend.env.sim.data.body_xpos[body_id][2])
             record["grasp_result"] = grasp
             record["physical_grasp"] = bool(
@@ -4091,7 +4422,27 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                 backend.env,
                 object_name,
             )
-            if record["physical_grasp"]:
+            if args.table_edge_undercut:
+                probe = _table_edge_undercut_probe(
+                    backend,
+                    object_name,
+                    table_edge_y=args.undercut_table_edge_y,
+                    outside_clearance_m=args.undercut_outside_clearance_m,
+                    edge_clearance_m=args.undercut_edge_clearance_m,
+                    raise_above_bottom_m=(
+                        args.undercut_raise_above_bottom_m
+                    ),
+                )
+                record["mode"] = "table_edge_undercut_probe"
+                record["open_gripper"] = bool(probe.get("open_gripper", False))
+                record["support_contact_steps"] = int(
+                    probe.get("support_contact_steps", 0)
+                )
+                record["object_lift_m"] = float(
+                    probe.get("object_lift_m", 0.0)
+                )
+                record["hold_probe"] = probe
+            elif record["physical_grasp"]:
                 if args.physical_push:
                     probe = _physical_push_probe(
                         backend,
@@ -4338,7 +4689,9 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
         if backend is not None:
             backend.close()
     record["elapsed_s"] = round(time.perf_counter() - started, 6)
-    if record.get("mode") == "physical_push_probe":
+    if record.get("mode") == "table_edge_undercut_probe":
+        record["gate_failures"] = undercut_gate_failures(record)
+    elif record.get("mode") == "physical_push_probe":
         record["gate_failures"] = push_gate_failures(record)
     elif record.get("mode") == "center_grasp_physical_transport":
         record["gate_failures"] = center_grasp_transport_failures(record)
@@ -4420,6 +4773,27 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--center-support-combined-motion",
         action="store_true",
+    )
+    parser.add_argument("--table-edge-undercut", action="store_true")
+    parser.add_argument(
+        "--undercut-table-edge-y",
+        type=float,
+        default=4.688,
+    )
+    parser.add_argument(
+        "--undercut-outside-clearance-m",
+        type=float,
+        default=0.08,
+    )
+    parser.add_argument(
+        "--undercut-edge-clearance-m",
+        type=float,
+        default=0.06,
+    )
+    parser.add_argument(
+        "--undercut-raise-above-bottom-m",
+        type=float,
+        default=0.12,
     )
     parser.add_argument("--align-closure-axes", action="store_true")
     parser.add_argument("--orientation-max-action", type=float, default=0.30)

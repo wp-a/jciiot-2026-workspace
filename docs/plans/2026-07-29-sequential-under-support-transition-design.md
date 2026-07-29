@@ -112,3 +112,19 @@ descent before starting inset is not a viable path. The next experiment combines
 the same 0.12 m descent and 0.04 m inset in one Cartesian target. This changes
 only path timing and tests whether the hand can enter the bottom region during
 the measured stationary-contact window.
+
+The combined path lasted 42 steps, compared with 38 for pure descent, but it
+did not change the load path. The right end effector moved about 0.096 m down
+and 0.026 m inward while the container moved about 0.087 m down and 0.044 m in
+the same lateral direction. The final contact set contained right fingertips
+only; left contact was lost and no allowed support geometry touched the object.
+This falsifies the post-grasp diagonal-inset hypothesis at the frozen geometry.
+
+The container geometry and station bounds expose a better non-prehensile
+entry. The `input_5` edge is at world `y=4.688`, while the container reaches
+approximately `y=4.820`, leaving about 0.132 m of bottom unsupported by the
+table. Further transition work should begin from the table-supported object:
+move an open hand outside that edge, descend below the bottom, inset only within
+the overhang, and raise until measured bottom support appears. This is a new
+table-edge undercut route, not a parameter continuation of the failed
+pinch-to-support sequence.

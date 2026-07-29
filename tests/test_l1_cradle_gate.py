@@ -36,7 +36,10 @@ from scripts.run_l1_cradle_gate import (
     push_gate_failures,
     projected_planar_motion,
     scheduled_orientation_action_limit,
+    table_edge_undercut_targets,
     trailing_corner_seat_targets,
+    undercut_gate_accepted,
+    undercut_gate_failures,
 )
 
 
@@ -56,6 +59,16 @@ VALID_PUSH_RECORD = {
     "physical_contact_steps": 20,
     "object_translation_m": 0.50,
     "base_translation_m": 0.30,
+    "attachment_calls": 0,
+    "object_pose_writes": 0,
+    "collision_frames": 0,
+    "infrastructure_error": None,
+}
+
+VALID_UNDERCUT_RECORD = {
+    "open_gripper": True,
+    "support_contact_steps": 5,
+    "object_lift_m": 0.02,
     "attachment_calls": 0,
     "object_pose_writes": 0,
     "collision_frames": 0,
@@ -697,6 +710,70 @@ class L1PhysicalPushGateTests(unittest.TestCase):
                 self.assertIn(key, push_gate_failures(record))
 
 
+class L1TableEdgeUndercutTests(unittest.TestCase):
+    def test_targets_descend_outside_then_inset_above_the_table_edge(self):
+        targets = table_edge_undercut_targets(
+            object_center=np.array([7.035, 4.620, 1.125]),
+            object_half_depth_m=0.20,
+            object_half_height_m=0.125,
+            table_edge_y=4.688,
+            outside_clearance_m=0.08,
+            edge_clearance_m=0.06,
+            object_offset_x_m=0.20,
+            above_clearance_m=0.15,
+            below_bottom_clearance_m=0.05,
+            raise_above_bottom_m=0.12,
+        )
+
+        np.testing.assert_allclose(targets["outside"], [7.235, 4.900, 1.400])
+        np.testing.assert_allclose(targets["below"], [7.235, 4.900, 0.950])
+        np.testing.assert_allclose(targets["undercut"], [7.235, 4.748, 0.950])
+        np.testing.assert_allclose(targets["raise"], [7.235, 4.748, 1.120])
+
+    def test_targets_reject_an_edge_without_exposed_bottom(self):
+        with self.assertRaises(ValueError):
+            table_edge_undercut_targets(
+                object_center=np.array([7.035, 4.620, 1.125]),
+                object_half_depth_m=0.20,
+                object_half_height_m=0.125,
+                table_edge_y=4.80,
+                outside_clearance_m=0.08,
+                edge_clearance_m=0.06,
+                object_offset_x_m=0.20,
+                above_clearance_m=0.15,
+                below_bottom_clearance_m=0.05,
+                raise_above_bottom_m=0.12,
+            )
+
+    def test_gate_accepts_complete_open_gripper_support_evidence(self):
+        self.assertTrue(undercut_gate_accepted(VALID_UNDERCUT_RECORD))
+        self.assertEqual(undercut_gate_failures(VALID_UNDERCUT_RECORD), [])
+
+    def test_each_hard_condition_rejects_the_record(self):
+        invalid_values = {
+            "open_gripper": False,
+            "support_contact_steps": 4,
+            "object_lift_m": 0.019,
+            "attachment_calls": 1,
+            "object_pose_writes": 1,
+            "collision_frames": 1,
+            "infrastructure_error": "simulator failed",
+        }
+        for key, value in invalid_values.items():
+            with self.subTest(key=key):
+                record = dict(VALID_UNDERCUT_RECORD)
+                record[key] = value
+                self.assertFalse(undercut_gate_accepted(record))
+                self.assertIn(key, undercut_gate_failures(record))
+
+    def test_runner_skips_official_grasp_for_the_undercut_mode(self):
+        source = inspect.getsource(gate_module.run_probe)
+
+        self.assertIn("if not args.table_edge_undercut", source)
+        self.assertIn("table_edge_undercut_no_grasp", source)
+        self.assertIn("_table_edge_undercut_probe(", source)
+
+
 class JointSeedMathTests(unittest.TestCase):
     def test_joint_seed_joint_names_append_only_the_official_torso_joint(self):
         arms_only = joint_seed_joint_names(include_torso=False)
@@ -976,6 +1053,11 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.center_support_inset_m, 0.04)
         self.assertFalse(args.center_support_keep_moving_gripper_closed)
         self.assertFalse(args.center_support_combined_motion)
+        self.assertFalse(args.table_edge_undercut)
+        self.assertAlmostEqual(args.undercut_table_edge_y, 4.688)
+        self.assertAlmostEqual(args.undercut_outside_clearance_m, 0.08)
+        self.assertAlmostEqual(args.undercut_edge_clearance_m, 0.06)
+        self.assertAlmostEqual(args.undercut_raise_above_bottom_m, 0.12)
 
     def test_center_carry_speed_can_be_overridden_for_single_variable_probe(self):
         args = parse_args(
@@ -1020,6 +1102,15 @@ class JointSeedParserTests(unittest.TestCase):
                 "0.05",
                 "--center-support-keep-moving-gripper-closed",
                 "--center-support-combined-motion",
+                "--table-edge-undercut",
+                "--undercut-table-edge-y",
+                "4.70",
+                "--undercut-outside-clearance-m",
+                "0.09",
+                "--undercut-edge-clearance-m",
+                "0.05",
+                "--undercut-raise-above-bottom-m",
+                "0.14",
             ]
         )
 
@@ -1041,6 +1132,11 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.center_support_inset_m, 0.05)
         self.assertTrue(args.center_support_keep_moving_gripper_closed)
         self.assertTrue(args.center_support_combined_motion)
+        self.assertTrue(args.table_edge_undercut)
+        self.assertAlmostEqual(args.undercut_table_edge_y, 4.70)
+        self.assertAlmostEqual(args.undercut_outside_clearance_m, 0.09)
+        self.assertAlmostEqual(args.undercut_edge_clearance_m, 0.05)
+        self.assertAlmostEqual(args.undercut_raise_above_bottom_m, 0.14)
 
 
 class OrientationCommandTests(unittest.TestCase):

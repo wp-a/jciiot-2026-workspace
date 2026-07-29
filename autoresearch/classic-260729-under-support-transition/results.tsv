@@ -3,3 +3,4 @@ iteration	moving_arm	moving_gripper	clearance_lift_m	descent_m	inset_m	center_gr
 1	right	open	0.08	0.12	0.04	true	20	true	false	false	false	false	true	0.050003	0	0	0	discard:opening moving gripper made the stationary left grasp fail after four lowering steps
 2	right	closed	0.08	0.12	0.04	true	20	true	false	false	false	false	true	0.039442	0	0	0	discard:strict official grasp boolean failed at step 33 although both arms retained real contacts and height remained safe
 3	right	closed	0.08	0.12	0.04	true	20	true	false	false	false	false	true	0.028489	0	0	0	discard:stationary physical contact vanished at step 38; pure descent pulled the object down before inset began
+4	right	closed	0.08	0.12	0.04	true	20	true	false	false	false	false	true	0.005758	0	0	0	discard:combined descent and inset lasted 42 steps but dragged the box with finger contact; no palm, wrist, or distal-arm support formed
