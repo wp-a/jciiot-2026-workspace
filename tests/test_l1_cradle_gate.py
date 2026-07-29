@@ -958,6 +958,7 @@ class L1TableEdgeUndercutTests(unittest.TestCase):
         self.assertIn('"raise_left_clearance_for_torso"', source)
         self.assertIn('"advance_base_for_fork_overlap"', source)
         self.assertIn("fork_raise_target = right_eef_position().copy()", source)
+        self.assertIn('"raise_open_with_torso"', source)
 
 
 class JointSeedMathTests(unittest.TestCase):
@@ -1269,6 +1270,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.undercut_horizontal_inset_m, 0.06)
         self.assertAlmostEqual(args.undercut_left_clearance_lift_m, 0.25)
         self.assertAlmostEqual(args.undercut_post_inset_base_advance_m, 0.0)
+        self.assertAlmostEqual(args.undercut_torso_raise_m, 0.0)
 
     def test_center_carry_speed_can_be_overridden_for_single_variable_probe(self):
         args = parse_args(
@@ -1353,6 +1355,8 @@ class JointSeedParserTests(unittest.TestCase):
                 "0.20",
                 "--undercut-post-inset-base-advance-m",
                 "0.05",
+                "--undercut-torso-raise-m",
+                "0.12",
             ]
         )
 
@@ -1404,6 +1408,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.undercut_horizontal_inset_m, 0.07)
         self.assertAlmostEqual(args.undercut_left_clearance_lift_m, 0.20)
         self.assertAlmostEqual(args.undercut_post_inset_base_advance_m, 0.05)
+        self.assertAlmostEqual(args.undercut_torso_raise_m, 0.12)
 
 
 class OrientationCommandTests(unittest.TestCase):

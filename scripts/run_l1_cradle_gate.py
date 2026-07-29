@@ -2059,6 +2059,7 @@ def _table_edge_undercut_probe(
     horizontal_inset_m: float,
     left_clearance_lift_m: float,
     post_inset_base_advance_m: float,
+    torso_raise_m: float,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import OfficialScriptedGraspDriver
     from robot_agent.skills.competition_transport import (
@@ -2078,6 +2079,8 @@ def _table_edge_undercut_probe(
     start_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
     if not np.isfinite(float(base_advance_m)) or float(base_advance_m) < 0.0:
         raise ValueError("base_advance_m must be finite and non-negative")
+    if not np.isfinite(float(torso_raise_m)) or float(torso_raise_m) < 0.0:
+        raise ValueError("torso_raise_m must be finite and non-negative")
     torso_joint_id = next(
         (
             index
@@ -2094,11 +2097,11 @@ def _table_edge_undercut_probe(
     torso_qpos_addr = raw_env.sim.model.get_joint_qpos_addr(torso_joint_name)
     if isinstance(torso_qpos_addr, tuple):
         raise RuntimeError("torso lift joint must have a scalar qpos address")
+    torso_range = np.asarray(
+        raw_env.sim.model.jnt_range[torso_joint_id], dtype=float
+    )
     if torso_target_m is not None:
         torso_target = float(torso_target_m)
-        torso_range = np.asarray(
-            raw_env.sim.model.jnt_range[torso_joint_id], dtype=float
-        )
         if (
             not np.isfinite(torso_target)
             or torso_target < float(torso_range[0])
@@ -2244,6 +2247,126 @@ def _table_edge_undercut_probe(
                 "final_object_position": np.asarray(
                     raw_env.sim.data.body_xpos[body_id], dtype=float
                 ).tolist(),
+            }
+        )
+        return success
+
+    def execute_torso_raise_into_support() -> bool:
+        """Lift the inserted open fork through the physical torso controller."""
+        nonlocal collision_steps, maximum_support_steps
+        requested_raise = float(torso_raise_m)
+        if not np.isfinite(requested_raise) or requested_raise <= 0.0:
+            raise ValueError("torso_raise_m must be finite and positive")
+        if "torso" not in hold_targets:
+            raise RuntimeError("torso controller hold target is unavailable")
+        stage = "raise_open_with_torso"
+        start_torso = torso_position()
+        target_torso = min(
+            start_torso + requested_raise,
+            float(torso_range[1]),
+        )
+        if target_torso <= start_torso + 1e-6:
+            raise ValueError("torso_raise_m has no room inside the joint range")
+        hold_targets["torso"] = np.array([target_torso], dtype=float)
+        safety_failure = None
+        stable_support_steps = 0
+        target_reached_steps = 0
+        success = False
+        for local_step in range(240):
+            robot.composite_controller.update_state()
+            action = helpers["build_action"](
+                robot,
+                arm_actions={},
+                gripper_value=-1.0,
+                hold_targets=hold_targets,
+            )
+            _, _, _, info = raw_env.step(action)
+            recorder = getattr(backend, "_record_trajectory_frame", None)
+            if callable(recorder):
+                recorder(_env=raw_env)
+            measured_torso = torso_position()
+            measured_eef = right_eef_position()
+            object_position = np.asarray(
+                raw_env.sim.data.body_xpos[body_id], dtype=float
+            )
+            object_lift_m = float(object_position[2] - start_object[2])
+            contacts = object_robot_contacts(raw_env, object_name)
+            right_support = any(
+                is_right_support(name) for name in contacts["right"]
+            )
+            invalid_right_contact = any(
+                not is_right_support(name) for name in contacts["right"]
+            )
+            stable_support_steps = (
+                stable_support_steps + 1
+                if right_support and object_lift_m >= 0.02
+                else 0
+            )
+            maximum_support_steps = max(
+                maximum_support_steps,
+                stable_support_steps,
+            )
+            torso_reached = abs(target_torso - measured_torso) <= 0.005
+            target_reached_steps = (
+                target_reached_steps + 1 if torso_reached else 0
+            )
+            collision = bool((info or {}).get("has_judge_collision", False))
+            collision_steps += int(collision)
+            observations.append(
+                {
+                    "stage": stage,
+                    "step": local_step + 1,
+                    "start_torso_position": start_torso,
+                    "target_torso_position": target_torso,
+                    "torso_position": measured_torso,
+                    "eef_position": measured_eef.tolist(),
+                    "object_position": object_position.tolist(),
+                    "object_lift_m": object_lift_m,
+                    "contacts": {
+                        arm: list(names) for arm, names in contacts.items()
+                    },
+                    "right_support": right_support,
+                    "stable_support_steps": stable_support_steps,
+                    "judge_collision": collision,
+                }
+            )
+            if collision:
+                safety_failure = "collision"
+                break
+            if contacts["left"] or invalid_right_contact:
+                safety_failure = "unsafe_object_contact"
+                break
+            if stable_support_steps >= 5:
+                success = True
+                break
+            if target_reached_steps >= 20:
+                safety_failure = "target_without_support"
+                break
+        if not success and safety_failure is None:
+            safety_failure = "timeout"
+        stages.append(
+            {
+                "stage": stage,
+                "success": success,
+                "steps": sum(
+                    1 for item in observations if item.get("stage") == stage
+                ),
+                "safety_failure": safety_failure,
+                "requested_raise_m": requested_raise,
+                "start_torso_position": start_torso,
+                "target_torso_position": target_torso,
+                "final_torso_position": torso_position(),
+                "final_eef_position": right_eef_position().tolist(),
+                "final_object_position": np.asarray(
+                    raw_env.sim.data.body_xpos[body_id], dtype=float
+                ).tolist(),
+                "final_contacts": {
+                    arm: list(names)
+                    for arm, names in object_robot_contacts(
+                        raw_env, object_name
+                    ).items()
+                },
+                "stable_support_steps": stable_support_steps,
             }
         )
         return success
@@ -2850,6 +2973,10 @@ def _table_edge_undercut_probe(
                     if not geometry_ready and not execute_post_inset_base_advance():
                         success = False
                         failure_stage = "advance_base_for_fork_overlap"
+                    elif float(torso_raise_m) > 0.0:
+                        if not execute_torso_raise_into_support():
+                            success = False
+                            failure_stage = "raise_open_with_torso"
                     else:
                         fork_raise_target = right_eef_position().copy()
                         fork_raise_target[2] = float(targets["raise"][2])
@@ -2894,6 +3021,7 @@ def _table_edge_undercut_probe(
         "horizontal_fork": bool(horizontal_fork),
         "horizontal_inset_m": float(horizontal_inset_m),
         "post_inset_base_advance_m": float(post_inset_base_advance_m),
+        "torso_raise_m": float(torso_raise_m),
         "final_torso_position": torso_position(),
         "start_object_position": start_object.tolist(),
         "final_object_position": final_object.tolist(),
@@ -5278,6 +5406,7 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                     post_inset_base_advance_m=(
                         args.undercut_post_inset_base_advance_m
                     ),
+                    torso_raise_m=args.undercut_torso_raise_m,
                 )
                 record["mode"] = "table_edge_undercut_probe"
                 record["open_gripper"] = bool(probe.get("open_gripper", False))
@@ -5710,6 +5839,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--undercut-post-inset-base-advance-m",
+        type=float,
+        default=0.0,
+    )
+    parser.add_argument(
+        "--undercut-torso-raise-m",
         type=float,
         default=0.0,
     )
