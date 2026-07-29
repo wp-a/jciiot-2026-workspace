@@ -2061,6 +2061,7 @@ def _table_edge_undercut_probe(
     post_inset_base_advance_m: float,
     torso_raise_m: float,
     torso_raise_orientation_max_action: float,
+    torso_raise_base_correction_max_m: float,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import OfficialScriptedGraspDriver
     from robot_agent.skills.competition_transport import (
@@ -2088,6 +2089,12 @@ def _table_edge_undercut_probe(
     ):
         raise ValueError(
             "torso_raise_orientation_max_action must be in (0, 1]"
+        )
+    if not np.isfinite(float(torso_raise_base_correction_max_m)) or float(
+        torso_raise_base_correction_max_m
+    ) <= 0.0:
+        raise ValueError(
+            "torso_raise_base_correction_max_m must be finite and positive"
         )
     torso_joint_id = next(
         (
@@ -2303,7 +2310,9 @@ def _table_edge_undercut_probe(
         )
         control_dt = 0.05
         maximum_base_correction_speed = 0.02
-        maximum_base_correction_distance = 0.04
+        maximum_base_correction_distance = float(
+            torso_raise_base_correction_max_m
+        )
         base_correction_start = np.asarray(backend.get_base_pose()[0], dtype=float)
         safety_failure = None
         stable_support_steps = 0
@@ -3139,6 +3148,9 @@ def _table_edge_undercut_probe(
         "torso_raise_m": float(torso_raise_m),
         "torso_raise_orientation_max_action": float(
             torso_raise_orientation_max_action
+        ),
+        "torso_raise_base_correction_max_m": float(
+            torso_raise_base_correction_max_m
         ),
         "final_torso_position": torso_position(),
         "start_object_position": start_object.tolist(),
@@ -5528,6 +5540,9 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                     torso_raise_orientation_max_action=(
                         args.undercut_torso_raise_orientation_max_action
                     ),
+                    torso_raise_base_correction_max_m=(
+                        args.undercut_torso_raise_base_correction_max_m
+                    ),
                 )
                 record["mode"] = "table_edge_undercut_probe"
                 record["open_gripper"] = bool(probe.get("open_gripper", False))
@@ -5972,6 +5987,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--undercut-torso-raise-orientation-max-action",
         type=float,
         default=0.30,
+    )
+    parser.add_argument(
+        "--undercut-torso-raise-base-correction-max-m",
+        type=float,
+        default=0.04,
     )
     parser.add_argument("--align-closure-axes", action="store_true")
     parser.add_argument("--orientation-max-action", type=float, default=0.30)

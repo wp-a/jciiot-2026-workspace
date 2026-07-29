@@ -1281,6 +1281,10 @@ class JointSeedParserTests(unittest.TestCase):
             args.undercut_torso_raise_orientation_max_action,
             0.30,
         )
+        self.assertAlmostEqual(
+            args.undercut_torso_raise_base_correction_max_m,
+            0.04,
+        )
 
     def test_center_carry_speed_can_be_overridden_for_single_variable_probe(self):
         args = parse_args(
@@ -1369,6 +1373,8 @@ class JointSeedParserTests(unittest.TestCase):
                 "0.12",
                 "--undercut-torso-raise-orientation-max-action",
                 "0.25",
+                "--undercut-torso-raise-base-correction-max-m",
+                "0.06",
             ]
         )
 
@@ -1424,6 +1430,10 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(
             args.undercut_torso_raise_orientation_max_action,
             0.25,
+        )
+        self.assertAlmostEqual(
+            args.undercut_torso_raise_base_correction_max_m,
+            0.06,
         )
 
 
