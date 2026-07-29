@@ -343,6 +343,48 @@ def arm_transport_stroke_targets(
     return targets
 
 
+def compensated_base_reset_step(
+    *,
+    travel_direction: object,
+    base_yaw: float,
+    remaining_m: float,
+    max_speed_m_s: float,
+    control_dt_s: float,
+) -> tuple[np.ndarray, dict[str, np.ndarray]]:
+    """Advance the base while opposing its world step with both arms."""
+    direction = np.asarray(travel_direction, dtype=float).reshape(2)
+    if not np.all(np.isfinite(direction)):
+        raise ValueError("travel_direction must be finite")
+    norm = float(np.linalg.norm(direction))
+    if norm <= 1e-12:
+        raise ValueError("travel_direction must be non-zero")
+    remaining = float(remaining_m)
+    speed_limit = float(max_speed_m_s)
+    control_dt = float(control_dt_s)
+    if not np.isfinite(remaining) or remaining < 0.0:
+        raise ValueError("remaining_m must be finite and non-negative")
+    if not np.isfinite(speed_limit) or speed_limit <= 0.0:
+        raise ValueError("max_speed_m_s must be finite and positive")
+    if not np.isfinite(control_dt) or control_dt <= 0.0:
+        raise ValueError("control_dt_s must be finite and positive")
+    world_step = direction * (min(speed_limit * control_dt, remaining) / norm)
+    world_velocity = world_step / control_dt
+    cosine = np.cos(float(base_yaw))
+    sine = np.sin(float(base_yaw))
+    base_velocity = np.array(
+        [
+            cosine * world_velocity[0] + sine * world_velocity[1],
+            -sine * world_velocity[0] + cosine * world_velocity[1],
+        ],
+        dtype=float,
+    )
+    compensation = np.array([-world_step[0], -world_step[1], 0.0])
+    return (
+        np.array([base_velocity[0], base_velocity[1], 0.0], dtype=float),
+        {arm: compensation.copy() for arm in ("right", "left")},
+    )
+
+
 def allocate_segment_steps(*, total_steps: int, segment_count: int) -> tuple[int, ...]:
     """Distribute a fixed positive waypoint budget across path segments."""
     if (
@@ -1715,6 +1757,7 @@ def _center_regrasp_probe(
     center_carry_corner_seat_m: float = 0.0,
     center_carry_arm_stroke_m: float = 0.0,
     center_carry_arm_stroke_lift_m: float = 0.0,
+    center_carry_base_reset_m: float = 0.0,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import (
         OfficialScriptedGraspDriver,
@@ -3169,6 +3212,169 @@ def _center_regrasp_probe(
                                         )
                                         if not physical_grasp:
                                             failure_stage = "arm_transport_stroke"
+                                    if (
+                                        physical_grasp
+                                        and float(center_carry_base_reset_m) > 0.0
+                                    ):
+                                        reset_driver = OfficialPhysicalCarryDriver()
+                                        reset_start_base = np.asarray(
+                                            backend.get_base_pose()[0], dtype=float
+                                        )
+                                        reset_start_object = np.asarray(
+                                            raw_env.sim.data.body_xpos[body_id],
+                                            dtype=float,
+                                        ).copy()
+                                        reset_start_grippers = eef_positions()
+                                        reset_direction = (
+                                            reset_start_object[:2] - reset_start_base
+                                        )
+                                        reset_direction /= np.linalg.norm(
+                                            reset_direction
+                                        )
+                                        reset_max_speed = float(
+                                            center_carry_max_linear
+                                        )
+                                        reset_collision = False
+                                        reset_grasped = True
+                                        reset_height_safe = True
+                                        reset_steps = 0
+                                        reset_translation = 0.0
+                                        maximum_object_drift = 0.0
+                                        maximum_gripper_drift = 0.0
+                                        reset_budget = int(
+                                            np.ceil(
+                                                float(center_carry_base_reset_m)
+                                                / (reset_max_speed * 0.05)
+                                            )
+                                        ) + 20
+                                        for _ in range(reset_budget):
+                                            base_xy, base_yaw = backend.get_base_pose()
+                                            base_xy = np.asarray(base_xy, dtype=float)
+                                            reset_translation = float(
+                                                np.dot(
+                                                    base_xy - reset_start_base,
+                                                    reset_direction,
+                                                )
+                                            )
+                                            remaining = max(
+                                                0.0,
+                                                float(center_carry_base_reset_m)
+                                                - reset_translation,
+                                            )
+                                            if remaining <= 1e-4:
+                                                break
+                                            base_command, arm_deltas = (
+                                                compensated_base_reset_step(
+                                                    travel_direction=reset_direction,
+                                                    base_yaw=float(base_yaw),
+                                                    remaining_m=remaining,
+                                                    max_speed_m_s=reset_max_speed,
+                                                    control_dt_s=0.05,
+                                                )
+                                            )
+                                            step_info = reset_driver.step(
+                                                backend,
+                                                object_name=object_name,
+                                                base_command=base_command,
+                                                hold_targets=hold_targets,
+                                                arm_world_deltas=arm_deltas,
+                                                gripper_value=1.0,
+                                                base_control_dt=0.05,
+                                            )
+                                            reset_steps += 1
+                                            reset_collision = bool(
+                                                step_info.get("collision", False)
+                                            )
+                                            collision_steps += int(reset_collision)
+                                            object_position = np.asarray(
+                                                raw_env.sim.data.body_xpos[body_id],
+                                                dtype=float,
+                                            )
+                                            current_grippers = eef_positions()
+                                            maximum_object_drift = max(
+                                                maximum_object_drift,
+                                                float(
+                                                    np.linalg.norm(
+                                                        object_position[:2]
+                                                        - reset_start_object[:2]
+                                                    )
+                                                ),
+                                            )
+                                            maximum_gripper_drift = max(
+                                                maximum_gripper_drift,
+                                                max(
+                                                    float(
+                                                        np.linalg.norm(
+                                                            current_grippers[arm][:2]
+                                                            - reset_start_grippers[arm][
+                                                                :2
+                                                            ]
+                                                        )
+                                                    )
+                                                    for arm in ("right", "left")
+                                                ),
+                                            )
+                                            reset_grasped = all(
+                                                bool(value)
+                                                for value in helpers["grasp_status"](
+                                                    raw_env, robot, object_name
+                                                ).values()
+                                            )
+                                            reset_height_safe = bool(
+                                                float(object_position[2])
+                                                >= float(table_object_z) + 0.10
+                                            )
+                                            if (
+                                                reset_collision
+                                                or not reset_grasped
+                                                or not reset_height_safe
+                                                or maximum_object_drift > 0.03
+                                                or maximum_gripper_drift > 0.03
+                                            ):
+                                                break
+                                        reset_end_base = np.asarray(
+                                            backend.get_base_pose()[0], dtype=float
+                                        )
+                                        reset_translation = float(
+                                            np.dot(
+                                                reset_end_base - reset_start_base,
+                                                reset_direction,
+                                            )
+                                        )
+                                        reset_success = bool(
+                                            reset_translation
+                                            >= float(center_carry_base_reset_m) - 1e-4
+                                            and not reset_collision
+                                            and reset_grasped
+                                            and reset_height_safe
+                                            and maximum_object_drift <= 0.03
+                                            and maximum_gripper_drift <= 0.03
+                                        )
+                                        stage_results.append(
+                                            {
+                                                "stage": "inchworm_base_reset",
+                                                "success": reset_success,
+                                                "requested_distance_m": float(
+                                                    center_carry_base_reset_m
+                                                ),
+                                                "base_translation_m": (
+                                                    reset_translation
+                                                ),
+                                                "maximum_object_drift_m": (
+                                                    maximum_object_drift
+                                                ),
+                                                "maximum_gripper_drift_m": (
+                                                    maximum_gripper_drift
+                                                ),
+                                                "bilateral_grasp": reset_grasped,
+                                                "height_safe": reset_height_safe,
+                                                "collision": reset_collision,
+                                                "steps": reset_steps,
+                                            }
+                                        )
+                                        physical_grasp = reset_success
+                                        if not physical_grasp:
+                                            failure_stage = "inchworm_base_reset"
                                     if not physical_grasp:
                                         failure_stage = failure_stage or "final_contact"
                                     elif float(center_carry_distance_m) > 0.0:
@@ -3440,6 +3646,7 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                         center_carry_arm_stroke_lift_m=(
                             args.center_carry_arm_stroke_lift_m
                         ),
+                        center_carry_base_reset_m=args.center_carry_base_reset_m,
                     )
                     record["mode"] = (
                         "center_grasp_physical_transport"
@@ -3600,6 +3807,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--center-carry-arm-stroke-lift-m", type=float, default=0.0
     )
+    parser.add_argument("--center-carry-base-reset-m", type=float, default=0.0)
     parser.add_argument("--align-closure-axes", action="store_true")
     parser.add_argument("--orientation-max-action", type=float, default=0.30)
     parser.add_argument("--orientation-fine-max-action", type=float)
