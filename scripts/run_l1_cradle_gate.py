@@ -2133,6 +2133,12 @@ def _table_edge_undercut_probe(
             dtype=float,
         )
 
+    def left_eef_position() -> np.ndarray:
+        return np.asarray(
+            helpers["gripper_position"](raw_env, robot, "left"),
+            dtype=float,
+        )
+
     def right_eef_pose() -> tuple[np.ndarray, np.ndarray]:
         return eef_site_pose(raw_env, robot, "right")
 
@@ -2247,6 +2253,7 @@ def _table_edge_undercut_probe(
         allow_object_contact: bool,
         require_support: bool = False,
         max_steps: int = 180,
+        other_arm_world_target: np.ndarray | None = None,
     ) -> bool:
         nonlocal collision_steps, maximum_support_steps
         stable_support_steps = 0
@@ -2266,9 +2273,24 @@ def _table_edge_undercut_probe(
                 controller_delta,
                 0.12,
             )
+            arm_actions = {"right": arm_action}
+            measured_left = None
+            if other_arm_world_target is not None:
+                measured_left = left_eef_position()
+                left_controller_delta = helpers["world_delta"](
+                    robot,
+                    "left",
+                    np.asarray(other_arm_world_target, dtype=float) - measured_left,
+                )
+                arm_actions["left"] = helpers["arm_action"](
+                    robot,
+                    "left",
+                    left_controller_delta,
+                    0.30,
+                )
             action = helpers["build_action"](
                 robot,
-                arm_actions={"right": arm_action},
+                arm_actions=arm_actions,
                 gripper_value=-1.0,
                 hold_targets=hold_targets,
             )
@@ -2302,6 +2324,14 @@ def _table_edge_undercut_probe(
                 "step": local_step + 1,
                 "target_eef_position": np.asarray(target, dtype=float).tolist(),
                 "eef_position": measured_eef.tolist(),
+                "other_arm_world_target": (
+                    None
+                    if other_arm_world_target is None
+                    else np.asarray(other_arm_world_target, dtype=float).tolist()
+                ),
+                "other_arm_eef_position": (
+                    None if measured_left is None else measured_left.tolist()
+                ),
                 "object_position": object_position.tolist(),
                 "object_lift_m": object_lift_m,
                 "torso_position": torso_position(),
@@ -2585,7 +2615,10 @@ def _table_edge_undercut_probe(
             ("descend_open_outside", targets["below"], False, False),
         )
         for stage, target, allow_contact, require_support in sequence:
+            other_arm_world_target = None
             if stage == "descend_open_outside" and torso_target_m is not None:
+                if horizontal_fork:
+                    other_arm_world_target = left_eef_position().copy()
                 hold_targets["torso"] = np.array(
                     [float(torso_target_m)], dtype=float
                 )
@@ -2594,6 +2627,7 @@ def _table_edge_undercut_probe(
                 target,
                 allow_object_contact=allow_contact,
                 require_support=require_support,
+                other_arm_world_target=other_arm_world_target,
             ):
                 success = False
                 failure_stage = stage

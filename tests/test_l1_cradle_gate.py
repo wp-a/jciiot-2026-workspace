@@ -953,6 +953,8 @@ class L1TableEdgeUndercutTests(unittest.TestCase):
         self.assertLess(inset_index, raise_index)
         self.assertIn("if success and horizontal_fork", source)
         self.assertIn("open_fork_under_bottom_support_ready", source)
+        self.assertIn("other_arm_world_target", source)
+        self.assertIn('left_eef_position().copy()', source)
 
 
 class JointSeedMathTests(unittest.TestCase):
