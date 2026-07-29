@@ -3200,11 +3200,17 @@ def _table_edge_undercut_probe(
                     - right_eef_position()
                 )
             )
+            inset_progress_m = max(
+                0.0,
+                float(targets["outside"][1]) - float(right_eef_position()[1]),
+            )
+            inset_stage["inset_progress_m"] = inset_progress_m
+            inset_stage["distance_to_target_m"] = inset_distance_to_target
             if (
                 not inset_success
                 and inset_stage.get("safety_failure") == "timeout"
                 and not any(object_robot_contacts(raw_env, object_name).values())
-                and inset_distance_to_target <= 0.02
+                and inset_progress_m >= 0.04
             ):
                 inset_success = True
                 inset_stage["success"] = True
