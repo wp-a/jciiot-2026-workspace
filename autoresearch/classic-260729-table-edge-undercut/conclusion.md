@@ -37,3 +37,9 @@ meaningful object movement. Rather than advancing into the object, the next
 trial restores the safe `0.10 m` base advance and changes only the target point
 from object-local `x=+0.20 m` to `x=+0.31 m`. The hand collision width still
 overlaps the bottom footprint while making the target reachable.
+
+Iteration 4 passed base advance, clearance, and the reachable outside target
+with zero contact or collision. The descent then saturated at `z=1.173`, about
+`0.173 m` above the container bottom. The recorded torso joint remained fixed at
+its `0.35 m` upper limit. The next trial changes only the torso hold target after
+the outside stage to `0.15 m`; all world-space hand targets remain unchanged.

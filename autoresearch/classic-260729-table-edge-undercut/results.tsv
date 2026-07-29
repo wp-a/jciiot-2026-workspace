@@ -1,5 +1,6 @@
-iteration	base_advance_m	object_offset_x_m	above_clearance_m	clearance_success	outside_success	descent_success	undercut_success	support_success	support_steps	object_lift_m	collision_frames	pose_writes	attachment_calls	status
-0	0.00	0.20	0.15	false	false	false	false	false	0	0.000000	0	0	0	discard:initial right EEF plateaued at z=1.324 while the conservative clearance target was z=1.400; stopped before lateral motion
-1	0.00	0.20	0.07	true	false	false	false	false	0	0.000000	0	0	0	discard:outside y and z reached, but right EEF plateaued at x=7.483 for target x=7.259; base must advance before the frozen undercut path
-2	0.10	0.20	0.07	true	false	false	false	false	0	0.000000	0	0	0	discard:base advance and clearance succeeded; outside target plateau improved to x=7.372 but remained 0.113 m from target
-3	0.20	0.20	0.07	false	false	false	false	false	0	-0.000020	0	0	0	discard:base advance stopped at 0.150 m on premature open-left-finger contact; no judge collision or material movement
+iteration	base_advance_m	object_offset_x_m	torso_target_m	above_clearance_m	clearance_success	outside_success	descent_success	undercut_success	support_success	support_steps	object_lift_m	collision_frames	pose_writes	attachment_calls	status
+0	0.00	0.20	none	0.15	false	false	false	false	false	0	0.000000	0	0	0	discard:initial right EEF plateaued at z=1.324 while the conservative clearance target was z=1.400; stopped before lateral motion
+1	0.00	0.20	none	0.07	true	false	false	false	false	0	0.000000	0	0	0	discard:outside y and z reached, but right EEF plateaued at x=7.483 for target x=7.259; base must advance before the frozen undercut path
+2	0.10	0.20	none	0.07	true	false	false	false	false	0	0.000000	0	0	0	discard:base advance and clearance succeeded; outside target plateau improved to x=7.372 but remained 0.113 m from target
+3	0.20	0.20	none	0.07	false	false	false	false	false	0	-0.000020	0	0	0	discard:base advance stopped at 0.150 m on premature open-left-finger contact; no judge collision or material movement
+4	0.10	0.31	none	0.07	true	true	false	false	false	0	0.000000	0	0	0	discard:reachable edge target passed outside stage, but descent saturated at z=1.173 with torso fixed at its 0.35 m upper limit

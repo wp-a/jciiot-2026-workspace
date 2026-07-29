@@ -1067,6 +1067,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.undercut_above_clearance_m, 0.15)
         self.assertAlmostEqual(args.undercut_base_advance_m, 0.0)
         self.assertAlmostEqual(args.undercut_object_offset_x_m, 0.20)
+        self.assertIsNone(args.undercut_torso_target_m)
         self.assertAlmostEqual(args.undercut_raise_above_bottom_m, 0.12)
 
     def test_center_carry_speed_can_be_overridden_for_single_variable_probe(self):
@@ -1125,6 +1126,8 @@ class JointSeedParserTests(unittest.TestCase):
                 "0.10",
                 "--undercut-object-offset-x-m",
                 "0.31",
+                "--undercut-torso-target-m",
+                "0.15",
                 "--undercut-raise-above-bottom-m",
                 "0.14",
             ]
@@ -1155,6 +1158,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.undercut_above_clearance_m, 0.07)
         self.assertAlmostEqual(args.undercut_base_advance_m, 0.10)
         self.assertAlmostEqual(args.undercut_object_offset_x_m, 0.31)
+        self.assertAlmostEqual(args.undercut_torso_target_m, 0.15)
         self.assertAlmostEqual(args.undercut_raise_above_bottom_m, 0.14)
 
 

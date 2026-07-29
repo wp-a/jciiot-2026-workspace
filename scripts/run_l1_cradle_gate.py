@@ -1895,6 +1895,7 @@ def _table_edge_undercut_probe(
     above_clearance_m: float,
     base_advance_m: float,
     object_offset_x_m: float,
+    torso_target_m: float | None,
     raise_above_bottom_m: float,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import OfficialScriptedGraspDriver
@@ -1915,6 +1916,35 @@ def _table_edge_undercut_probe(
     start_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
     if not np.isfinite(float(base_advance_m)) or float(base_advance_m) < 0.0:
         raise ValueError("base_advance_m must be finite and non-negative")
+    torso_joint_id = next(
+        (
+            index
+            for index in range(raw_env.sim.model.njnt)
+            if (raw_env.sim.model.joint_id2name(index) or "").endswith(
+                "torso_lift_joint"
+            )
+        ),
+        None,
+    )
+    if torso_joint_id is None:
+        raise RuntimeError("torso lift joint is unavailable")
+    torso_joint_name = raw_env.sim.model.joint_id2name(torso_joint_id)
+    torso_qpos_addr = raw_env.sim.model.get_joint_qpos_addr(torso_joint_name)
+    if isinstance(torso_qpos_addr, tuple):
+        raise RuntimeError("torso lift joint must have a scalar qpos address")
+    if torso_target_m is not None:
+        torso_target = float(torso_target_m)
+        torso_range = np.asarray(
+            raw_env.sim.model.jnt_range[torso_joint_id], dtype=float
+        )
+        if (
+            not np.isfinite(torso_target)
+            or torso_target < float(torso_range[0])
+            or torso_target > float(torso_range[1])
+        ):
+            raise ValueError("torso_target_m is outside the model joint range")
+        if "torso" not in hold_targets:
+            raise RuntimeError("torso controller hold target is unavailable")
     targets = table_edge_undercut_targets(
         object_center=start_object,
         object_half_depth_m=0.20,
@@ -1937,6 +1967,9 @@ def _table_edge_undercut_probe(
             helpers["gripper_position"](raw_env, robot, "right"),
             dtype=float,
         )
+
+    def torso_position() -> float:
+        return float(raw_env.sim.data.qpos[torso_qpos_addr])
 
     def execute_base_advance() -> bool:
         nonlocal collision_steps
@@ -2103,6 +2136,7 @@ def _table_edge_undercut_probe(
                 "eef_position": measured_eef.tolist(),
                 "object_position": object_position.tolist(),
                 "object_lift_m": object_lift_m,
+                "torso_position": torso_position(),
                 "contacts": {
                     arm: list(names) for arm, names in contacts.items()
                 },
@@ -2149,6 +2183,7 @@ def _table_edge_undercut_probe(
                 "final_object_position": np.asarray(
                     raw_env.sim.data.body_xpos[body_id], dtype=float
                 ).tolist(),
+                "final_torso_position": torso_position(),
                 "final_contacts": {
                     arm: list(names)
                     for arm, names in object_robot_contacts(
@@ -2180,6 +2215,10 @@ def _table_edge_undercut_probe(
             ("raise_open_into_support", targets["raise"], True, True),
         )
         for stage, target, allow_contact, require_support in sequence:
+            if stage == "descend_open_outside" and torso_target_m is not None:
+                hold_targets["torso"] = np.array(
+                    [float(torso_target_m)], dtype=float
+                )
             if not execute_stage(
                 stage,
                 target,
@@ -2202,6 +2241,8 @@ def _table_edge_undercut_probe(
         "base_translation_m": float(
             np.linalg.norm(np.asarray(backend.get_base_pose()[0]) - start_base_xy)
         ),
+        "torso_target_m": torso_target_m,
+        "final_torso_position": torso_position(),
         "start_object_position": start_object.tolist(),
         "final_object_position": final_object.tolist(),
         "targets": {name: target.tolist() for name, target in targets.items()},
@@ -4549,6 +4590,7 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                     above_clearance_m=args.undercut_above_clearance_m,
                     base_advance_m=args.undercut_base_advance_m,
                     object_offset_x_m=args.undercut_object_offset_x_m,
+                    torso_target_m=args.undercut_torso_target_m,
                     raise_above_bottom_m=(
                         args.undercut_raise_above_bottom_m
                     ),
@@ -4925,6 +4967,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=float,
         default=0.20,
     )
+    parser.add_argument("--undercut-torso-target-m", type=float)
     parser.add_argument(
         "--undercut-raise-above-bottom-m",
         type=float,
