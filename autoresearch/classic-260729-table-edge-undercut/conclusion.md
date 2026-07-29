@@ -13,3 +13,9 @@ The next single-variable trial lowers only the above-container clearance from
 `0.15 m` to `0.07 m`, producing a target near the measured reachable height.
 The table edge, outside clearance, undercut depth, lower target, and raise target
 remain frozen.
+
+Iteration 1 passed the lowered clearance stage and reached the requested outside
+`y` and `z` without contact. Its world `x` plateaued at `7.483` for a target of
+`7.259`, which is also outside the container's maximum `x` support footprint of
+approximately `7.359`. The next trial adds only the previously validated
+`0.10 m` physical base advance before running the same open-gripper targets.

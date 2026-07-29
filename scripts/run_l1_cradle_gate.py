@@ -1893,10 +1893,15 @@ def _table_edge_undercut_probe(
     outside_clearance_m: float,
     edge_clearance_m: float,
     above_clearance_m: float,
+    base_advance_m: float,
     raise_above_bottom_m: float,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import OfficialScriptedGraspDriver
-    from robot_agent.skills.competition_transport import _is_allowed_cradle_geom
+    from robot_agent.skills.competition_transport import (
+        OfficialPhysicalCarryDriver,
+        _is_allowed_cradle_geom,
+        world_velocity_to_base_frame,
+    )
 
     helpers = OfficialScriptedGraspDriver._helpers()
     raw_env = backend.env
@@ -1906,6 +1911,9 @@ def _table_edge_undercut_probe(
     start_object = np.asarray(
         raw_env.sim.data.body_xpos[body_id], dtype=float
     ).copy()
+    start_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
+    if not np.isfinite(float(base_advance_m)) or float(base_advance_m) < 0.0:
+        raise ValueError("base_advance_m must be finite and non-negative")
     targets = table_edge_undercut_targets(
         object_center=start_object,
         object_half_depth_m=0.20,
@@ -1928,6 +1936,107 @@ def _table_edge_undercut_probe(
             helpers["gripper_position"](raw_env, robot, "right"),
             dtype=float,
         )
+
+    def execute_base_advance() -> bool:
+        nonlocal collision_steps
+        requested_distance = float(base_advance_m)
+        if requested_distance == 0.0:
+            return True
+        control_dt = 0.05
+        max_speed = 0.04
+        driver = OfficialPhysicalCarryDriver()
+        safety_failure = None
+        success = False
+        max_steps = int(np.ceil(requested_distance / (max_speed * control_dt))) + 5
+        for local_step in range(max_steps):
+            base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
+            translation = float(np.linalg.norm(base_xy - start_base_xy))
+            remaining = max(0.0, requested_distance - translation)
+            if remaining <= 1e-6:
+                success = True
+                break
+            object_xy = np.asarray(
+                raw_env.sim.data.body_xpos[body_id][:2], dtype=float
+            )
+            world_velocity = bounded_base_advance_world_velocity(
+                base_xy=base_xy,
+                object_xy=object_xy,
+                remaining_m=remaining,
+                max_speed_m_s=max_speed,
+                control_dt_s=control_dt,
+            )
+            _, base_yaw = backend.get_base_pose()
+            base_velocity = world_velocity_to_base_frame(world_velocity, base_yaw)
+            step_info = driver.step(
+                backend,
+                object_name=object_name,
+                base_command=np.array(
+                    [base_velocity[0], base_velocity[1], 0.0], dtype=float
+                ),
+                hold_targets=hold_targets,
+                arm_world_deltas=None,
+                gripper_value=-1.0,
+                base_control_dt=control_dt,
+            )
+            collision = bool(step_info.get("collision", False))
+            collision_steps += int(collision)
+            contacts = object_robot_contacts(raw_env, object_name)
+            premature_contact = any(contacts.values())
+            measured_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
+            observations.append(
+                {
+                    "stage": "advance_base_for_undercut",
+                    "step": local_step + 1,
+                    "base_xy": measured_base_xy.tolist(),
+                    "base_translation_m": float(
+                        np.linalg.norm(measured_base_xy - start_base_xy)
+                    ),
+                    "eef_position": right_eef_position().tolist(),
+                    "object_position": np.asarray(
+                        raw_env.sim.data.body_xpos[body_id], dtype=float
+                    ).tolist(),
+                    "contacts": {
+                        arm: list(names) for arm, names in contacts.items()
+                    },
+                    "judge_collision": collision,
+                }
+            )
+            if collision:
+                safety_failure = "collision"
+                break
+            if premature_contact:
+                safety_failure = "premature_object_contact"
+                break
+        final_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
+        final_translation = float(np.linalg.norm(final_base_xy - start_base_xy))
+        success = bool(
+            success
+            or (
+                safety_failure is None
+                and final_translation >= requested_distance - 1e-6
+            )
+        )
+        if not success and safety_failure is None:
+            safety_failure = "timeout"
+        stages.append(
+            {
+                "stage": "advance_base_for_undercut",
+                "success": success,
+                "steps": sum(
+                    1
+                    for item in observations
+                    if item["stage"] == "advance_base_for_undercut"
+                ),
+                "safety_failure": safety_failure,
+                "requested_translation_m": requested_distance,
+                "base_translation_m": final_translation,
+                "final_eef_position": right_eef_position().tolist(),
+                "final_object_position": np.asarray(
+                    raw_env.sim.data.body_xpos[body_id], dtype=float
+                ).tolist(),
+            }
+        )
+        return success
 
     def execute_stage(
         stage: str,
@@ -2064,18 +2173,19 @@ def _table_edge_undercut_probe(
         ("inset_open_under_overhang", targets["undercut"], False, False),
         ("raise_open_into_support", targets["raise"], True, True),
     )
-    success = True
-    failure_stage = None
-    for stage, target, allow_contact, require_support in sequence:
-        if not execute_stage(
-            stage,
-            target,
-            allow_object_contact=allow_contact,
-            require_support=require_support,
-        ):
-            success = False
-            failure_stage = stage
-            break
+    success = execute_base_advance()
+    failure_stage = None if success else "advance_base_for_undercut"
+    if success:
+        for stage, target, allow_contact, require_support in sequence:
+            if not execute_stage(
+                stage,
+                target,
+                allow_object_contact=allow_contact,
+                require_support=require_support,
+            ):
+                success = False
+                failure_stage = stage
+                break
     final_object = np.asarray(
         raw_env.sim.data.body_xpos[body_id], dtype=float
     ).copy()
@@ -2086,6 +2196,9 @@ def _table_edge_undercut_probe(
         "support_contact_steps": maximum_support_steps,
         "object_lift_m": float(final_object[2] - start_object[2]),
         "collision_steps": collision_steps,
+        "base_translation_m": float(
+            np.linalg.norm(np.asarray(backend.get_base_pose()[0]) - start_base_xy)
+        ),
         "start_object_position": start_object.tolist(),
         "final_object_position": final_object.tolist(),
         "targets": {name: target.tolist() for name, target in targets.items()},
@@ -4431,6 +4544,7 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                     outside_clearance_m=args.undercut_outside_clearance_m,
                     edge_clearance_m=args.undercut_edge_clearance_m,
                     above_clearance_m=args.undercut_above_clearance_m,
+                    base_advance_m=args.undercut_base_advance_m,
                     raise_above_bottom_m=(
                         args.undercut_raise_above_bottom_m
                     ),
@@ -4796,6 +4910,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--undercut-above-clearance-m",
         type=float,
         default=0.15,
+    )
+    parser.add_argument(
+        "--undercut-base-advance-m",
+        type=float,
+        default=0.0,
     )
     parser.add_argument(
         "--undercut-raise-above-bottom-m",
