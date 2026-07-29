@@ -2709,7 +2709,7 @@ def _center_regrasp_probe(
         support_seek_down_step: float = 0.0,
         support_seek_down_limit: float = 0.0,
         minimum_object_z: float | None = None,
-        required_grasp_arm: str | None = None,
+        required_contact_arm: str | None = None,
         require_bilateral_grasp: bool = False,
         require_target: bool = True,
     ) -> bool:
@@ -2726,8 +2726,8 @@ def _center_regrasp_probe(
         grasp_stop_met = False
         stage_grasp_steps = 0
         safety_failure = None
-        if required_grasp_arm not in (None, "right", "left"):
-            raise ValueError("required_grasp_arm must be right, left, or None")
+        if required_contact_arm not in (None, "right", "left"):
+            raise ValueError("required_contact_arm must be right, left, or None")
         active_targets = {
             arm: np.asarray(targets[arm], dtype=float).copy()
             for arm in ("right", "left")
@@ -2839,10 +2839,10 @@ def _center_regrasp_probe(
             ):
                 safety_failure = "height_loss"
                 break
-            if required_grasp_arm is not None and not bool(
-                grasp_contacts.get(required_grasp_arm)
+            if required_contact_arm is not None and not bool(
+                contacts.get(required_contact_arm)
             ):
-                safety_failure = "required_grasp_loss"
+                safety_failure = "required_contact_loss"
                 break
             if float(support_seek_down_step) > 0.0:
                 for arm in ("right", "left"):
@@ -3315,7 +3315,7 @@ def _center_regrasp_probe(
                                                 minimum_object_z=(
                                                     float(table_object_z) + 0.10
                                                 ),
-                                                required_grasp_arm=stationary_arm,
+                                                required_contact_arm=stationary_arm,
                                             )
                                         if lower_reached:
                                             inset_targets = (
@@ -3337,7 +3337,7 @@ def _center_regrasp_probe(
                                                 minimum_object_z=(
                                                     float(table_object_z) + 0.10
                                                 ),
-                                                required_grasp_arm=stationary_arm,
+                                                required_contact_arm=stationary_arm,
                                             )
                                         transition_contacts = object_robot_contacts(
                                             raw_env,
@@ -3364,6 +3364,9 @@ def _center_regrasp_probe(
                                         stationary_grasp = bool(
                                             transition_grasp.get(stationary_arm)
                                         )
+                                        stationary_contact = bool(
+                                            transition_contacts.get(stationary_arm)
+                                        )
                                         height_safe = bool(
                                             float(transition_object[2])
                                             >= float(table_object_z) + 0.10
@@ -3373,7 +3376,7 @@ def _center_regrasp_probe(
                                             and lower_reached
                                             and inset_reached
                                             and moving_support
-                                            and stationary_grasp
+                                            and stationary_contact
                                             and height_safe
                                         )
                                         support_transition = {
@@ -3387,6 +3390,7 @@ def _center_regrasp_probe(
                                             "lower_success": lower_reached,
                                             "inset_success": inset_reached,
                                             "moving_arm_support": moving_support,
+                                            "stationary_arm_contact": stationary_contact,
                                             "stationary_arm_grasp": stationary_grasp,
                                             "height_safe": height_safe,
                                             "object_lift_m": float(

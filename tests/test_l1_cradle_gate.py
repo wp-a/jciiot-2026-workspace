@@ -539,15 +539,16 @@ class CenterRegraspSequenceTests(unittest.TestCase):
         self.assertLess(lower_index, inset_index)
         self.assertLess(inset_index, transport_index)
 
-    def test_single_arm_transition_stops_on_height_or_stationary_grasp_loss(self):
+    def test_single_arm_transition_stops_on_height_or_stationary_contact_loss(self):
         source = inspect.getsource(_center_regrasp_probe)
 
-        self.assertEqual(source.count("required_grasp_arm=stationary_arm"), 2)
+        self.assertEqual(source.count("required_contact_arm=stationary_arm"), 2)
         self.assertGreaterEqual(source.count("minimum_object_z="), 2)
         self.assertIn("require_bilateral_grasp=True", source)
         self.assertIn('safety_failure = "bilateral_grasp_loss"', source)
         self.assertIn('safety_failure = "height_loss"', source)
-        self.assertIn('safety_failure = "required_grasp_loss"', source)
+        self.assertIn('safety_failure = "required_contact_loss"', source)
+        self.assertIn('"stationary_arm_contact": stationary_contact', source)
 
     def test_support_transition_can_keep_the_moving_gripper_closed(self):
         source = inspect.getsource(_center_regrasp_probe)
