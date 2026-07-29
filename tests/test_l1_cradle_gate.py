@@ -192,6 +192,75 @@ class PostureCarryGateTests(unittest.TestCase):
                     )
 
 
+class TransportAttachmentAuditTests(unittest.TestCase):
+    @staticmethod
+    def fake_module():
+        calls = []
+
+        def capture(env, object_name):
+            calls.append(("capture", env, object_name))
+            return {"active": True, "object_name": object_name}
+
+        def write(env, joint_name, qpos):
+            calls.append(("write", env, joint_name, tuple(qpos)))
+            return "written"
+
+        module = SimpleNamespace(
+            TRANSPORT_ATTACHMENT_ATTR="_transport_attachment",
+            capture_transport_attachment=capture,
+            set_object_qpos=write,
+        )
+        return module, calls
+
+    def test_transport_attachment_audit_counts_without_suppressing_calls(self):
+        self.assertTrue(hasattr(gate_module, "transport_attachment_audit"))
+        module, calls = self.fake_module()
+        original_capture = module.capture_transport_attachment
+        original_write = module.set_object_qpos
+        raw_env = SimpleNamespace(
+            _transport_attachment={"active": False}
+        )
+
+        with gate_module.transport_attachment_audit(raw_env, module) as audit:
+            attachment = module.capture_transport_attachment(raw_env, "box")
+            result = module.set_object_qpos(raw_env, "box_free", [1.0, 2.0])
+
+        self.assertEqual(attachment["object_name"], "box")
+        self.assertEqual(result, "written")
+        self.assertEqual([entry[0] for entry in calls], ["capture", "write"])
+        self.assertEqual(audit["attachment_activations"], 1)
+        self.assertEqual(audit["object_pose_writes"], 1)
+        self.assertFalse(audit["active_before"])
+        self.assertFalse(audit["active_after"])
+        self.assertIs(module.capture_transport_attachment, original_capture)
+        self.assertIs(module.set_object_qpos, original_write)
+
+    def test_transport_attachment_audit_reports_active_state(self):
+        module, _ = self.fake_module()
+        raw_env = SimpleNamespace(
+            _transport_attachment={"active": True}
+        )
+
+        with gate_module.transport_attachment_audit(raw_env, module) as audit:
+            raw_env._transport_attachment["active"] = False
+
+        self.assertTrue(audit["active_before"])
+        self.assertFalse(audit["active_after"])
+
+    def test_transport_attachment_audit_restores_functions_after_exception(self):
+        module, _ = self.fake_module()
+        original_capture = module.capture_transport_attachment
+        original_write = module.set_object_qpos
+        raw_env = SimpleNamespace()
+
+        with self.assertRaisesRegex(RuntimeError, "probe failed"):
+            with gate_module.transport_attachment_audit(raw_env, module):
+                raise RuntimeError("probe failed")
+
+        self.assertIs(module.capture_transport_attachment, original_capture)
+        self.assertIs(module.set_object_qpos, original_write)
+
+
 class FingerpadBracketTests(unittest.TestCase):
     def test_reads_official_fingerpad_geom_positions(self):
         self.assertTrue(hasattr(gate_module, "fingerpad_world_positions"))

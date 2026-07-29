@@ -10,6 +10,7 @@ import subprocess
 import sys
 import time
 from collections.abc import Mapping
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +41,42 @@ POSTURE_CARRY_THRESHOLDS = {
     "object_gripper_drift_m": 0.03,
     "final_object_lift_m": 0.10,
 }
+
+
+@contextmanager
+def transport_attachment_audit(raw_env: object, transport_module: object):
+    """Count transport attachment and direct object-pose operations in a scope."""
+    attachment_attr = str(transport_module.TRANSPORT_ATTACHMENT_ATTR)
+    original_capture = transport_module.capture_transport_attachment
+    original_set_object_qpos = transport_module.set_object_qpos
+
+    def attachment_active() -> bool:
+        state = getattr(raw_env, attachment_attr, None)
+        return bool(isinstance(state, Mapping) and state.get("active", False))
+
+    audit = {
+        "attachment_activations": 0,
+        "object_pose_writes": 0,
+        "active_before": attachment_active(),
+        "active_after": False,
+    }
+
+    def capture_wrapper(*args: object, **kwargs: object):
+        audit["attachment_activations"] += 1
+        return original_capture(*args, **kwargs)
+
+    def set_object_qpos_wrapper(*args: object, **kwargs: object):
+        audit["object_pose_writes"] += 1
+        return original_set_object_qpos(*args, **kwargs)
+
+    transport_module.capture_transport_attachment = capture_wrapper
+    transport_module.set_object_qpos = set_object_qpos_wrapper
+    try:
+        yield audit
+    finally:
+        audit["active_after"] = attachment_active()
+        transport_module.capture_transport_attachment = original_capture
+        transport_module.set_object_qpos = original_set_object_qpos
 
 _REQUIRED_FIELDS = (
     "physical_grasp",
