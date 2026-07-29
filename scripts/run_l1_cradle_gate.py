@@ -350,6 +350,7 @@ def compensated_base_reset_step(
     remaining_m: float,
     max_speed_m_s: float,
     control_dt_s: float,
+    gripper_world_errors: Mapping[str, object] | None = None,
 ) -> tuple[np.ndarray, dict[str, np.ndarray]]:
     """Advance the base while opposing its world step with both arms."""
     direction = np.asarray(travel_direction, dtype=float).reshape(2)
@@ -379,9 +380,16 @@ def compensated_base_reset_step(
         dtype=float,
     )
     compensation = np.array([-world_step[0], -world_step[1], 0.0])
+    errors = gripper_world_errors or {}
+    arm_deltas = {}
+    for arm in ("right", "left"):
+        error = np.asarray(errors.get(arm, np.zeros(3)), dtype=float).reshape(3)
+        if not np.all(np.isfinite(error)):
+            raise ValueError(f"{arm} gripper world error must be finite")
+        arm_deltas[arm] = compensation + error
     return (
         np.array([base_velocity[0], base_velocity[1], 0.0], dtype=float),
-        {arm: compensation.copy() for arm in ("right", "left")},
+        arm_deltas,
     )
 
 
@@ -3263,6 +3271,7 @@ def _center_regrasp_probe(
                                             )
                                             if remaining <= 1e-4:
                                                 break
+                                            current_grippers = eef_positions()
                                             base_command, arm_deltas = (
                                                 compensated_base_reset_step(
                                                     travel_direction=reset_direction,
@@ -3270,6 +3279,16 @@ def _center_regrasp_probe(
                                                     remaining_m=remaining,
                                                     max_speed_m_s=reset_max_speed,
                                                     control_dt_s=0.05,
+                                                    gripper_world_errors={
+                                                        arm: (
+                                                            reset_start_grippers[arm]
+                                                            - current_grippers[arm]
+                                                        )
+                                                        for arm in (
+                                                            "right",
+                                                            "left",
+                                                        )
+                                                    },
                                                 )
                                             )
                                             step_info = reset_driver.step(

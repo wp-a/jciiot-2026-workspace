@@ -390,11 +390,15 @@ class CenterGraspTransportTests(unittest.TestCase):
             remaining_m=0.08,
             max_speed_m_s=0.04,
             control_dt_s=0.05,
+            gripper_world_errors={
+                "right": np.array([0.01, 0.0, 0.002]),
+                "left": np.array([0.008, 0.0, -0.001]),
+            },
         )
 
         np.testing.assert_allclose(base_command, [0.04, 0.0, 0.0], atol=1e-9)
-        np.testing.assert_allclose(arm_deltas["right"], [0.002, 0.0, 0.0])
-        np.testing.assert_allclose(arm_deltas["left"], [0.002, 0.0, 0.0])
+        np.testing.assert_allclose(arm_deltas["right"], [0.012, 0.0, 0.002])
+        np.testing.assert_allclose(arm_deltas["left"], [0.010, 0.0, -0.001])
 
 
 class L1CradleGateTests(unittest.TestCase):
