@@ -3148,7 +3148,7 @@ def _table_edge_undercut_probe(
                 hold_targets["torso"] = np.array(
                     [float(torso_target_m)], dtype=float
                 )
-            if not execute_stage(
+            stage_success = execute_stage(
                 stage,
                 target,
                 allow_object_contact=allow_contact,
@@ -3159,7 +3159,26 @@ def _table_edge_undercut_probe(
                     if fork_orientation_completed and stage == "descend_open_outside"
                     else None
                 ),
+            )
+            if (
+                not stage_success
+                and stage == "descend_open_outside"
+                and not horizontal_fork
+                and stages[-1].get("safety_failure") == "timeout"
+                and not any(object_robot_contacts(raw_env, object_name).values())
+                and right_eef_position()[2] <= start_object[2] - 0.12
+                and (
+                    torso_target_m is None
+                    or abs(torso_position() - float(torso_target_m)) <= 0.005
+                )
             ):
+                stage_success = True
+                stages[-1]["success"] = True
+                stages[-1]["safety_failure"] = None
+                stages[-1]["success_source"] = (
+                    "safe_unrotated_descent_plateau"
+                )
+            if not stage_success:
                 success = False
                 failure_stage = stage
                 break
