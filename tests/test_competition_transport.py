@@ -151,6 +151,7 @@ class FakePhysicalTransportDriver:
         recovered_height_result=None,
     ):
         self.base_xy = np.zeros(2, dtype=float)
+        self.object_xy = np.array([0.5, 0.0], dtype=float)
         self.yaw = 0.0
         self.contacts = list(contacts or [{"right": True, "left": True}])
         self.object_heights = list(object_heights or [1.0])
@@ -178,13 +179,13 @@ class FakePhysicalTransportDriver:
             "base_xy": self.base_xy.copy(),
             "base_yaw": self.yaw,
             "object_pos": np.array(
-                [self.base_xy[0] + 0.5, self.base_xy[1], object_z],
+                [self.object_xy[0], self.object_xy[1], object_z],
                 dtype=float,
             ),
             "contacts": dict(self.contacts[index]),
             "gripper_positions": {
                 arm: np.array(
-                    [self.base_xy[0] + 0.5, self.base_xy[1], self.gripper_z[arm]],
+                    [self.object_xy[0], self.object_xy[1], self.gripper_z[arm]],
                     dtype=float,
                 )
                 for arm in ("right", "left")
@@ -217,6 +218,11 @@ class FakePhysicalTransportDriver:
             self.base_xy += command[:2]
             self.yaw += command[2]
         if arm_world_deltas:
+            planar_deltas = [
+                np.asarray(arm_world_deltas[arm], dtype=float)[:2]
+                for arm in ("right", "left")
+            ]
+            self.object_xy += np.mean(planar_deltas, axis=0)
             for arm in ("right", "left"):
                 self.gripper_z[arm] += float(arm_world_deltas[arm][2])
         return {"collision": self.collision_step == len(self.steps)}
@@ -360,10 +366,13 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
         np.testing.assert_allclose(driver.steps[0]["base_command"], np.zeros(3))
         self.assertGreater(driver.steps[0]["arm_world_deltas"]["right"][0], 0.0)
         self.assertGreater(driver.steps[1]["base_command"][0], 0.0)
-        self.assertLess(driver.steps[1]["arm_world_deltas"]["right"][0], 0.0)
+        np.testing.assert_allclose(
+            driver.steps[1]["arm_world_deltas"]["right"][:2],
+            np.zeros(2),
+        )
         self.assertAlmostEqual(
+            driver.object_xy[0] - 0.5,
             driver.steps[0]["arm_world_deltas"]["right"][0],
-            -driver.steps[1]["arm_world_deltas"]["right"][0],
         )
 
     def test_object_slip_triggers_a_physical_height_recovery(self):
