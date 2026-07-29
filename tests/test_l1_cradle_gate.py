@@ -10,6 +10,7 @@ from scripts.run_l1_cradle_gate import (
     eef_site_pose,
     has_bilateral_object_contact,
     interior_joint_bounds,
+    interpolate_directed_axis,
     joint_seed_failures,
     joint_seed_objective_residual,
     minimum_undirected_axis_rotation,
@@ -165,6 +166,46 @@ class JointSeedMathTests(unittest.TestCase):
             with self.subTest(lower=lower, upper=upper, margin=margin):
                 with self.assertRaises(ValueError):
                     interior_joint_bounds(lower, upper, margin_rad=margin)
+
+    def test_directed_axis_interpolation_has_exact_normalized_endpoints(self):
+        source = np.array([0.0, 2.0, 0.0])
+        target = np.array([1.0, 1.0, 0.0])
+
+        np.testing.assert_allclose(
+            interpolate_directed_axis(source, target, fraction=0.0),
+            [0.0, 1.0, 0.0],
+        )
+        np.testing.assert_allclose(
+            interpolate_directed_axis(source, target, fraction=1.0),
+            np.array([1.0, 1.0, 0.0]) / np.sqrt(2.0),
+        )
+
+    def test_directed_axis_interpolation_is_unit_and_monotonic(self):
+        source = np.array([0.0, 1.0, 0.0])
+        target = np.array([1.0, 0.0, 0.0])
+        values = [
+            interpolate_directed_axis(source, target, fraction=fraction)
+            for fraction in np.linspace(0.0, 1.0, 11)
+        ]
+
+        np.testing.assert_allclose(
+            [np.linalg.norm(value) for value in values],
+            np.ones(11),
+        )
+        errors = [closure_axis_error_degrees(value, target) for value in values]
+        self.assertTrue(all(a >= b for a, b in zip(errors, errors[1:])))
+
+    def test_directed_axis_interpolation_rejects_invalid_inputs(self):
+        invalid = (
+            ([0.0, 1.0, 0.0], [0.0, -1.0, 0.0], 0.5),
+            ([0.0, 1.0, 0.0], [1.0, 0.0, 0.0], -0.01),
+            ([0.0, 1.0, 0.0], [1.0, 0.0, 0.0], 1.01),
+            ([0.0, 1.0, 0.0], [1.0, 0.0, 0.0], float("nan")),
+        )
+        for source, target, fraction in invalid:
+            with self.subTest(fraction=fraction):
+                with self.assertRaises(ValueError):
+                    interpolate_directed_axis(source, target, fraction=fraction)
 
     @staticmethod
     def seed_inputs():

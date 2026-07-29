@@ -197,6 +197,26 @@ def nearest_directed_axis_target(
     return target if float(np.dot(source, target)) >= 0.0 else -target
 
 
+def interpolate_directed_axis(
+    source_axis: object,
+    target_axis: object,
+    *,
+    fraction: float,
+) -> np.ndarray:
+    """Interpolate normalized directed axes within the same hemisphere."""
+    source = _normalized_axis(source_axis, name="source_axis")
+    target = _normalized_axis(target_axis, name="target_axis")
+    if float(np.dot(source, target)) < -1e-12:
+        raise ValueError("directed axes must lie in the same hemisphere")
+    amount = float(fraction)
+    if not np.isfinite(amount) or amount < 0.0 or amount > 1.0:
+        raise ValueError("fraction must be finite and in [0, 1]")
+    return _normalized_axis(
+        (1.0 - amount) * source + amount * target,
+        name="interpolated_axis",
+    )
+
+
 def joint_seed_objective_residual(
     *,
     current_positions: Mapping[str, object],
