@@ -1,0 +1,4 @@
+iteration	seed	orientation_max_action	orientation_fine_max_action	orientation_fine_threshold_deg	orientation_max_steps	right_error_deg	left_error_deg	stable_steps	max_position_drift_m	orientation_collision_frames	orientation_accepted	failure_stage	bilateral_contact	lift_m	accepted	elapsed_s	status
+1	0	0.02	none	none	2600	11.708005	18.066913	0	0.009752	0	false	align_closure_axes_high	false	0.0	false	131.872682	discard
+2	0	0.02	none	none	2600	9.681509	15.220797	0	0.006870	0	false	align_closure_axes_high	false	0.0	false	130.987942	discard
+3	0	0.02	0.005	15.0	5000	9.760016	15.505853	0	0.007096	0	false	align_closure_axes_high	false	0.0	false	211.156793	discard
