@@ -542,7 +542,7 @@ class CenterRegraspSequenceTests(unittest.TestCase):
     def test_single_arm_transition_stops_on_height_or_stationary_contact_loss(self):
         source = inspect.getsource(_center_regrasp_probe)
 
-        self.assertEqual(source.count("required_contact_arm=stationary_arm"), 2)
+        self.assertEqual(source.count("required_contact_arm=stationary_arm"), 3)
         self.assertGreaterEqual(source.count("minimum_object_z="), 2)
         self.assertIn("require_bilateral_grasp=True", source)
         self.assertIn('safety_failure = "bilateral_grasp_loss"', source)
@@ -556,6 +556,15 @@ class CenterRegraspSequenceTests(unittest.TestCase):
         self.assertIn("center_support_keep_moving_gripper_closed", source)
         self.assertIn("moving_gripper_value = (", source)
         self.assertIn("else -1.0", source)
+
+    def test_support_transition_can_combine_descent_and_inset(self):
+        source = inspect.getsource(_center_regrasp_probe)
+
+        self.assertIn("center_support_combined_motion", source)
+        self.assertIn(
+            'f"lower_inset_{center_support_moving_arm}_under_object"',
+            source,
+        )
 
     def test_inchworm_extraction_can_reverse_toward_the_robot_base(self):
         direction = gate_module.resolve_inchworm_direction(
@@ -966,6 +975,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.center_support_descent_m, 0.12)
         self.assertAlmostEqual(args.center_support_inset_m, 0.04)
         self.assertFalse(args.center_support_keep_moving_gripper_closed)
+        self.assertFalse(args.center_support_combined_motion)
 
     def test_center_carry_speed_can_be_overridden_for_single_variable_probe(self):
         args = parse_args(
@@ -1009,6 +1019,7 @@ class JointSeedParserTests(unittest.TestCase):
                 "--center-support-inset-m",
                 "0.05",
                 "--center-support-keep-moving-gripper-closed",
+                "--center-support-combined-motion",
             ]
         )
 
@@ -1029,6 +1040,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.center_support_descent_m, 0.13)
         self.assertAlmostEqual(args.center_support_inset_m, 0.05)
         self.assertTrue(args.center_support_keep_moving_gripper_closed)
+        self.assertTrue(args.center_support_combined_motion)
 
 
 class OrientationCommandTests(unittest.TestCase):

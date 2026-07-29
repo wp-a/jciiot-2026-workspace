@@ -1822,6 +1822,7 @@ def _center_regrasp_probe(
     center_support_descent_m: float = 0.12,
     center_support_inset_m: float = 0.04,
     center_support_keep_moving_gripper_closed: bool = False,
+    center_support_combined_motion: bool = False,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import (
         OfficialScriptedGraspDriver,
@@ -3294,30 +3295,62 @@ def _center_regrasp_probe(
                                                 center_support_moving_arm: moving_gripper_value,
                                                 stationary_arm: 1.0,
                                             }
-                                            lower_targets = (
-                                                single_arm_under_support_targets(
-                                                    eef_positions(),
-                                                    moving_arm=(
-                                                        center_support_moving_arm
-                                                    ),
-                                                    separation_axis=separation_axis,
-                                                    descent_m=(
-                                                        center_support_descent_m
-                                                    ),
-                                                    inset_m=0.0,
+                                            if center_support_combined_motion:
+                                                combined_targets = (
+                                                    single_arm_under_support_targets(
+                                                        eef_positions(),
+                                                        moving_arm=(
+                                                            center_support_moving_arm
+                                                        ),
+                                                        separation_axis=(
+                                                            separation_axis
+                                                        ),
+                                                        descent_m=(
+                                                            center_support_descent_m
+                                                        ),
+                                                        inset_m=(
+                                                            center_support_inset_m
+                                                        ),
+                                                    )
                                                 )
-                                            )
-                                            lower_reached = execute_stage(
-                                                f"lower_{center_support_moving_arm}_for_support",
-                                                lower_targets,
-                                                max_steps=180,
-                                                gripper_value=gripper_commands,
-                                                minimum_object_z=(
-                                                    float(table_object_z) + 0.10
-                                                ),
-                                                required_contact_arm=stationary_arm,
-                                            )
-                                        if lower_reached:
+                                                lower_reached = execute_stage(
+                                                    f"lower_inset_{center_support_moving_arm}_under_object",
+                                                    combined_targets,
+                                                    max_steps=180,
+                                                    gripper_value=gripper_commands,
+                                                    minimum_object_z=(
+                                                        float(table_object_z) + 0.10
+                                                    ),
+                                                    required_contact_arm=stationary_arm,
+                                                )
+                                                inset_reached = lower_reached
+                                            else:
+                                                lower_targets = (
+                                                    single_arm_under_support_targets(
+                                                        eef_positions(),
+                                                        moving_arm=(
+                                                            center_support_moving_arm
+                                                        ),
+                                                        separation_axis=(
+                                                            separation_axis
+                                                        ),
+                                                        descent_m=(
+                                                            center_support_descent_m
+                                                        ),
+                                                        inset_m=0.0,
+                                                    )
+                                                )
+                                                lower_reached = execute_stage(
+                                                    f"lower_{center_support_moving_arm}_for_support",
+                                                    lower_targets,
+                                                    max_steps=180,
+                                                    gripper_value=gripper_commands,
+                                                    minimum_object_z=(
+                                                        float(table_object_z) + 0.10
+                                                    ),
+                                                    required_contact_arm=stationary_arm,
+                                                )
+                                        if lower_reached and not center_support_combined_motion:
                                             inset_targets = (
                                                 single_arm_under_support_targets(
                                                     eef_positions(),
@@ -3385,6 +3418,9 @@ def _center_regrasp_probe(
                                             "stationary_arm": stationary_arm,
                                             "moving_gripper_closed": bool(
                                                 center_support_keep_moving_gripper_closed
+                                            ),
+                                            "combined_motion": bool(
+                                                center_support_combined_motion
                                             ),
                                             "clearance_success": clearance_safe,
                                             "lower_success": lower_reached,
@@ -4171,6 +4207,9 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                         center_support_keep_moving_gripper_closed=(
                             args.center_support_keep_moving_gripper_closed
                         ),
+                        center_support_combined_motion=(
+                            args.center_support_combined_motion
+                        ),
                     )
                     if args.center_support_moving_arm != "none":
                         record["mode"] = "single_arm_under_support_probe"
@@ -4376,6 +4415,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--center-support-keep-moving-gripper-closed",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--center-support-combined-motion",
         action="store_true",
     )
     parser.add_argument("--align-closure-axes", action="store_true")
