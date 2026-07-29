@@ -95,3 +95,12 @@ the load while the moving hand changes position. The stage is accepted only if
 the final contact set includes an allowed hand, wrist, or distal-arm geometry;
 finger-only contact still does not count. Opening is deferred until measured
 support exists.
+
+The closed-gripper run retained object contact on both arms for 33 lowering
+steps and moved the right end effector down 0.069 m. The object remained 0.173 m
+above its table reference with zero collision, but the stationary arm's
+official complete-grasp boolean became false when one fingertip contact was
+lost. Four other stationary-arm contacts remained. The transition safety gate
+is therefore revised to require measured stationary-arm object contact and
+minimum height, rather than the stricter complete-grasp heuristic. The initial
+center grasp and hold still require the official bilateral grasp check.

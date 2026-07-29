@@ -54,3 +54,10 @@ The first valid run showed that opening the moving gripper immediately removes
 the bilateral load path: the stationary grasp failed after four lowering steps.
 Iteration 2 changes only the moving gripper command from open to closed during
 descent and inset. All geometry and safety parameters remain fixed.
+
+Iteration 2 retained multiple physical contacts on both arms and safe height,
+but stopped on the stationary arm's complete-grasp heuristic after one
+fingertip contact disappeared. Iteration 3 changes the transition early-stop
+gate from complete stationary grasp to measured stationary object contact.
+Collision and minimum-height gates remain unchanged, and final success still
+requires new non-finger support on the moving side.
