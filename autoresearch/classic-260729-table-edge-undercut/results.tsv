@@ -1,0 +1,2 @@
+iteration	above_clearance_m	clearance_success	outside_success	descent_success	undercut_success	support_success	support_steps	object_lift_m	collision_frames	pose_writes	attachment_calls	status
+0	0.15	false	false	false	false	false	0	0.000000	0	0	0	discard:initial right EEF plateaued at z=1.324 while the conservative clearance target was z=1.400; stopped before lateral motion
