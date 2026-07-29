@@ -954,15 +954,13 @@ def geometry_snapshot(raw_env, object_name: str) -> dict[str, Any]:
             continue
         lowered = name.lower()
         is_object = int(model.geom_bodyid[geom_id]) in object_bodies
-        is_support_link = any(
+        is_support_link = lowered.startswith("gripper0_") or any(
             token in lowered
             for token in (
                 "arm_5_collision",
                 "arm_6_collision",
                 "arm_5_left_collision",
                 "arm_6_left_collision",
-                "gripper0_right_hand_collision",
-                "gripper0_left_hand_collision",
             )
         )
         if not (is_object or is_support_link):

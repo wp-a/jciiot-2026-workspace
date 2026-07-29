@@ -12,6 +12,7 @@ from scripts.run_l1_cradle_gate import (
     cradle_gate_accepted,
     cradle_gate_failures,
     eef_site_pose,
+    geometry_snapshot,
     has_bilateral_object_contact,
     interior_joint_bounds,
     interpolate_directed_axis,
@@ -79,6 +80,11 @@ VALID_JOINT_SEED_RECORD = {
 
 
 class L1CradleGateTests(unittest.TestCase):
+    def test_geometry_snapshot_includes_all_gripper_geometries(self):
+        source = inspect.getsource(geometry_snapshot)
+
+        self.assertIn('lowered.startswith("gripper0_")', source)
+
     def test_gate_accepts_only_complete_physical_evidence(self):
         self.assertTrue(cradle_gate_accepted(VALID_RECORD))
         self.assertEqual(cradle_gate_failures(VALID_RECORD), [])
