@@ -266,8 +266,9 @@ def forward_carry_target(
     base_xy: object,
     object_xy: object,
     distance_m: float,
+    toward_object: bool = True,
 ) -> np.ndarray:
-    """Return a base waypoint the requested distance toward the object."""
+    """Return a base waypoint along or opposite the base-to-object axis."""
     base = np.asarray(base_xy, dtype=float).reshape(2)
     target = np.asarray(object_xy, dtype=float).reshape(2)
     if not np.all(np.isfinite(base)) or not np.all(np.isfinite(target)):
@@ -281,6 +282,8 @@ def forward_carry_target(
     direction_norm = float(np.linalg.norm(direction))
     if direction_norm <= 1e-12:
         raise ValueError("base and object positions must differ")
+    if not toward_object:
+        direction = -direction
     return base + direction * (distance / direction_norm)
 
 
@@ -1781,6 +1784,7 @@ def _center_regrasp_probe(
     orientation_joint_seed_torso_margin_m: float = 0.005,
     center_carry_distance_m: float = 0.0,
     center_carry_max_linear: float = 0.04,
+    center_carry_away_from_object: bool = False,
     center_carry_corner_seat_m: float = 0.0,
     center_carry_arm_stroke_m: float = 0.0,
     center_carry_arm_stroke_lift_m: float = 0.0,
@@ -3545,6 +3549,9 @@ def _center_regrasp_probe(
                                             base_xy=transport_start_base_xy,
                                             object_xy=transport_start_object_xy,
                                             distance_m=center_carry_distance_m,
+                                            toward_object=(
+                                                not center_carry_away_from_object
+                                            ),
                                         )
                                         control_dt = 0.05
                                         max_linear = float(center_carry_max_linear)
@@ -3795,6 +3802,9 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                         ),
                         center_carry_distance_m=args.center_carry_distance_m,
                         center_carry_max_linear=args.center_carry_max_linear,
+                        center_carry_away_from_object=(
+                            args.center_carry_away_from_object
+                        ),
                         center_carry_corner_seat_m=args.center_carry_corner_seat_m,
                         center_carry_arm_stroke_m=args.center_carry_arm_stroke_m,
                         center_carry_arm_stroke_lift_m=(
@@ -3966,6 +3976,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--regrasp-base-advance-m", type=float, default=0.0)
     parser.add_argument("--center-carry-distance-m", type=float, default=0.0)
     parser.add_argument("--center-carry-max-linear", type=float, default=0.04)
+    parser.add_argument("--center-carry-away-from-object", action="store_true")
     parser.add_argument("--center-carry-corner-seat-m", type=float, default=0.0)
     parser.add_argument("--center-carry-arm-stroke-m", type=float, default=0.0)
     parser.add_argument(

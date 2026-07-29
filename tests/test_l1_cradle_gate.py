@@ -313,6 +313,16 @@ class CenterGraspTransportTests(unittest.TestCase):
 
         np.testing.assert_allclose(target, [7.8, 4.6])
 
+    def test_forward_carry_target_can_retreat_from_object_for_physical_pull(self):
+        target = gate_module.forward_carry_target(
+            base_xy=np.array([8.0, 4.6]),
+            object_xy=np.array([7.0, 4.6]),
+            distance_m=0.2,
+            toward_object=False,
+        )
+
+        np.testing.assert_allclose(target, [8.2, 4.6])
+
     def test_zero_carry_distance_keeps_current_base_position(self):
         target = gate_module.forward_carry_target(
             base_xy=np.array([8.0, 4.6]),
@@ -879,6 +889,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.orientation_joint_seed_torso_margin_m, 0.005)
         self.assertAlmostEqual(args.regrasp_base_advance_m, 0.0)
         self.assertAlmostEqual(args.center_carry_distance_m, 0.0)
+        self.assertFalse(args.center_carry_away_from_object)
         self.assertAlmostEqual(args.center_carry_max_linear, 0.04)
         self.assertAlmostEqual(args.center_carry_corner_seat_m, 0.0)
         self.assertAlmostEqual(args.center_carry_arm_stroke_m, 0.0)
@@ -900,6 +911,7 @@ class JointSeedParserTests(unittest.TestCase):
                 "/tmp/trajectory.json",
                 "--center-carry-max-linear",
                 "0.005",
+                "--center-carry-away-from-object",
                 "--center-carry-corner-seat-m",
                 "0.08",
                 "--center-carry-arm-stroke-m",
@@ -915,6 +927,7 @@ class JointSeedParserTests(unittest.TestCase):
         )
 
         self.assertAlmostEqual(args.center_carry_max_linear, 0.005)
+        self.assertTrue(args.center_carry_away_from_object)
         self.assertAlmostEqual(args.center_carry_corner_seat_m, 0.08)
         self.assertAlmostEqual(args.center_carry_arm_stroke_m, 0.07)
         self.assertAlmostEqual(args.center_carry_arm_stroke_lift_m, 0.04)

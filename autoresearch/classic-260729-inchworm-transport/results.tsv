@@ -7,3 +7,4 @@ iteration	variant	arm_stroke_m	arm_lift_m	projected_object_progress_m	lateral_ob
 6	repeating-controller-before-terminal-stop	0.08	dynamic	0.138252	0.005252	0.08	0.223982	-	0.027240	false	true	0	discard:two full cycles passed, but unnecessary third reset lost right contact after target
 7	terminal-stop-at-measured-target	0.08	dynamic	0.142747	0.000920	0.08	0.159989	-	0.027240	true	true	0	keep:0.12 m target passed with two full resets and final arm stroke
 8	short-reset-repeating-controller	0.08	dynamic	0.226583	0.000053	0.06	0.179990	-	0.022896	true	true	0	keep:0.20 m target passed with three full resets and final arm stroke
+9	toward-base-inchworm-extraction	0.08	dynamic	0.100188	0.001396	0.06	0.060000	-	0.016239	false	false	0	discard:first macro passed; second arm lost left contact and object dropped
