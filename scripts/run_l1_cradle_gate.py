@@ -2270,34 +2270,51 @@ def _table_edge_undercut_probe(
         hold_targets["torso"] = np.array([target_torso], dtype=float)
         fork_lift_target = right_eef_position().copy()
         fork_lift_target[2] += requested_raise
+        driver = OfficialPhysicalCarryDriver()
+        control_dt = 0.05
+        maximum_base_correction_speed = 0.02
+        maximum_base_correction_distance = 0.04
+        base_correction_start = np.asarray(backend.get_base_pose()[0], dtype=float)
         safety_failure = None
         stable_support_steps = 0
         target_reached_steps = 0
+        support_active = False
         success = False
         for local_step in range(240):
-            robot.composite_controller.update_state()
             current_eef = right_eef_position()
-            controller_delta = helpers["world_delta"](
-                robot,
-                "right",
-                fork_lift_target - current_eef,
+            commanded_torso = min(
+                target_torso,
+                start_torso + 0.003 * float(local_step + 1),
             )
-            arm_action = helpers["arm_action"](
-                robot,
-                "right",
-                controller_delta,
-                0.12,
+            hold_targets["torso"] = np.array([commanded_torso], dtype=float)
+            planar_error = fork_lift_target[:2] - current_eef[:2]
+            planar_error_norm = float(np.linalg.norm(planar_error))
+            if support_active:
+                base_world_velocity = np.zeros(2, dtype=float)
+            elif planar_error_norm > maximum_base_correction_speed * control_dt:
+                base_world_velocity = (
+                    planar_error
+                    / planar_error_norm
+                    * maximum_base_correction_speed
+                )
+            else:
+                base_world_velocity = planar_error / control_dt
+            _, base_yaw = backend.get_base_pose()
+            base_velocity = world_velocity_to_base_frame(
+                base_world_velocity,
+                base_yaw,
             )
-            action = helpers["build_action"](
-                robot,
-                arm_actions={"right": arm_action},
-                gripper_value=-1.0,
+            step_info = driver.step(
+                backend,
+                object_name=object_name,
+                base_command=np.array(
+                    [base_velocity[0], base_velocity[1], 0.0], dtype=float
+                ),
                 hold_targets=hold_targets,
+                arm_world_deltas={"right": fork_lift_target - current_eef},
+                gripper_value=-1.0,
+                base_control_dt=control_dt,
             )
-            _, _, _, info = raw_env.step(action)
-            recorder = getattr(backend, "_record_trajectory_frame", None)
-            if callable(recorder):
-                recorder(_env=raw_env)
             measured_torso = torso_position()
             measured_eef = right_eef_position()
             object_position = np.asarray(
@@ -2308,6 +2325,7 @@ def _table_edge_undercut_probe(
             right_support = any(
                 is_right_support(name) for name in contacts["right"]
             )
+            support_active = right_support
             invalid_right_contact = any(
                 not is_right_support(name) for name in contacts["right"]
             )
@@ -2329,17 +2347,26 @@ def _table_edge_undercut_probe(
                 if torso_reached and fork_reached
                 else 0
             )
-            collision = bool((info or {}).get("has_judge_collision", False))
+            collision = bool(step_info.get("collision", False))
             collision_steps += int(collision)
+            base_correction_distance = float(
+                np.linalg.norm(
+                    np.asarray(backend.get_base_pose()[0], dtype=float)
+                    - base_correction_start
+                )
+            )
             observations.append(
                 {
                     "stage": stage,
                     "step": local_step + 1,
                     "start_torso_position": start_torso,
                     "target_torso_position": target_torso,
+                    "commanded_torso_position": commanded_torso,
                     "torso_position": measured_torso,
                     "target_eef_position": fork_lift_target.tolist(),
                     "eef_position": measured_eef.tolist(),
+                    "base_world_velocity": base_world_velocity.tolist(),
+                    "base_correction_distance_m": base_correction_distance,
                     "object_position": object_position.tolist(),
                     "object_lift_m": object_lift_m,
                     "contacts": {
@@ -2355,6 +2382,9 @@ def _table_edge_undercut_probe(
                 break
             if contacts["left"] or invalid_right_contact:
                 safety_failure = "unsafe_object_contact"
+                break
+            if base_correction_distance > maximum_base_correction_distance:
+                safety_failure = "base_correction_limit"
                 break
             if stable_support_steps >= 5:
                 success = True
@@ -2418,11 +2448,10 @@ def _table_edge_undercut_probe(
             base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
             translation = float(np.linalg.norm(base_xy - segment_start_xy))
             remaining = max(0.0, requested_distance - translation)
-            if geometry_ready:
-                success = True
-                break
             if remaining <= 1e-6:
-                safety_failure = "bottom_overlap_not_reached"
+                success = geometry_ready
+                if not success:
+                    safety_failure = "bottom_overlap_not_reached"
                 break
             object_xy = np.asarray(
                 raw_env.sim.data.body_xpos[body_id][:2], dtype=float
@@ -2486,6 +2515,9 @@ def _table_edge_undercut_probe(
                 break
             if unsafe_object_contact:
                 safety_failure = "unsafe_object_contact"
+                break
+            if contacts["right"] and geometry_ready:
+                success = True
                 break
         final_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
         final_translation = float(
