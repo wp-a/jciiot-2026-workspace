@@ -268,6 +268,29 @@ def normalized_osc_orientation_command(
     return command
 
 
+def scheduled_orientation_action_limit(
+    *,
+    error_deg: float,
+    coarse_action: float,
+    fine_action: float,
+    fine_threshold_deg: float,
+) -> float:
+    """Select a per-arm fine action limit near the orientation target."""
+    error = float(error_deg)
+    coarse = float(coarse_action)
+    fine = float(fine_action)
+    threshold = float(fine_threshold_deg)
+    if not all(np.isfinite(value) for value in (error, coarse, fine, threshold)):
+        raise ValueError("orientation schedule values must be finite")
+    if error < 0.0 or threshold < 0.0:
+        raise ValueError("orientation errors and thresholds must be non-negative")
+    if coarse <= 0.0 or coarse > 1.0:
+        raise ValueError("coarse_action must be in (0, 1]")
+    if fine <= 0.0 or fine > coarse:
+        raise ValueError("fine_action must be in (0, coarse_action]")
+    return fine if error <= threshold else coarse
+
+
 _ORIENTATION_REQUIRED_FIELDS = (
     "orientation_right_error_deg",
     "orientation_left_error_deg",
@@ -1052,6 +1075,8 @@ def _center_regrasp_probe(
     hold_steps: int,
     align_closure_axes: bool,
     orientation_max_action: float,
+    orientation_fine_max_action: float | None,
+    orientation_fine_threshold_deg: float,
     orientation_tolerance_deg: float,
     orientation_stable_steps: int,
     orientation_max_steps: int,
@@ -1136,6 +1161,7 @@ def _center_regrasp_probe(
             }
             arm_actions = {}
             orientation_actions = {}
+            orientation_action_limits = {}
             for arm in ("right", "left"):
                 controller = robot.part_controllers[arm]
                 controller_delta = helpers["world_delta"](
@@ -1150,6 +1176,18 @@ def _center_regrasp_probe(
                     0.30,
                 )
                 closure_axis = current_orientations[arm][:, 0]
+                current_error = closure_axis_error_degrees(
+                    closure_axis,
+                    target_axis,
+                )
+                action_limit = float(orientation_max_action)
+                if orientation_fine_max_action is not None:
+                    action_limit = scheduled_orientation_action_limit(
+                        error_deg=current_error,
+                        coarse_action=orientation_max_action,
+                        fine_action=orientation_fine_max_action,
+                        fine_threshold_deg=orientation_fine_threshold_deg,
+                    )
                 world_rotation_delta = minimum_undirected_axis_rotation(
                     closure_axis,
                     target_axis,
@@ -1159,11 +1197,12 @@ def _center_regrasp_probe(
                     controller_origin_rotation=controller_origin_rotation(arm),
                     output_min=controller.output_min,
                     output_max=controller.output_max,
-                    max_action=orientation_max_action,
+                    max_action=action_limit,
                 )
                 arm_action[3:6] = orientation_action
                 arm_actions[arm] = arm_action
                 orientation_actions[arm] = orientation_action
+                orientation_action_limits[arm] = action_limit
             action = helpers["build_action"](
                 robot,
                 arm_actions=arm_actions,
@@ -1238,6 +1277,7 @@ def _center_regrasp_probe(
                         arm: orientation_actions[arm].tolist()
                         for arm in ("right", "left")
                     },
+                    "orientation_action_limits": orientation_action_limits,
                     "orientation_errors_deg": errors,
                     "position_drift_m": position_drift,
                     "orientation_stable_steps": int(state["stable_steps"]),
@@ -1775,6 +1815,12 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                         hold_steps=args.hold_steps,
                         align_closure_axes=args.align_closure_axes,
                         orientation_max_action=args.orientation_max_action,
+                        orientation_fine_max_action=(
+                            args.orientation_fine_max_action
+                        ),
+                        orientation_fine_threshold_deg=(
+                            args.orientation_fine_threshold_deg
+                        ),
                         orientation_tolerance_deg=args.orientation_tolerance_deg,
                         orientation_stable_steps=args.orientation_stable_steps,
                         orientation_max_steps=args.orientation_max_steps,
@@ -1878,6 +1924,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--regrasp-wall-squeeze-m", type=float, default=0.025)
     parser.add_argument("--align-closure-axes", action="store_true")
     parser.add_argument("--orientation-max-action", type=float, default=0.30)
+    parser.add_argument("--orientation-fine-max-action", type=float)
+    parser.add_argument(
+        "--orientation-fine-threshold-deg",
+        type=float,
+        default=0.0,
+    )
     parser.add_argument("--orientation-tolerance-deg", type=float, default=5.0)
     parser.add_argument("--orientation-stable-steps", type=int, default=5)
     parser.add_argument("--orientation-max-steps", type=int, default=160)

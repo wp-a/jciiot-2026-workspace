@@ -17,6 +17,7 @@ from scripts.run_l1_cradle_gate import (
     orientation_alignment_failures,
     push_gate_accepted,
     push_gate_failures,
+    scheduled_orientation_action_limit,
 )
 
 
@@ -194,6 +195,45 @@ class OrientationCommandTests(unittest.TestCase):
         common["world_rotation_delta"] = np.full((3, 3), float("nan"))
         with self.assertRaises(ValueError):
             normalized_osc_orientation_command(**common)
+
+    def test_orientation_action_schedule_slows_each_arm_near_target(self):
+        self.assertAlmostEqual(
+            scheduled_orientation_action_limit(
+                error_deg=15.01,
+                coarse_action=0.02,
+                fine_action=0.005,
+                fine_threshold_deg=15.0,
+            ),
+            0.02,
+        )
+        self.assertAlmostEqual(
+            scheduled_orientation_action_limit(
+                error_deg=15.0,
+                coarse_action=0.02,
+                fine_action=0.005,
+                fine_threshold_deg=15.0,
+            ),
+            0.005,
+        )
+
+    def test_orientation_action_schedule_rejects_invalid_limits(self):
+        invalid = (
+            {"error_deg": float("nan")},
+            {"coarse_action": 0.0},
+            {"fine_action": 0.03},
+            {"fine_threshold_deg": -1.0},
+        )
+        common = {
+            "error_deg": 10.0,
+            "coarse_action": 0.02,
+            "fine_action": 0.005,
+            "fine_threshold_deg": 15.0,
+        }
+        for override in invalid:
+            with self.subTest(override=override):
+                values = {**common, **override}
+                with self.assertRaises(ValueError):
+                    scheduled_orientation_action_limit(**values)
 
 
 class EefSitePoseTests(unittest.TestCase):
