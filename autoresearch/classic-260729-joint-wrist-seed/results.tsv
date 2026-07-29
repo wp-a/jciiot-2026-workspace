@@ -1,0 +1,5 @@
+iteration	variant	seed	margin_rad	regularization	position_scale_m	solver_success	solver_nfev	joint_seed_accepted	right_seed_error_deg	left_seed_error_deg	endpoint_position_error_m	path_drift_m	joint_seed_collision_frames	orientation_accepted	right_orientation_error_deg	left_orientation_error_deg	bilateral_contact	lift_m	accepted	failure_stage	elapsed_s	status
+1	default	0	0.03	0.02	0.01	true	24	false	7.524935	11.102042	0.004269	0.0	0	false	NA	NA	false	0.0	false	joint_space_wrist_seed	44.576718	discard
+2	margin-001	0	0.01	0.02	0.01	true	38	false	7.204739	10.826973	0.004255	0.0	0	false	NA	NA	false	0.0	false	joint_space_wrist_seed	44.319787	discard
+3	position-scale-015	0	0.01	0.02	0.015	true	37	false	6.896174	10.346423	0.009135	0.0	0	false	NA	NA	false	0.0	false	joint_space_wrist_seed	43.900803	discard
+4	position-scale-020	0	0.01	0.02	0.020	true	39	false	6.505827	9.744096	0.015265	0.0	0	false	NA	NA	false	0.0	false	joint_space_wrist_seed	43.874562	discard
