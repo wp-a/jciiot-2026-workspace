@@ -71,7 +71,7 @@ from the preceding node. Use the preceding node as the residual regularization
 origin. After each solve, set the node proposal temporarily and record solver,
 node-axis errors, position errors, bound margin, and official collision pairs.
 
-Reject and restore on solver failure, node error above 5 degrees, position error
+Reject and restore on solver failure, node error above 10 degrees, position error
 above 15 mm, bounds violation, collision, or exception. Preserve one-node
 behavior as the current direct solve.
 

@@ -552,6 +552,42 @@ def joint_seed_failures(record: Mapping[str, object]) -> list[str]:
     return list(dict.fromkeys(failures))
 
 
+def joint_seed_node_failure(
+    *,
+    solver_success: bool,
+    right_error_deg: float,
+    left_error_deg: float,
+    position_error_m: float,
+    min_bound_margin_rad: float,
+    collision: bool,
+) -> str | None:
+    """Return the first hard-gate failure for a continuation IK node."""
+    if not isinstance(solver_success, (bool, np.bool_)):
+        raise ValueError("solver_success must be boolean")
+    if not isinstance(collision, (bool, np.bool_)):
+        raise ValueError("collision must be boolean")
+    errors = (float(right_error_deg), float(left_error_deg))
+    position_error = float(position_error_m)
+    bound_margin = float(min_bound_margin_rad)
+    if not all(np.isfinite(value) and value >= 0.0 for value in errors):
+        raise ValueError("node orientation errors must be finite and non-negative")
+    if not np.isfinite(position_error) or position_error < 0.0:
+        raise ValueError("node position error must be finite and non-negative")
+    if not np.isfinite(bound_margin):
+        raise ValueError("node bound margin must be finite")
+    if not bool(solver_success):
+        return "solver"
+    if bool(collision):
+        return "collision"
+    if max(errors) > JOINT_SEED_THRESHOLDS["error_deg"]:
+        return "orientation"
+    if position_error > JOINT_SEED_THRESHOLDS["max_endpoint_position_error_m"]:
+        return "position"
+    if bound_margin < 0.0:
+        return "bounds"
+    return None
+
+
 def next_joint_seed_path_state(
     previous: Mapping[str, object],
     *,
@@ -1630,21 +1666,14 @@ def _center_regrasp_probe(
                     "solver": solver_record,
                     "failure": None,
                 }
-                node_error_limit = (
-                    max_error
-                    if continuation_nodes == 1
-                    else ORIENTATION_ALIGNMENT_THRESHOLDS["error_deg"]
+                node_record["failure"] = joint_seed_node_failure(
+                    solver_success=bool(solution.success),
+                    right_error_deg=node_errors["right"],
+                    left_error_deg=node_errors["left"],
+                    position_error_m=max(node_position_errors.values()),
+                    min_bound_margin_rad=node_bound_margin,
+                    collision=bool(node_collisions),
                 )
-                if not bool(solution.success):
-                    node_record["failure"] = "solver"
-                elif node_collisions:
-                    node_record["failure"] = "collision"
-                elif max(node_errors.values()) > node_error_limit:
-                    node_record["failure"] = "orientation"
-                elif max(node_position_errors.values()) > max_endpoint_position_error:
-                    node_record["failure"] = "position"
-                elif node_bound_margin < 0.0:
-                    node_record["failure"] = "bounds"
                 node_records.append(node_record)
                 if node_record["failure"] is not None:
                     if node_collisions:

@@ -13,6 +13,7 @@ from scripts.run_l1_cradle_gate import (
     interior_joint_bounds,
     interpolate_directed_axis,
     joint_seed_failures,
+    joint_seed_node_failure,
     joint_seed_objective_residual,
     minimum_undirected_axis_rotation,
     nearest_directed_axis_target,
@@ -494,6 +495,41 @@ class OrientationAlignmentGateTests(unittest.TestCase):
 
 
 class JointSeedGateTests(unittest.TestCase):
+    def test_joint_seed_node_uses_the_endpoint_orientation_gate(self):
+        self.assertIsNone(
+            joint_seed_node_failure(
+                solver_success=True,
+                right_error_deg=2.71,
+                left_error_deg=5.94,
+                position_error_m=0.008,
+                min_bound_margin_rad=0.0,
+                collision=False,
+            )
+        )
+
+    def test_joint_seed_node_reports_the_first_failed_condition(self):
+        common = {
+            "solver_success": True,
+            "right_error_deg": 2.0,
+            "left_error_deg": 3.0,
+            "position_error_m": 0.008,
+            "min_bound_margin_rad": 0.0,
+            "collision": False,
+        }
+        failures = (
+            ({"solver_success": False}, "solver"),
+            ({"collision": True}, "collision"),
+            ({"left_error_deg": 10.01}, "orientation"),
+            ({"position_error_m": 0.0151}, "position"),
+            ({"min_bound_margin_rad": -0.0001}, "bounds"),
+        )
+        for override, expected in failures:
+            with self.subTest(expected=expected):
+                self.assertEqual(
+                    joint_seed_node_failure(**{**common, **override}),
+                    expected,
+                )
+
     def test_joint_seed_gate_accepts_complete_bounded_evidence(self):
         self.assertEqual(joint_seed_failures(VALID_JOINT_SEED_RECORD), [])
 
