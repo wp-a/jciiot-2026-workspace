@@ -3261,12 +3261,24 @@ def _table_edge_undercut_probe(
                 not inset_success
                 and inset_stage.get("safety_failure") == "timeout"
                 and not any(object_robot_contacts(raw_env, object_name).values())
-                and inset_progress_m >= 0.04
+                and (
+                    inset_progress_m >= 0.04
+                    or (
+                        float(post_inset_base_advance_m) > 0.0
+                        and post_inset_world_direction_x is not None
+                        and post_inset_world_direction_y is not None
+                        and right_eef_position()[2] <= start_object[2] - 0.12
+                    )
+                )
             ):
                 inset_success = True
                 inset_stage["success"] = True
                 inset_stage["safety_failure"] = None
-                inset_stage["success_source"] = "safe_unrotated_inset_plateau"
+                inset_stage["success_source"] = (
+                    "safe_unrotated_inset_plateau"
+                    if inset_progress_m >= 0.04
+                    else "safe_unrotated_base_assisted_inset"
+                )
             insertion_geometry = geometry_snapshot(raw_env, object_name)
             geometry_ready = open_fork_under_bottom_support_ready(
                 insertion_geometry,
