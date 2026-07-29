@@ -13,6 +13,7 @@ from scripts.run_l1_cradle_gate import (
     interior_joint_bounds,
     interpolate_directed_axis,
     joint_seed_failures,
+    joint_seed_joint_names,
     joint_seed_node_failure,
     joint_seed_objective_residual,
     minimum_undirected_axis_rotation,
@@ -146,6 +147,25 @@ class L1PhysicalPushGateTests(unittest.TestCase):
 
 
 class JointSeedMathTests(unittest.TestCase):
+    def test_joint_seed_joint_names_append_only_the_official_torso_joint(self):
+        arms_only = joint_seed_joint_names(include_torso=False)
+        with_torso = joint_seed_joint_names(include_torso=True)
+
+        self.assertEqual(len(arms_only), 12)
+        self.assertEqual(
+            arms_only[:6],
+            tuple(f"robot0_arm_right_{index}_joint" for index in range(1, 7)),
+        )
+        self.assertEqual(
+            arms_only[6:],
+            tuple(f"robot0_arm_left_{index}_joint" for index in range(1, 7)),
+        )
+        self.assertEqual(with_torso, (*arms_only, "robot0_torso_lift_joint"))
+
+    def test_joint_seed_joint_names_require_a_boolean_option(self):
+        with self.assertRaises(ValueError):
+            joint_seed_joint_names(include_torso=1)
+
     def test_allocate_segment_steps_preserves_total_and_balance(self):
         allocation = allocate_segment_steps(total_steps=10, segment_count=3)
 
@@ -328,6 +348,8 @@ class JointSeedParserTests(unittest.TestCase):
             0.015,
         )
         self.assertEqual(args.orientation_joint_seed_continuation_nodes, 1)
+        self.assertFalse(args.orientation_joint_seed_include_torso)
+        self.assertAlmostEqual(args.orientation_joint_seed_torso_margin_m, 0.005)
 
 
 class OrientationCommandTests(unittest.TestCase):

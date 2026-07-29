@@ -150,6 +150,20 @@ def push_gate_accepted(record: Mapping[str, object]) -> bool:
     return not push_gate_failures(record)
 
 
+def joint_seed_joint_names(*, include_torso: bool) -> tuple[str, ...]:
+    """Return the ordered Tiago joints controlled by the wrist seed solver."""
+    if not isinstance(include_torso, (bool, np.bool_)):
+        raise ValueError("include_torso must be boolean")
+    names = tuple(
+        f"robot0_arm_{arm}_{index}_joint"
+        for arm in ("right", "left")
+        for index in range(1, 7)
+    )
+    if bool(include_torso):
+        names = (*names, "robot0_torso_lift_joint")
+    return names
+
+
 def allocate_segment_steps(*, total_steps: int, segment_count: int) -> tuple[int, ...]:
     """Distribute a fixed positive waypoint budget across path segments."""
     if (
@@ -1403,6 +1417,8 @@ def _center_regrasp_probe(
         JOINT_SEED_THRESHOLDS["max_endpoint_position_error_m"]
     ),
     orientation_joint_seed_continuation_nodes: int = 1,
+    orientation_joint_seed_include_torso: bool = False,
+    orientation_joint_seed_torso_margin_m: float = 0.005,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import (
         OfficialScriptedGraspDriver,
@@ -1447,11 +1463,10 @@ def _center_regrasp_probe(
         arms = ("right", "left")
         model = raw_env.sim.model
         data = raw_env.sim.data
-        joint_names = [
-            f"robot0_arm_{arm}_{index}_joint"
-            for arm in arms
-            for index in range(1, 7)
-        ]
+        include_torso = bool(orientation_joint_seed_include_torso)
+        joint_names = list(
+            joint_seed_joint_names(include_torso=include_torso)
+        )
         joint_ids = [model.joint_name2id(name) for name in joint_names]
         qpos_addrs = [model.get_joint_qpos_addr(name) for name in joint_names]
         if any(isinstance(address, tuple) for address in qpos_addrs):
@@ -1464,11 +1479,21 @@ def _center_regrasp_probe(
             [model.jnt_range[joint_id][1] for joint_id in joint_ids],
             dtype=float,
         )
-        lower, upper = interior_joint_bounds(
-            official_lower,
-            official_upper,
+        arm_lower, arm_upper = interior_joint_bounds(
+            official_lower[:12],
+            official_upper[:12],
             margin_rad=orientation_joint_seed_margin_rad,
         )
+        if include_torso:
+            torso_lower, torso_upper = interior_joint_bounds(
+                official_lower[12:],
+                official_upper[12:],
+                margin_rad=orientation_joint_seed_torso_margin_m,
+            )
+            lower = np.concatenate([arm_lower, torso_lower])
+            upper = np.concatenate([arm_upper, torso_upper])
+        else:
+            lower, upper = arm_lower, arm_upper
         start = np.asarray(data.qpos[qpos_addrs], dtype=float).copy()
         start_poses = alignment_eef_poses()
         start_positions = {arm: start_poses[arm][0] for arm in arms}
@@ -1527,6 +1552,15 @@ def _center_regrasp_probe(
             "rolled_back": False,
             "controller_synchronized": False,
             "joint_names": joint_names,
+            "include_torso": include_torso,
+            "arm_margin_rad": float(orientation_joint_seed_margin_rad),
+            "torso_margin_m": (
+                float(orientation_joint_seed_torso_margin_m)
+                if include_torso
+                else None
+            ),
+            "initial_torso_joint_m": float(start[-1]) if include_torso else None,
+            "refreshed_torso_hold_target": None,
             "start_joints": start.tolist(),
             "target_joints": None,
             "official_lower_bounds": official_lower.tolist(),
@@ -1915,6 +1949,15 @@ def _center_regrasp_probe(
         else:
             synchronize_controller_goals(robot)
             summary["controller_synchronized"] = True
+            if include_torso:
+                refreshed_holds = helpers["capture_hold_targets"](robot)
+                hold_targets["torso"] = np.asarray(
+                    refreshed_holds["torso"],
+                    dtype=float,
+                ).copy()
+                summary["refreshed_torso_hold_target"] = hold_targets[
+                    "torso"
+                ].tolist()
             summary["success"] = True
         stage_results.append({"stage": "joint_space_wrist_seed", **summary})
         return summary
@@ -2673,6 +2716,12 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                         orientation_joint_seed_continuation_nodes=(
                             args.orientation_joint_seed_continuation_nodes
                         ),
+                        orientation_joint_seed_include_torso=(
+                            args.orientation_joint_seed_include_torso
+                        ),
+                        orientation_joint_seed_torso_margin_m=(
+                            args.orientation_joint_seed_torso_margin_m
+                        ),
                     )
                     record["mode"] = "table_assisted_center_regrasp"
                     record["physical_grasp"] = bool(probe.get("success", False))
@@ -2863,6 +2912,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--orientation-joint-seed-continuation-nodes",
         type=int,
         default=1,
+    )
+    parser.add_argument(
+        "--orientation-joint-seed-include-torso",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--orientation-joint-seed-torso-margin-m",
+        type=float,
+        default=0.005,
     )
     parser.add_argument("--physical-push", action="store_true")
     parser.add_argument("--push-distance-m", type=float, default=0.50)
