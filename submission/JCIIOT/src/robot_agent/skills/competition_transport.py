@@ -94,6 +94,47 @@ def bounded_symmetric_cradle_deltas(
     }
 
 
+def single_arm_under_support_targets(
+    current_positions: Mapping[str, np.ndarray],
+    *,
+    moving_arm: str,
+    separation_axis,
+    descent_m: float,
+    inset_m: float,
+) -> dict[str, np.ndarray]:
+    """Move one arm down and toward the measured midpoint of the two arms."""
+    if moving_arm not in ("right", "left"):
+        raise ValueError("moving_arm must be 'right' or 'left'")
+    positions = {
+        arm: np.asarray(current_positions[arm], dtype=float).reshape(3).copy()
+        for arm in ("right", "left")
+    }
+    if any(not np.all(np.isfinite(position)) for position in positions.values()):
+        raise ValueError("current_positions must be finite")
+    axis = np.asarray(separation_axis, dtype=float).reshape(3)
+    axis_norm = float(np.linalg.norm(axis))
+    if not np.all(np.isfinite(axis)) or axis_norm == 0.0:
+        raise ValueError("separation_axis must be finite and non-zero")
+    axis = axis / axis_norm
+    descent = float(descent_m)
+    inset = float(inset_m)
+    if not np.isfinite(descent) or descent < 0.0:
+        raise ValueError("descent_m must be finite and non-negative")
+    if not np.isfinite(inset) or inset < 0.0:
+        raise ValueError("inset_m must be finite and non-negative")
+
+    midpoint_projection = 0.5 * sum(
+        float(np.dot(position, axis)) for position in positions.values()
+    )
+    moving_projection = float(np.dot(positions[moving_arm], axis))
+    side = float(np.sign(moving_projection - midpoint_projection))
+    if side == 0.0 and inset > 0.0:
+        raise ValueError("moving arm must differ from the arm midpoint")
+    positions[moving_arm] -= axis * side * inset
+    positions[moving_arm][2] -= descent
+    return positions
+
+
 def _cradle_result(
     *,
     success: bool,

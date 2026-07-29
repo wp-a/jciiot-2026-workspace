@@ -138,6 +138,57 @@ class PhysicalTransportGeometryTests(unittest.TestCase):
 
         self.assertLessEqual(float(np.linalg.norm(target)), 0.006 + 1e-12)
 
+    def test_single_arm_under_support_target_descends_and_moves_toward_midpoint(self):
+        module = load_module()
+        current = {
+            "right": np.array([7.25, 4.82, 1.36]),
+            "left": np.array([7.25, 4.42, 1.36]),
+        }
+
+        right_targets = module.single_arm_under_support_targets(
+            current,
+            moving_arm="right",
+            separation_axis=np.array([0.0, 1.0, 0.0]),
+            descent_m=0.12,
+            inset_m=0.06,
+        )
+        left_targets = module.single_arm_under_support_targets(
+            current,
+            moving_arm="left",
+            separation_axis=np.array([0.0, 1.0, 0.0]),
+            descent_m=0.12,
+            inset_m=0.06,
+        )
+
+        np.testing.assert_allclose(right_targets["right"], [7.25, 4.76, 1.24])
+        np.testing.assert_allclose(right_targets["left"], current["left"])
+        np.testing.assert_allclose(left_targets["left"], [7.25, 4.48, 1.24])
+        np.testing.assert_allclose(left_targets["right"], current["right"])
+
+    def test_single_arm_under_support_target_rejects_invalid_geometry(self):
+        module = load_module()
+        current = {"right": np.ones(3), "left": np.zeros(3)}
+
+        invalid_cases = (
+            {"moving_arm": "middle"},
+            {"separation_axis": np.zeros(3)},
+            {"descent_m": -0.01},
+            {"inset_m": -0.01},
+            {"separation_axis": np.array([0.0, np.nan, 0.0])},
+        )
+        defaults = {
+            "moving_arm": "right",
+            "separation_axis": np.array([0.0, 1.0, 0.0]),
+            "descent_m": 0.12,
+            "inset_m": 0.06,
+        }
+        for override in invalid_cases:
+            with self.subTest(override=override), self.assertRaises(ValueError):
+                module.single_arm_under_support_targets(
+                    current,
+                    **{**defaults, **override},
+                )
+
 
 class FakePhysicalTransportDriver:
     def __init__(
