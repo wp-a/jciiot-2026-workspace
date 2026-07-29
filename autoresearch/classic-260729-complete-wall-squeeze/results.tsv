@@ -1,1 +1,5 @@
 iteration	variant	seed	squeeze_m	squeeze_steps	squeeze_success	final_squeeze_contacts	grasp_contact_steps	lift_m	hold_contact_steps	collision_frames	accepted	failure_stage	elapsed_s	status
+1	complete-squeeze-025	0	0.025	10	true	left:left_inner_knuckle|right:left_inner_knuckle	0	0.0	0	0	false	close_center_grasp	66.770255	keep
+2	complete-squeeze-040	0	0.040	18	true	left:left_inner_knuckle|right:left_inner_knuckle	0	0.0	0	0	false	close_center_grasp	66.706626	keep
+3	complete-approach-040	0	0.040	0	false	not-run	0	-0.000097	0	0	false	approach_center_walls	70.044489	discard
+4	high-precenter-040	0	0.040	16	true	none	0	-0.000095	0	0	false	approach_center_walls	70.959782	keep
