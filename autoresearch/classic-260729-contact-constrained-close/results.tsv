@@ -1,1 +1,3 @@
 iteration	variant	seed	bracket_ready	completion_mode	grasp_contact_steps	close_steps	lift_m	hold_contact_steps	collision_frames	accepted	failure_stage	elapsed_s	status
+1	bracket-close	0	true	fingerpad_bracket	3	12	0.134882	20	0	false	gate:support_contact_steps+base_translation_m	75.575728	keep
+2	bracket-close-repeat	0	true	fingerpad_bracket	3	12	0.134882	20	0	false	gate:support_contact_steps+base_translation_m	74.866939	keep
