@@ -30,6 +30,7 @@ from scripts.run_l1_cradle_gate import (
     next_orientation_alignment_state,
     normalized_osc_orientation_command,
     open_fork_alignment_sufficient,
+    open_fork_under_bottom_support_ready,
     open_fork_target_orientation,
     opposed_wall_clearance_targets,
     opposed_wall_squeeze_targets,
@@ -715,6 +716,68 @@ class L1PhysicalPushGateTests(unittest.TestCase):
 
 
 class L1TableEdgeUndercutTests(unittest.TestCase):
+    @staticmethod
+    def box_geometry(name, center, half_extents, *, is_object=False):
+        return {
+            "name": name,
+            "is_object": is_object,
+            "world_position": list(center),
+            "world_rotation": np.eye(3).tolist(),
+            "size": list(half_extents),
+            "type": 6,
+        }
+
+    def test_open_fork_requires_real_planar_overlap_below_bottom(self):
+        bottom = self.box_geometry(
+            "container_col_bottom",
+            [7.059, 4.619, 1.009],
+            [0.300, 0.200, 0.009],
+            is_object=True,
+        )
+        outside_x = self.box_geometry(
+            "gripper0_right_left_fingertip_collision",
+            [7.380, 4.805, 0.975],
+            [0.015, 0.035, 0.004],
+        )
+        overlapping = self.box_geometry(
+            "gripper0_right_left_fingertip_collision",
+            [7.345, 4.805, 0.975],
+            [0.015, 0.035, 0.004],
+        )
+
+        self.assertFalse(
+            open_fork_under_bottom_support_ready(
+                {"geometries": [bottom, outside_x]},
+                minimum_planar_overlap_m=0.001,
+            )
+        )
+        self.assertTrue(
+            open_fork_under_bottom_support_ready(
+                {"geometries": [bottom, overlapping]},
+                minimum_planar_overlap_m=0.001,
+            )
+        )
+
+    def test_open_fork_rejects_finger_above_the_bottom_surface(self):
+        bottom = self.box_geometry(
+            "container_col_bottom",
+            [7.059, 4.619, 1.009],
+            [0.300, 0.200, 0.009],
+            is_object=True,
+        )
+        too_high = self.box_geometry(
+            "gripper0_right_left_fingertip_collision",
+            [7.345, 4.805, 1.010],
+            [0.015, 0.035, 0.004],
+        )
+
+        self.assertFalse(
+            open_fork_under_bottom_support_ready(
+                {"geometries": [bottom, too_high]},
+                minimum_planar_overlap_m=0.001,
+            )
+        )
+
     def test_open_fork_alignment_accepts_measured_safe_partial_rotation(self):
         measured = np.array(
             [
@@ -889,6 +952,7 @@ class L1TableEdgeUndercutTests(unittest.TestCase):
         self.assertLess(orientation_index, inset_index)
         self.assertLess(inset_index, raise_index)
         self.assertIn("if success and horizontal_fork", source)
+        self.assertIn("open_fork_under_bottom_support_ready", source)
 
 
 class JointSeedMathTests(unittest.TestCase):

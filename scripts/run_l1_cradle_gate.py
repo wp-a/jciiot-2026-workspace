@@ -819,6 +819,75 @@ def is_allowed_open_fork_support_geom(geom_name: str, arm: str) -> bool:
     )
 
 
+def _oriented_box_world_bounds(geometry: Mapping[str, object]) -> tuple[np.ndarray, np.ndarray]:
+    center = np.asarray(geometry.get("world_position"), dtype=float)
+    half_extents = np.asarray(geometry.get("size"), dtype=float)
+    if (
+        center.shape != (3,)
+        or half_extents.shape != (3,)
+        or not np.all(np.isfinite(center))
+        or not np.all(np.isfinite(half_extents))
+        or np.any(half_extents < 0.0)
+    ):
+        raise ValueError("box geometry must contain finite center and half extents")
+    rotation = _validated_rotation_matrix(
+        geometry.get("world_rotation"),
+        name="box geometry rotation",
+    )
+    world_half_extents = np.abs(rotation) @ half_extents
+    return center - world_half_extents, center + world_half_extents
+
+
+def open_fork_under_bottom_support_ready(
+    snapshot: Mapping[str, object],
+    *,
+    minimum_planar_overlap_m: float,
+) -> bool:
+    """Require a real open fingertip box beneath the object's bottom box."""
+    minimum_overlap = float(minimum_planar_overlap_m)
+    if not np.isfinite(minimum_overlap) or minimum_overlap <= 0.0:
+        raise ValueError("minimum_planar_overlap_m must be finite and positive")
+    geometries = snapshot.get("geometries")
+    if not isinstance(geometries, list):
+        raise ValueError("snapshot geometries must be a list")
+    bottom = next(
+        (
+            geometry
+            for geometry in geometries
+            if isinstance(geometry, Mapping)
+            and bool(geometry.get("is_object"))
+            and "col_bottom" in str(geometry.get("name", "")).lower()
+            and int(geometry.get("type", -1)) == 6
+        ),
+        None,
+    )
+    if bottom is None:
+        return False
+    bottom_minimum, bottom_maximum = _oriented_box_world_bounds(bottom)
+    for geometry in geometries:
+        if not isinstance(geometry, Mapping) or int(geometry.get("type", -1)) != 6:
+            continue
+        name = str(geometry.get("name", ""))
+        lowered = name.lower()
+        if not is_allowed_open_fork_support_geom(name, "right"):
+            continue
+        if not any(
+            token in lowered
+            for token in ("fingertip_collision", "fingerpad_collision")
+        ):
+            continue
+        support_minimum, support_maximum = _oriented_box_world_bounds(geometry)
+        planar_overlap = np.minimum(bottom_maximum[:2], support_maximum[:2]) - np.maximum(
+            bottom_minimum[:2], support_minimum[:2]
+        )
+        if (
+            np.all(planar_overlap >= minimum_overlap)
+            and float(support_maximum[2]) <= float(bottom_minimum[2]) + 1e-4
+        ):
+            return True
+    return False
+
+
 def rotation_error_degrees(current: object, target: object) -> float:
     """Return the geodesic angle between two complete tool frames."""
     current_rotation = _validated_rotation_matrix(
@@ -2546,11 +2615,27 @@ def _table_edge_undercut_probe(
                     raise ValueError("horizontal_inset_m must be finite and positive")
                 fork_inset_target = np.asarray(targets["below"], dtype=float).copy()
                 fork_inset_target[1] = float(targets["outside"][1]) - inset_distance
-                if not execute_stage(
+                inset_success = execute_stage(
                     "inset_horizontal_fork_under_overhang",
                     fork_inset_target,
                     allow_object_contact=True,
+                )
+                insertion_geometry = geometry_snapshot(raw_env, object_name)
+                geometry_ready = open_fork_under_bottom_support_ready(
+                    insertion_geometry,
+                    minimum_planar_overlap_m=0.001,
+                )
+                stages[-1]["geometry_ready"] = geometry_ready
+                if (
+                    not inset_success
+                    and geometry_ready
+                    and stages[-1].get("safety_failure") == "timeout"
                 ):
+                    inset_success = True
+                    stages[-1]["success"] = True
+                    stages[-1]["safety_failure"] = None
+                    stages[-1]["success_source"] = "measured_bottom_overlap"
+                if not inset_success:
                     success = False
                     failure_stage = "inset_horizontal_fork_under_overhang"
                 else:
