@@ -2566,6 +2566,14 @@ def _table_edge_undercut_probe(
                     max_speed,
                     remaining / control_dt,
                 )
+            base_follow_arm_deltas["right"] = np.array(
+                [
+                    world_velocity[0] * control_dt,
+                    world_velocity[1] * control_dt,
+                    0.0,
+                ],
+                dtype=float,
+            )
             _, base_yaw = backend.get_base_pose()
             base_velocity = world_velocity_to_base_frame(world_velocity, base_yaw)
             step_info = driver.step(
