@@ -2057,6 +2057,7 @@ def _table_edge_undercut_probe(
     orientation_min_inward_projection: float,
     orientation_max_closure_vertical: float,
     horizontal_inset_m: float,
+    left_clearance_lift_m: float,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import OfficialScriptedGraspDriver
     from robot_agent.skills.competition_transport import (
@@ -2295,6 +2296,11 @@ def _table_edge_undercut_probe(
                 hold_targets=hold_targets,
             )
             _, _, _, info = raw_env.step(action)
+            measured_left_after = (
+                None
+                if other_arm_world_target is None
+                else left_eef_position()
+            )
             recorder = getattr(backend, "_record_trajectory_frame", None)
             if callable(recorder):
                 recorder(_env=raw_env)
@@ -2330,7 +2336,9 @@ def _table_edge_undercut_probe(
                     else np.asarray(other_arm_world_target, dtype=float).tolist()
                 ),
                 "other_arm_eef_position": (
-                    None if measured_left is None else measured_left.tolist()
+                    None
+                    if measured_left_after is None
+                    else measured_left_after.tolist()
                 ),
                 "object_position": object_position.tolist(),
                 "object_lift_m": object_lift_m,
@@ -2364,7 +2372,23 @@ def _table_edge_undercut_probe(
             if require_support and stable_support_steps >= 5:
                 success = True
                 break
-            if float(np.linalg.norm(np.asarray(target) - measured_eef)) <= 0.012:
+            right_reached = bool(
+                float(np.linalg.norm(np.asarray(target) - measured_eef)) <= 0.012
+            )
+            other_reached = bool(
+                other_arm_world_target is None
+                or (
+                    measured_left_after is not None
+                    and float(
+                        np.linalg.norm(
+                            np.asarray(other_arm_world_target, dtype=float)
+                            - measured_left_after
+                        )
+                    )
+                    <= 0.012
+                )
+            )
+            if right_reached and other_reached:
                 success = not require_support
                 if require_support:
                     safety_failure = "target_without_support"
@@ -2618,6 +2642,22 @@ def _table_edge_undercut_probe(
             other_arm_world_target = None
             if stage == "descend_open_outside" and torso_target_m is not None:
                 if horizontal_fork:
+                    clearance_lift = float(left_clearance_lift_m)
+                    if not np.isfinite(clearance_lift) or clearance_lift <= 0.0:
+                        raise ValueError(
+                            "left_clearance_lift_m must be finite and positive"
+                        )
+                    left_clearance_target = left_eef_position().copy()
+                    left_clearance_target[2] += clearance_lift
+                    if not execute_stage(
+                        "raise_left_clearance_for_torso",
+                        right_eef_position().copy(),
+                        allow_object_contact=False,
+                        other_arm_world_target=left_clearance_target,
+                    ):
+                        success = False
+                        failure_stage = "raise_left_clearance_for_torso"
+                        break
                     other_arm_world_target = left_eef_position().copy()
                 hold_targets["torso"] = np.array(
                     [float(torso_target_m)], dtype=float
@@ -5093,6 +5133,9 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                         args.undercut_orientation_max_closure_vertical
                     ),
                     horizontal_inset_m=args.undercut_horizontal_inset_m,
+                    left_clearance_lift_m=(
+                        args.undercut_left_clearance_lift_m
+                    ),
                 )
                 record["mode"] = "table_edge_undercut_probe"
                 record["open_gripper"] = bool(probe.get("open_gripper", False))
@@ -5517,6 +5560,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--undercut-horizontal-inset-m",
         type=float,
         default=0.06,
+    )
+    parser.add_argument(
+        "--undercut-left-clearance-lift-m",
+        type=float,
+        default=0.25,
     )
     parser.add_argument("--align-closure-axes", action="store_true")
     parser.add_argument("--orientation-max-action", type=float, default=0.30)
