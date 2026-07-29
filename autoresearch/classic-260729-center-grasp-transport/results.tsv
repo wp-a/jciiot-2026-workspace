@@ -3,3 +3,4 @@ iteration	variant	seed	requested_distance_m	transport_success	transport_steps	ba
 3	arm-lead-no-retract	0	0.20	true	234	0.190393	0.027205	1.249065	20	0	false	lift_m+object_translation_m+dropped	85.500480	discard
 4	base-only-drift-gated	0	0.20	false	22	0.041002	0.005870	1.326161	20	0	false	planar_grasp_drift	75.655548	discard
 5	base-only-0.005mps	0	0.20	false	150	0.037500	0.009960	1.279186	20	0	false	planar_grasp_drift	81.557106	discard
+6	trailing-corner-seat-080	0	0.20	false	0	0.000000	0.000000	-	20	0	false	seat_trailing_corners	77.478391	discard:seat physically moved object 0.107759 m but body height fell below the 0.10 m transport margin

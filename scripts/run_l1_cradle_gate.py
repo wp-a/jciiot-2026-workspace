@@ -311,6 +311,38 @@ def trailing_corner_seat_targets(
     return targets
 
 
+def arm_transport_stroke_targets(
+    current: Mapping[str, object],
+    *,
+    travel_direction: object,
+    stroke_m: float,
+    lift_m: float,
+) -> dict[str, np.ndarray]:
+    """Move a bilateral grasp through one bounded transport stroke."""
+    direction = np.asarray(travel_direction, dtype=float).reshape(2)
+    if not np.all(np.isfinite(direction)):
+        raise ValueError("travel_direction must be finite")
+    norm = float(np.linalg.norm(direction))
+    if norm <= 1e-12:
+        raise ValueError("travel_direction must be non-zero")
+    stroke = float(stroke_m)
+    lift = float(lift_m)
+    if not np.isfinite(stroke) or stroke < 0.0:
+        raise ValueError("stroke_m must be finite and non-negative")
+    if not np.isfinite(lift) or lift < 0.0:
+        raise ValueError("lift_m must be finite and non-negative")
+    planar_offset = direction * (stroke / norm)
+    targets = {}
+    for arm in ("right", "left"):
+        position = np.asarray(current[arm], dtype=float).reshape(3).copy()
+        if not np.all(np.isfinite(position)):
+            raise ValueError(f"{arm} position must be finite")
+        position[:2] += planar_offset
+        position[2] += lift
+        targets[arm] = position
+    return targets
+
+
 def allocate_segment_steps(*, total_steps: int, segment_count: int) -> tuple[int, ...]:
     """Distribute a fixed positive waypoint budget across path segments."""
     if (
@@ -1681,6 +1713,8 @@ def _center_regrasp_probe(
     center_carry_distance_m: float = 0.0,
     center_carry_max_linear: float = 0.04,
     center_carry_corner_seat_m: float = 0.0,
+    center_carry_arm_stroke_m: float = 0.0,
+    center_carry_arm_stroke_lift_m: float = 0.0,
 ) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import (
         OfficialScriptedGraspDriver,
@@ -3059,6 +3093,82 @@ def _center_regrasp_probe(
                                         )
                                         if not physical_grasp:
                                             failure_stage = "seat_trailing_corners"
+                                    if (
+                                        physical_grasp
+                                        and float(center_carry_arm_stroke_m) > 0.0
+                                    ):
+                                        stroke_base_xy = np.asarray(
+                                            backend.get_base_pose()[0], dtype=float
+                                        )
+                                        stroke_start_object = np.asarray(
+                                            raw_env.sim.data.body_xpos[body_id],
+                                            dtype=float,
+                                        ).copy()
+                                        stroke_direction = (
+                                            stroke_start_object[:2] - stroke_base_xy
+                                        )
+                                        stroke_direction /= np.linalg.norm(
+                                            stroke_direction
+                                        )
+                                        stroke_targets = arm_transport_stroke_targets(
+                                            eef_positions(),
+                                            travel_direction=stroke_direction,
+                                            stroke_m=center_carry_arm_stroke_m,
+                                            lift_m=center_carry_arm_stroke_lift_m,
+                                        )
+                                        stroke_reached = execute_stage(
+                                            "arm_transport_stroke",
+                                            stroke_targets,
+                                            max_steps=120,
+                                            gripper_value=1.0,
+                                        )
+                                        stroke_stage = stage_results[-1]
+                                        stroke_end_object = np.asarray(
+                                            raw_env.sim.data.body_xpos[body_id],
+                                            dtype=float,
+                                        ).copy()
+                                        stroke_delta = (
+                                            stroke_end_object[:2]
+                                            - stroke_start_object[:2]
+                                        )
+                                        projected_progress = float(
+                                            np.dot(stroke_delta, stroke_direction)
+                                        )
+                                        lateral_drift = float(
+                                            np.linalg.norm(
+                                                stroke_delta
+                                                - projected_progress * stroke_direction
+                                            )
+                                        )
+                                        stroke_stage.update(
+                                            {
+                                                "requested_stroke_m": float(
+                                                    center_carry_arm_stroke_m
+                                                ),
+                                                "requested_lift_m": float(
+                                                    center_carry_arm_stroke_lift_m
+                                                ),
+                                                "projected_object_progress_m": (
+                                                    projected_progress
+                                                ),
+                                                "lateral_object_drift_m": lateral_drift,
+                                            }
+                                        )
+                                        final_contacts = object_robot_contacts(
+                                            raw_env, object_name
+                                        )
+                                        physical_grasp = bool(
+                                            stroke_reached
+                                            and projected_progress >= 0.02
+                                            and lateral_drift <= 0.03
+                                            and has_bilateral_object_contact(
+                                                final_contacts
+                                            )
+                                            and float(stroke_end_object[2])
+                                            >= float(table_object_z) + 0.10
+                                        )
+                                        if not physical_grasp:
+                                            failure_stage = "arm_transport_stroke"
                                     if not physical_grasp:
                                         failure_stage = failure_stage or "final_contact"
                                     elif float(center_carry_distance_m) > 0.0:
@@ -3326,6 +3436,10 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                         center_carry_distance_m=args.center_carry_distance_m,
                         center_carry_max_linear=args.center_carry_max_linear,
                         center_carry_corner_seat_m=args.center_carry_corner_seat_m,
+                        center_carry_arm_stroke_m=args.center_carry_arm_stroke_m,
+                        center_carry_arm_stroke_lift_m=(
+                            args.center_carry_arm_stroke_lift_m
+                        ),
                     )
                     record["mode"] = (
                         "center_grasp_physical_transport"
@@ -3482,6 +3596,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--center-carry-distance-m", type=float, default=0.0)
     parser.add_argument("--center-carry-max-linear", type=float, default=0.04)
     parser.add_argument("--center-carry-corner-seat-m", type=float, default=0.0)
+    parser.add_argument("--center-carry-arm-stroke-m", type=float, default=0.0)
+    parser.add_argument(
+        "--center-carry-arm-stroke-lift-m", type=float, default=0.0
+    )
     parser.add_argument("--align-closure-axes", action="store_true")
     parser.add_argument("--orientation-max-action", type=float, default=0.30)
     parser.add_argument("--orientation-fine-max-action", type=float)

@@ -8,6 +8,7 @@ import scripts.run_l1_cradle_gate as gate_module
 from scripts.run_l1_cradle_gate import (
     _center_regrasp_probe,
     allocate_segment_steps,
+    arm_transport_stroke_targets,
     bounded_base_advance_world_velocity,
     closure_axis_error_degrees,
     cradle_gate_accepted,
@@ -367,6 +368,20 @@ class CenterGraspTransportTests(unittest.TestCase):
                         distance_m=distance,
                     )
 
+    def test_arm_transport_stroke_moves_toward_goal_and_compensates_height(self):
+        targets = arm_transport_stroke_targets(
+            {
+                "right": np.array([7.25, 4.82, 1.36]),
+                "left": np.array([7.25, 4.42, 1.36]),
+            },
+            travel_direction=np.array([-1.0, 0.0]),
+            stroke_m=0.08,
+            lift_m=0.05,
+        )
+
+        np.testing.assert_allclose(targets["right"], [7.17, 4.82, 1.41])
+        np.testing.assert_allclose(targets["left"], [7.17, 4.42, 1.41])
+
 
 class L1CradleGateTests(unittest.TestCase):
     def test_geometry_snapshot_includes_all_gripper_geometries(self):
@@ -414,6 +429,15 @@ class CenterRegraspSequenceTests(unittest.TestCase):
         transport_index = source.index("run_physical_transport(")
         self.assertLess(hold_index, seat_index)
         self.assertLess(seat_index, transport_index)
+
+    def test_optional_arm_stroke_runs_after_hold_and_before_transport(self):
+        source = inspect.getsource(_center_regrasp_probe)
+
+        hold_index = source.index('"hold_center_grasp"')
+        stroke_index = source.index('"arm_transport_stroke"')
+        transport_index = source.index("run_physical_transport(")
+        self.assertLess(hold_index, stroke_index)
+        self.assertLess(stroke_index, transport_index)
 
     def test_contact_constrained_close_is_guarded_after_failed_approach(self):
         source = inspect.getsource(_center_regrasp_probe)
@@ -800,6 +824,8 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.center_carry_distance_m, 0.0)
         self.assertAlmostEqual(args.center_carry_max_linear, 0.04)
         self.assertAlmostEqual(args.center_carry_corner_seat_m, 0.0)
+        self.assertAlmostEqual(args.center_carry_arm_stroke_m, 0.0)
+        self.assertAlmostEqual(args.center_carry_arm_stroke_lift_m, 0.0)
 
     def test_center_carry_speed_can_be_overridden_for_single_variable_probe(self):
         args = parse_args(
@@ -816,11 +842,17 @@ class JointSeedParserTests(unittest.TestCase):
                 "0.005",
                 "--center-carry-corner-seat-m",
                 "0.08",
+                "--center-carry-arm-stroke-m",
+                "0.07",
+                "--center-carry-arm-stroke-lift-m",
+                "0.04",
             ]
         )
 
         self.assertAlmostEqual(args.center_carry_max_linear, 0.005)
         self.assertAlmostEqual(args.center_carry_corner_seat_m, 0.08)
+        self.assertAlmostEqual(args.center_carry_arm_stroke_m, 0.07)
+        self.assertAlmostEqual(args.center_carry_arm_stroke_lift_m, 0.04)
 
 
 class OrientationCommandTests(unittest.TestCase):
