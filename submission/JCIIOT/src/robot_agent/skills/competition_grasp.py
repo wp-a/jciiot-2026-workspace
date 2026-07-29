@@ -139,6 +139,43 @@ def normalized_position_action(
     return np.concatenate([normalized, np.zeros(3, dtype=float)])
 
 
+def build_independent_gripper_action(
+    robot,
+    *,
+    arm_actions: Mapping[str, np.ndarray],
+    gripper_values: Mapping[str, float],
+    hold_targets: Mapping[str, np.ndarray],
+    build_action_fn=None,
+) -> np.ndarray:
+    """Reuse the official action builder, then set each gripper independently."""
+    if set(gripper_values) != set(ARMS):
+        raise ValueError("gripper_values must provide commands for both arms")
+    values = {arm: float(gripper_values[arm]) for arm in ARMS}
+    if any(not np.isfinite(value) for value in values.values()):
+        raise ValueError("gripper commands must be finite")
+    if build_action_fn is None:
+        from robosuite.environments.factory_sorting.lift_after_grasp import (
+            build_action as build_action_fn,
+        )
+
+    action = np.asarray(
+        build_action_fn(
+            robot,
+            arm_actions,
+            gripper_value=0.0,
+            hold_targets=hold_targets,
+        ),
+        dtype=float,
+    ).copy()
+    split_indexes = robot.composite_controller._action_split_indexes
+    for arm in ARMS:
+        if int(robot.gripper[arm].dof) <= 0:
+            continue
+        start, end = split_indexes[f"{arm}_gripper"]
+        action[int(start) : int(end)] = values[arm]
+    return action
+
+
 def lowered_torso_target(current, *, drop: float, minimum: float) -> np.ndarray:
     """Return a bounded absolute torso target for improved low reach."""
     current = np.asarray(current, dtype=float).copy()

@@ -127,6 +127,85 @@ class CompetitionGraspTests(unittest.TestCase):
         self.assertEqual(config.lift_height, 0.04)
         self.assertEqual(config.lift_hold_steps, 0)
 
+    def test_independent_gripper_action_keeps_stationary_arm_closed(self):
+        robot = SimpleNamespace(
+            gripper={
+                "right": SimpleNamespace(dof=1),
+                "left": SimpleNamespace(dof=1),
+            },
+            composite_controller=SimpleNamespace(
+                _action_split_indexes={
+                    "right": (0, 6),
+                    "right_gripper": (6, 7),
+                    "left": (7, 13),
+                    "left_gripper": (13, 14),
+                }
+            ),
+        )
+        calls = []
+
+        def build_action(robot_arg, arm_actions, gripper_value, hold_targets):
+            calls.append(
+                {
+                    "robot": robot_arg,
+                    "arm_actions": arm_actions,
+                    "gripper_value": gripper_value,
+                    "hold_targets": hold_targets,
+                }
+            )
+            return np.zeros(14, dtype=float)
+
+        arm_actions = {
+            "right": np.ones(6, dtype=float),
+            "left": np.zeros(6, dtype=float),
+        }
+        action = self.module.build_independent_gripper_action(
+            robot,
+            arm_actions=arm_actions,
+            gripper_values={"right": 1.0, "left": -1.0},
+            hold_targets={"torso": np.array([0.3])},
+            build_action_fn=build_action,
+        )
+
+        self.assertEqual(action[6], 1.0)
+        self.assertEqual(action[13], -1.0)
+        self.assertEqual(calls[0]["gripper_value"], 0.0)
+        self.assertIs(calls[0]["arm_actions"], arm_actions)
+
+    def test_independent_gripper_action_requires_finite_commands_for_both_arms(self):
+        robot = SimpleNamespace(
+            gripper={
+                "right": SimpleNamespace(dof=1),
+                "left": SimpleNamespace(dof=1),
+            },
+            composite_controller=SimpleNamespace(
+                _action_split_indexes={
+                    "right_gripper": (0, 1),
+                    "left_gripper": (1, 2),
+                }
+            ),
+        )
+
+        def build_action(*_args, **_kwargs):
+            return np.zeros(2, dtype=float)
+
+        with self.assertRaisesRegex(ValueError, "both arms"):
+            self.module.build_independent_gripper_action(
+                robot,
+                arm_actions={},
+                gripper_values={"right": 1.0},
+                hold_targets={},
+                build_action_fn=build_action,
+            )
+        with self.assertRaisesRegex(ValueError, "finite"):
+            self.module.build_independent_gripper_action(
+                robot,
+                arm_actions={},
+                gripper_values={"right": 1.0, "left": np.nan},
+                hold_targets={},
+                build_action_fn=build_action,
+            )
+
     def test_mirrored_fingerpad_targets_reflect_and_lower_right_template(self):
         right_fingerpads = np.array(
             [
