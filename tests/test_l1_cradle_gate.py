@@ -104,6 +104,16 @@ class L1CradleGateTests(unittest.TestCase):
 
 
 class CenterRegraspSequenceTests(unittest.TestCase):
+    def test_center_regrasp_imports_its_base_advance_dependencies(self):
+        source = inspect.getsource(_center_regrasp_probe)
+
+        import_block = source[
+            source.index("from robot_agent.skills.competition_transport import") :
+            source.index("helpers = OfficialScriptedGraspDriver._helpers()")
+        ]
+        self.assertIn("OfficialPhysicalCarryDriver", import_block)
+        self.assertIn("world_velocity_to_base_frame", import_block)
+
     def test_center_regrasp_closes_before_lift_and_stays_closed(self):
         source = inspect.getsource(_center_regrasp_probe)
 

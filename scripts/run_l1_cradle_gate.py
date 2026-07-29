@@ -1468,7 +1468,11 @@ def _center_regrasp_probe(
         joint_interpolation_path,
         synchronize_controller_goals,
     )
-    from robot_agent.skills.competition_transport import _is_allowed_cradle_geom
+    from robot_agent.skills.competition_transport import (
+        OfficialPhysicalCarryDriver,
+        _is_allowed_cradle_geom,
+        world_velocity_to_base_frame,
+    )
 
     helpers = OfficialScriptedGraspDriver._helpers()
     raw_env = backend.env
