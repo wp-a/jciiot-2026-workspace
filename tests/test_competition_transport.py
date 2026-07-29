@@ -576,6 +576,11 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
 
 
 class InchwormTransportRunnerTests(unittest.TestCase):
+    def test_default_reset_stays_below_observed_contact_loss_distance(self):
+        module = load_module()
+
+        self.assertAlmostEqual(module.InchwormCarryConfig().reset_distance, 0.06)
+
     def test_stops_after_arm_stroke_when_measured_object_progress_reaches_target(self):
         module = load_module()
         driver = FakeInchwormDriver()

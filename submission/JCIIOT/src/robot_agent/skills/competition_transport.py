@@ -316,7 +316,7 @@ class InchwormCarryConfig:
         max_vertical_adjustment: float = 0.05,
         arm_target_tolerance: float = 0.01,
         arm_max_steps: int = 120,
-        reset_distance: float = 0.08,
+        reset_distance: float = 0.06,
         reset_max_linear: float = 0.04,
         reset_control_dt: float = 0.05,
         reset_position_tolerance: float = 1e-4,

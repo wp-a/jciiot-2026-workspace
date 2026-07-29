@@ -3474,7 +3474,7 @@ def _center_regrasp_probe(
                                                 stroke_distance=0.08,
                                                 stroke_vertical_feedforward=0.015,
                                                 stroke_height_gain=0.75,
-                                                reset_distance=0.08,
+                                                reset_distance=0.06,
                                                 reset_max_linear=0.04,
                                                 max_cycles=max(
                                                     2,
