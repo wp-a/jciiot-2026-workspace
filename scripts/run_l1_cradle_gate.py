@@ -304,6 +304,59 @@ def posture_carry_accepted(record: Mapping[str, object]) -> bool:
     return not posture_carry_failures(record)
 
 
+_SETDOWN_REQUIRED_FIELDS = (
+    "physical_grasp",
+    "transport_success",
+    "place_success",
+    "support_detected",
+    "released",
+    "object_translation_m",
+    "attachment_calls",
+    "object_pose_writes",
+    "collision_frames",
+    "infrastructure_error",
+)
+
+
+def setdown_gate_failures(record: Mapping[str, object]) -> list[str]:
+    """Return failed evidence fields for transport followed by physical setdown."""
+    failures = [key for key in _SETDOWN_REQUIRED_FIELDS if key not in record]
+
+    def numeric(key: str) -> float | None:
+        if key not in record or isinstance(record[key], bool):
+            return None
+        try:
+            value = float(record[key])
+        except (TypeError, ValueError):
+            return None
+        return value if np.isfinite(value) else None
+
+    for key in (
+        "physical_grasp",
+        "transport_success",
+        "place_success",
+        "support_detected",
+        "released",
+    ):
+        if record.get(key) is not True:
+            failures.append(key)
+    translation = numeric("object_translation_m")
+    if translation is None or translation < 0.12:
+        failures.append("object_translation_m")
+    for key in ("attachment_calls", "object_pose_writes", "collision_frames"):
+        value = numeric(key)
+        if value is None or value != 0.0:
+            failures.append(key)
+    if record.get("infrastructure_error") is not None:
+        failures.append("infrastructure_error")
+    return list(dict.fromkeys(failures))
+
+
+def setdown_gate_accepted(record: Mapping[str, object]) -> bool:
+    """Accept only collision-free physical extraction, support, and release."""
+    return not setdown_gate_failures(record)
+
+
 _PUSH_REQUIRED_FIELDS = (
     "physical_contact_steps",
     "object_translation_m",
@@ -2219,6 +2272,130 @@ def _end_grasp_inchworm_probe(
         "object_pose_writes": int(audit["object_pose_writes"]),
         "transport_attachment_active_before": bool(audit["active_before"]),
         "transport_attachment_active_after": bool(audit["active_after"]),
+    }
+
+
+def _end_grasp_setdown_probe(
+    backend,
+    object_name: str,
+    *,
+    distance_m: float,
+    world_direction_x: float | None,
+    world_direction_y: float | None,
+    table_object_z: float,
+    stroke_m: float,
+    stroke_lift_m: float,
+    height_gain: float,
+    reset_m: float,
+    place_max_descent_m: float,
+) -> dict[str, Any]:
+    """Extract with the end grasp, then physically support and release the object."""
+    from robosuite.environments.factory_sorting import transport_attachment
+    from robot_agent.skills.competition_transport import (
+        PhysicalCarryConfig,
+        run_physical_place,
+    )
+
+    max_descent = float(place_max_descent_m)
+    if not np.isfinite(max_descent) or max_descent <= 0.0:
+        raise ValueError("place_max_descent_m must be finite and positive")
+
+    transport = _end_grasp_inchworm_probe(
+        backend,
+        object_name,
+        distance_m=distance_m,
+        world_direction_x=world_direction_x,
+        world_direction_y=world_direction_y,
+        table_object_z=table_object_z,
+        stroke_m=stroke_m,
+        stroke_lift_m=stroke_lift_m,
+        height_gain=height_gain,
+        reset_m=reset_m,
+    )
+    raw_env = backend.env
+    body_id = raw_env.obj_body_id[object_name]
+    place = None
+    place_audit = {
+        "attachment_activations": 0,
+        "object_pose_writes": 0,
+        "active_before": False,
+        "active_after": False,
+    }
+    if bool(transport.get("success", False)):
+        setdown_xy = np.asarray(
+            raw_env.sim.data.body_xpos[body_id][:2], dtype=float
+        ).copy()
+        with transport_attachment_audit(
+            raw_env, transport_attachment
+        ) as place_audit:
+            place = run_physical_place(
+                backend,
+                object_name=object_name,
+                target_xy=setdown_xy,
+                config=PhysicalCarryConfig(max_descent=max_descent),
+            )
+
+    end_object = np.asarray(
+        raw_env.sim.data.body_xpos[body_id], dtype=float
+    ).copy()
+    start_object = np.asarray(
+        transport["start_object_position"], dtype=float
+    )
+    place_success = bool(isinstance(place, Mapping) and place.get("success"))
+    support_detected = bool(
+        isinstance(place, Mapping) and place.get("support_detected")
+    )
+    contacts = dict(place.get("contacts", {})) if isinstance(place, Mapping) else {}
+    released = bool(
+        place_success
+        and contacts
+        and not any(bool(contacts.get(arm, False)) for arm in ("right", "left"))
+    )
+    transport_success = bool(transport.get("success", False))
+    success = bool(
+        transport_success and place_success and support_detected and released
+    )
+    if not transport_success:
+        failure_stage = f"transport:{transport.get('failure_stage') or 'unknown'}"
+    elif not place_success:
+        place_failure = (
+            place.get("failure_stage") if isinstance(place, Mapping) else "missing"
+        )
+        failure_stage = f"place:{place_failure or 'unknown'}"
+    elif not released:
+        failure_stage = "place:release"
+    else:
+        failure_stage = None
+
+    return {
+        "success": success,
+        "failure_stage": failure_stage,
+        "transport_success": transport_success,
+        "place_success": place_success,
+        "support_detected": support_detected,
+        "released": released,
+        "transport": transport,
+        "place": place,
+        "world_direction": list(transport["world_direction"]),
+        "start_object_position": start_object.tolist(),
+        "end_object_position": end_object.tolist(),
+        "measured_object_translation_m": float(
+            np.linalg.norm(end_object[:2] - start_object[:2])
+        ),
+        "attachment_activations": int(
+            transport.get("attachment_activations", 0)
+        )
+        + int(place_audit["attachment_activations"]),
+        "object_pose_writes": int(transport.get("object_pose_writes", 0))
+        + int(place_audit["object_pose_writes"]),
+        "transport_attachment_active_before": bool(
+            transport.get("transport_attachment_active_before", False)
+        )
+        or bool(place_audit["active_before"]),
+        "transport_attachment_active_after": bool(
+            transport.get("transport_attachment_active_after", False)
+        )
+        or bool(place_audit["active_after"]),
     }
 
 
@@ -6276,24 +6453,46 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                     for key in _POSTURE_CARRY_REQUIRED_FIELDS:
                         record[key] = probe[key]
                 elif args.end_grasp_inchworm_distance_m > 0.0:
-                    record["mode"] = "end_grasp_inchworm_transport"
-                    probe = _end_grasp_inchworm_probe(
-                        backend,
-                        object_name,
-                        distance_m=args.end_grasp_inchworm_distance_m,
-                        world_direction_x=(
+                    inchworm_kwargs = {
+                        "distance_m": args.end_grasp_inchworm_distance_m,
+                        "world_direction_x": (
                             args.end_grasp_inchworm_world_direction_x
                         ),
-                        world_direction_y=(
+                        "world_direction_y": (
                             args.end_grasp_inchworm_world_direction_y
                         ),
-                        table_object_z=pre_grasp_z,
-                        stroke_m=args.end_grasp_inchworm_stroke_m,
-                        stroke_lift_m=args.end_grasp_inchworm_stroke_lift_m,
-                        height_gain=args.end_grasp_inchworm_height_gain,
-                        reset_m=args.end_grasp_inchworm_reset_m,
-                    )
-                    record["transport_success"] = bool(probe.get("success"))
+                        "table_object_z": pre_grasp_z,
+                        "stroke_m": args.end_grasp_inchworm_stroke_m,
+                        "stroke_lift_m": args.end_grasp_inchworm_stroke_lift_m,
+                        "height_gain": args.end_grasp_inchworm_height_gain,
+                        "reset_m": args.end_grasp_inchworm_reset_m,
+                    }
+                    if args.end_grasp_setdown_after_inchworm:
+                        record["mode"] = "end_grasp_setdown_probe"
+                        probe = _end_grasp_setdown_probe(
+                            backend,
+                            object_name,
+                            place_max_descent_m=(
+                                args.end_grasp_place_max_descent_m
+                            ),
+                            **inchworm_kwargs,
+                        )
+                        record["transport_success"] = bool(
+                            probe.get("transport_success")
+                        )
+                        record["place_success"] = bool(probe.get("place_success"))
+                        record["support_detected"] = bool(
+                            probe.get("support_detected")
+                        )
+                        record["released"] = bool(probe.get("released"))
+                    else:
+                        record["mode"] = "end_grasp_inchworm_transport"
+                        probe = _end_grasp_inchworm_probe(
+                            backend,
+                            object_name,
+                            **inchworm_kwargs,
+                        )
+                        record["transport_success"] = bool(probe.get("success"))
                     record["object_translation_m"] = float(
                         probe.get("measured_object_translation_m", 0.0)
                     )
@@ -6553,6 +6752,8 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
         record["gate_failures"] = undercut_gate_failures(record)
     elif record.get("mode") == "posture_locked_physical_carry":
         record["gate_failures"] = posture_carry_failures(record)
+    elif record.get("mode") == "end_grasp_setdown_probe":
+        record["gate_failures"] = setdown_gate_failures(record)
     elif record.get("mode") == "physical_push_probe":
         record["gate_failures"] = push_gate_failures(record)
     elif record.get("mode") == "center_grasp_physical_transport":
@@ -6622,6 +6823,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--end-grasp-inchworm-world-direction-x", type=float)
     parser.add_argument("--end-grasp-inchworm-world-direction-y", type=float)
+    parser.add_argument("--end-grasp-setdown-after-inchworm", action="store_true")
+    parser.add_argument(
+        "--end-grasp-place-max-descent-m", type=float, default=0.25
+    )
     parser.add_argument("--center-carry-distance-m", type=float, default=0.0)
     parser.add_argument("--center-carry-max-linear", type=float, default=0.04)
     parser.add_argument("--center-carry-away-from-object", action="store_true")
