@@ -181,6 +181,7 @@ class OfficialCompetitionDriver:
         self._clearance_prepared = False
         self._physical_hold: dict[str, Any] | None = None
         self._last_transport: dict[str, Any] | None = None
+        self._last_alignment: dict[str, Any] | None = None
         self._last_place: dict[str, Any] | None = None
         self.move_skill = MoveSkill(
             backend=backend,
@@ -388,7 +389,9 @@ class OfficialCompetitionDriver:
         import numpy as np
 
         from robot_agent.skills.competition_transport import (
+            PostureLockedPhysicalCarryDriver,
             PhysicalCarryConfig,
+            physical_carry_step_budget,
             run_physical_transport,
             transport_base_goal,
         )
@@ -399,7 +402,6 @@ class OfficialCompetitionDriver:
         if station is None:
             return False
 
-        config = PhysicalCarryConfig()
         base_xy, _ = self.backend.get_base_pose()
         hold = self._physical_hold
         object_pos = np.asarray(hold["object_pos"], dtype=float)
@@ -423,15 +425,38 @@ class OfficialCompetitionDriver:
                 "failure_stage": "path",
             }
             return False
+        max_linear = 0.04
+        control_dt = 0.05
+        config = PhysicalCarryConfig(
+            max_steps=physical_carry_step_budget(
+                path,
+                start_xy=base_xy,
+                max_linear=max_linear,
+                control_dt=control_dt,
+            ),
+            max_linear=max_linear,
+            max_angular=0.04,
+            max_linear_delta=0.005,
+            max_angular_delta=0.01,
+            base_control_dt=control_dt,
+            max_planar_grasp_drift=0.03,
+        )
         self._last_transport = run_physical_transport(
             self.backend,
             path=path,
             object_name=object_name,
             hold_yaw=float(hold["base_yaw"]),
             minimum_object_z=(
-                float(hold["object_z"]) - config.object_drop_tolerance
+                float(
+                    hold.get(
+                        "minimum_transport_object_z",
+                        float(hold["object_z"])
+                        - config.object_drop_tolerance,
+                    )
+                )
             ),
             config=config,
+            driver=PostureLockedPhysicalCarryDriver(),
         )
         return bool(self._last_transport.get("success", False))
 
@@ -458,15 +483,33 @@ class OfficialCompetitionDriver:
         return result
 
     def place(self, target: str, object_name: str) -> bool:
-        from robot_agent.skills.competition_transport import run_physical_place
+        from robot_agent.skills.competition_transport import (
+            run_physical_place,
+            run_physical_target_alignment,
+        )
 
         station = self.scene_context.output_ports.get(target)
         if station is None or not self._physical_hold:
             return False
+        target_xy = delivery_slot_target(station.center[:2], object_name)
+        minimum_object_z = float(
+            self._physical_hold.get(
+                "minimum_transport_object_z",
+                float(self._physical_hold["object_z"]) - 0.025,
+            )
+        )
+        self._last_alignment = run_physical_target_alignment(
+            self.backend,
+            object_name=object_name,
+            target_xy=target_xy,
+            minimum_object_z=minimum_object_z,
+        )
+        if not bool(self._last_alignment.get("success", False)):
+            return False
         self._last_place = run_physical_place(
             self.backend,
             object_name=object_name,
-            target_xy=delivery_slot_target(station.center[:2], object_name),
+            target_xy=target_xy,
         )
         if bool(self._last_place.get("success", False)):
             self._physical_hold = None

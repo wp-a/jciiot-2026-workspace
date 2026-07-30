@@ -1360,15 +1360,30 @@ class OfficialScriptedGraspDriver:
         """Return read-only state needed by the physical transport controller."""
         helpers = self._helpers()
         base_xy, base_yaw = backend.get_base_pose()
+        raw_env = backend.env
         object_pos = np.asarray(
-            helpers["object_center"](backend.env, object_name),
+            helpers["object_center"](raw_env, object_name),
             dtype=float,
         ).copy()
+        body_id = raw_env.obj_body_id[object_name]
+        current_body_z = float(raw_env.sim.data.body_xpos[body_id][2])
+        reference_name, reference_body_z = getattr(
+            self,
+            "_close_lift_reference",
+            (object_name, current_body_z),
+        )
+        if reference_name != object_name:
+            reference_body_z = current_body_z
+        support_reference_object_z = float(reference_body_z) + (
+            float(object_pos[2]) - current_body_z
+        )
         return {
             "base_xy": np.asarray(base_xy, dtype=float).tolist(),
             "base_yaw": float(base_yaw),
             "object_pos": object_pos.tolist(),
             "object_z": float(object_pos[2]),
+            "support_reference_object_z": support_reference_object_z,
+            "minimum_transport_object_z": support_reference_object_z + 0.10,
         }
 
 

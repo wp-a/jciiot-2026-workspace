@@ -138,6 +138,70 @@ class PhysicalTransportGeometryTests(unittest.TestCase):
 
         self.assertLessEqual(float(np.linalg.norm(target)), 0.006 + 1e-12)
 
+    def test_long_route_step_budget_covers_slow_physical_carry(self):
+        module = load_module()
+
+        budget = module.physical_carry_step_budget(
+            [np.array([1.0, 0.0]), np.array([1.0, 2.0])],
+            start_xy=np.array([0.0, 0.0]),
+            max_linear=0.04,
+            control_dt=0.05,
+        )
+
+        nominal_steps = math.ceil(3.0 / (0.04 * 0.05))
+        self.assertGreaterEqual(budget, nominal_steps * 2)
+
+
+class PostureLockedPhysicalCarryDriverTests(unittest.TestCase):
+    def test_restores_only_non_gripper_robot_posture_after_actuated_step(self):
+        module = load_module()
+        forward_calls = []
+
+        class Delegate:
+            def capture_hold_targets(self, _backend):
+                return {"torso": np.array([0.2])}
+
+            def step(self, backend, **_kwargs):
+                backend.env.sim.data.qpos[:] += 10.0
+                backend.env.sim.data.qvel[:] += 20.0
+                return {"collision": False}
+
+        addresses = {"arm": 0, "torso": 1, "head": 2, "gripper": 3}
+        model = SimpleNamespace(
+            get_joint_qpos_addr=addresses.__getitem__,
+            get_joint_qvel_addr=addresses.__getitem__,
+        )
+        robot = SimpleNamespace(
+            robot_arm_joints=["arm"],
+            robot_model=SimpleNamespace(
+                torso_joints=["torso"],
+                head_joints=["head"],
+            ),
+        )
+        backend = SimpleNamespace(
+            env=SimpleNamespace(
+                robots=[robot],
+                sim=SimpleNamespace(
+                    model=model,
+                    data=SimpleNamespace(
+                        qpos=np.array([1.0, 2.0, 3.0, 4.0]),
+                        qvel=np.array([5.0, 6.0, 7.0, 8.0]),
+                    ),
+                    forward=lambda: forward_calls.append(True),
+                ),
+            ),
+            _record_trajectory_frame=lambda **_kwargs: None,
+        )
+        driver = module.PostureLockedPhysicalCarryDriver(Delegate())
+
+        driver.capture_hold_targets(backend)
+        result = driver.step(backend)
+
+        self.assertFalse(result["collision"])
+        np.testing.assert_allclose(backend.env.sim.data.qpos, [1, 2, 3, 14])
+        np.testing.assert_allclose(backend.env.sim.data.qvel, [5, 6, 7, 28])
+        self.assertEqual(forward_calls, [True])
+
     def test_single_arm_under_support_target_descends_and_moves_toward_midpoint(self):
         module = load_module()
         current = {
@@ -913,6 +977,89 @@ class FakePhysicalPlacementDriver:
 
     def record_event(self, _backend, event, **payload):
         return (event, payload)
+
+
+class FakePhysicalAlignmentDriver:
+    def __init__(self, *, collision_step=None, contacts=None):
+        self.object_pos = np.array([0.0, 0.0, 1.0], dtype=float)
+        self.grippers = {
+            "right": np.array([0.0, -0.2, 1.0], dtype=float),
+            "left": np.array([0.0, 0.2, 1.0], dtype=float),
+        }
+        self.collision_step = collision_step
+        self.contacts = contacts or {"right": True, "left": True}
+        self.steps = []
+
+    def capture_hold_targets(self, _backend):
+        return {"torso": np.array([0.3]), "head": np.array([0.0, 0.0])}
+
+    def observe(self, _backend, _object_name):
+        return {
+            "base_xy": np.array([0.0, 0.0]),
+            "base_yaw": 0.0,
+            "object_pos": self.object_pos.copy(),
+            "contacts": dict(self.contacts),
+            "gripper_positions": {
+                arm: position.copy() for arm, position in self.grippers.items()
+            },
+        }
+
+    def step(self, _backend, **kwargs):
+        self.steps.append(kwargs)
+        delta = np.mean(
+            np.stack(list(kwargs["arm_world_deltas"].values())),
+            axis=0,
+        )
+        self.object_pos += delta
+        for arm in self.grippers:
+            self.grippers[arm] += delta
+        return {"collision": len(self.steps) == self.collision_step}
+
+    def record_event(self, _backend, _event, **_payload):
+        return None
+
+
+class PhysicalTargetAlignmentTests(unittest.TestCase):
+    def setUp(self):
+        self.module = load_module()
+
+    def test_moves_held_object_inside_scoring_margin_with_stationary_base(self):
+        driver = FakePhysicalAlignmentDriver()
+
+        result = self.module.run_physical_target_alignment(
+            object(),
+            object_name="box",
+            target_xy=np.array([0.82, 0.0]),
+            minimum_object_z=0.95,
+            target_distance=0.70,
+            max_translation=0.18,
+            step_size=0.02,
+            max_steps=20,
+            driver=driver,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertLessEqual(result["final_distance"], 0.70 + 1e-9)
+        self.assertGreater(result["translation_m"], 0.0)
+        self.assertTrue(
+            all(np.allclose(step["base_command"], 0.0) for step in driver.steps)
+        )
+        self.assertTrue(all(step["gripper_value"] == 1.0 for step in driver.steps))
+
+    def test_collision_stops_target_alignment_without_fallback(self):
+        driver = FakePhysicalAlignmentDriver(collision_step=1)
+
+        result = self.module.run_physical_target_alignment(
+            object(),
+            object_name="box",
+            target_xy=np.array([1.0, 0.0]),
+            minimum_object_z=0.95,
+            driver=driver,
+        )
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["failure_stage"], "collision")
+        self.assertEqual(len(driver.steps), 1)
 
 
 class PhysicalPlacementRunnerTests(unittest.TestCase):

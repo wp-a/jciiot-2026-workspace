@@ -362,9 +362,14 @@ class CompetitionFlowTests(unittest.TestCase):
         transport_module = types.ModuleType(
             "robot_agent.skills.competition_transport"
         )
-        transport_module.PhysicalCarryConfig = lambda: SimpleNamespace(
-            object_drop_tolerance=0.025
+        transport_module.PhysicalCarryConfig = lambda **kwargs: SimpleNamespace(
+            object_drop_tolerance=0.025,
+            **kwargs,
         )
+        transport_module.PostureLockedPhysicalCarryDriver = (
+            lambda: "posture-locked-driver"
+        )
+        transport_module.physical_carry_step_budget = lambda *_args, **_kwargs: 4321
         transport_module.transport_base_goal = (
             lambda **kwargs: (
                 np.asarray(kwargs["object_target_xy"])
@@ -402,6 +407,13 @@ class CompetitionFlowTests(unittest.TestCase):
             captured["transport"]["minimum_object_z"],
             1.075,
         )
+        self.assertEqual(captured["transport"]["driver"], "posture-locked-driver")
+        self.assertEqual(captured["transport"]["config"].max_steps, 4321)
+        self.assertAlmostEqual(captured["transport"]["config"].max_linear, 0.04)
+        self.assertAlmostEqual(
+            captured["transport"]["config"].max_linear_delta,
+            0.005,
+        )
 
     def test_carrying_move_propagates_physical_contact_failure(self):
         driver = object.__new__(self.module.OfficialCompetitionDriver)
@@ -424,9 +436,14 @@ class CompetitionFlowTests(unittest.TestCase):
         transport_module = types.ModuleType(
             "robot_agent.skills.competition_transport"
         )
-        transport_module.PhysicalCarryConfig = lambda: SimpleNamespace(
-            object_drop_tolerance=0.025
+        transport_module.PhysicalCarryConfig = lambda **kwargs: SimpleNamespace(
+            object_drop_tolerance=0.025,
+            **kwargs,
         )
+        transport_module.PostureLockedPhysicalCarryDriver = (
+            lambda: "posture-locked-driver"
+        )
+        transport_module.physical_carry_step_budget = lambda *_args, **_kwargs: 4321
         transport_module.transport_base_goal = lambda **kwargs: np.asarray(
             kwargs["object_target_xy"]
         )
@@ -485,16 +502,26 @@ class CompetitionFlowTests(unittest.TestCase):
                 "output_5": SimpleNamespace(center=np.array([4.0, -7.0]))
             }
         )
-        driver._physical_hold = {"object_z": 1.1}
+        driver._physical_hold = {
+            "object_z": 1.1,
+            "minimum_transport_object_z": 0.95,
+        }
         transport_module = types.ModuleType(
             "robot_agent.skills.competition_transport"
         )
+
+        def run_physical_target_alignment(_backend, **kwargs):
+            captured.update(alignment=kwargs)
+            return {"success": True, "failure_stage": None}
 
         def run_physical_place(_backend, **kwargs):
             captured.update(kwargs)
             return {"success": True, "failure_stage": None}
 
         transport_module.run_physical_place = run_physical_place
+        transport_module.run_physical_target_alignment = (
+            run_physical_target_alignment
+        )
         modules = {
             "robot_agent": types.ModuleType("robot_agent"),
             "robot_agent.skills": types.ModuleType("robot_agent.skills"),
@@ -507,7 +534,49 @@ class CompetitionFlowTests(unittest.TestCase):
         self.assertTrue(success)
         self.assertEqual(captured["object_name"], "blue_tote")
         np.testing.assert_allclose(captured["target_xy"], [4.0, -7.0])
+        self.assertEqual(captured["alignment"]["object_name"], "blue_tote")
+        np.testing.assert_allclose(
+            captured["alignment"]["target_xy"],
+            [4.0, -7.0],
+        )
+        self.assertAlmostEqual(
+            captured["alignment"]["minimum_object_z"],
+            0.95,
+        )
         self.assertIsNone(driver._physical_hold)
+
+    def test_place_stops_when_physical_target_alignment_fails(self):
+        driver = object.__new__(self.module.OfficialCompetitionDriver)
+        driver.backend = object()
+        driver.scene_context = SimpleNamespace(
+            output_ports={
+                "output_5": SimpleNamespace(center=np.array([4.0, -7.0]))
+            }
+        )
+        driver._physical_hold = {"object_z": 1.1}
+        transport_module = types.ModuleType(
+            "robot_agent.skills.competition_transport"
+        )
+        transport_module.run_physical_target_alignment = (
+            lambda *_args, **_kwargs: {
+                "success": False,
+                "failure_stage": "collision",
+            }
+        )
+        transport_module.run_physical_place = lambda *_args, **_kwargs: self.fail(
+            "placement must not run after alignment failure"
+        )
+        modules = {
+            "robot_agent": types.ModuleType("robot_agent"),
+            "robot_agent.skills": types.ModuleType("robot_agent.skills"),
+            "robot_agent.skills.competition_transport": transport_module,
+        }
+
+        with patch.dict(sys.modules, modules):
+            success = driver.place("output_5", "blue_tote")
+
+        self.assertFalse(success)
+        self.assertEqual(driver._last_alignment["failure_stage"], "collision")
 
     def test_workflow_source_has_no_transport_attachment(self):
         source = MODULE_PATH.read_text(encoding="utf-8")

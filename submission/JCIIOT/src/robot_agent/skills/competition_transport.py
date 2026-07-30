@@ -345,6 +345,34 @@ class PhysicalCarryConfig:
         self.max_arm_action = float(max_arm_action)
 
 
+def physical_carry_step_budget(
+    path,
+    *,
+    start_xy,
+    max_linear: float,
+    control_dt: float,
+    safety_factor: float = 5.0,
+) -> int:
+    """Size the control budget from measured route length and bounded speed."""
+    speed = float(max_linear)
+    dt = float(control_dt)
+    factor = float(safety_factor)
+    if speed <= 0.0 or dt <= 0.0 or factor < 1.0:
+        raise ValueError("carry speed, control dt, and safety factor must be positive")
+    previous = np.asarray(start_xy, dtype=float).reshape(2)
+    route_length = 0.0
+    waypoint_count = 0
+    for point in path:
+        waypoint = np.asarray(point, dtype=float).reshape(2)
+        if not np.all(np.isfinite(waypoint)):
+            raise ValueError("carry path must contain only finite waypoints")
+        route_length += float(np.linalg.norm(waypoint - previous))
+        previous = waypoint
+        waypoint_count += 1
+    nominal_steps = int(math.ceil(route_length / (speed * dt)))
+    return max(80, int(math.ceil(nominal_steps * factor)) + waypoint_count * 10)
+
+
 class InchwormCarryConfig:
     """Quasi-static arm-stroke and base-reset transport parameters."""
 
@@ -1439,6 +1467,192 @@ class OfficialPhysicalCarryDriver:
         marker = getattr(backend, "_mark_trajectory_event", None)
         if callable(marker):
             marker(event, **payload)
+
+
+class PostureLockedPhysicalCarryDriver:
+    """Keep upper-body posture base-relative while grip actuators stay active."""
+
+    def __init__(self, delegate=None) -> None:
+        self._delegate = delegate or OfficialPhysicalCarryDriver()
+        self._posture = None
+
+    def __getattr__(self, name: str):
+        return getattr(self._delegate, name)
+
+    @staticmethod
+    def _capture_robot_posture(backend) -> dict[str, object]:
+        raw_env = backend.env
+        robot = raw_env.robots[0]
+        joint_names = list(getattr(robot, "robot_arm_joints", ()))
+        joint_names.extend(getattr(robot.robot_model, "torso_joints", ()))
+        joint_names.extend(getattr(robot.robot_model, "head_joints", ()))
+        joint_names = list(dict.fromkeys(joint_names))
+        qpos_indexes = [
+            raw_env.sim.model.get_joint_qpos_addr(name) for name in joint_names
+        ]
+        qvel_indexes = [
+            raw_env.sim.model.get_joint_qvel_addr(name) for name in joint_names
+        ]
+        return {
+            "qpos_indexes": qpos_indexes,
+            "qvel_indexes": qvel_indexes,
+            "qpos": np.asarray(
+                raw_env.sim.data.qpos[qpos_indexes], dtype=float
+            ).copy(),
+            "qvel": np.asarray(
+                raw_env.sim.data.qvel[qvel_indexes], dtype=float
+            ).copy(),
+        }
+
+    def capture_hold_targets(self, backend):
+        targets = self._delegate.capture_hold_targets(backend)
+        self._posture = self._capture_robot_posture(backend)
+        return targets
+
+    def _restore_robot_posture(self, backend) -> None:
+        if self._posture is None:
+            raise RuntimeError("robot posture must be captured before carry")
+        raw_env = backend.env
+        raw_env.sim.data.qpos[self._posture["qpos_indexes"]] = self._posture[
+            "qpos"
+        ]
+        raw_env.sim.data.qvel[self._posture["qvel_indexes"]] = self._posture[
+            "qvel"
+        ]
+        raw_env.sim.forward()
+        recorder = getattr(backend, "_record_trajectory_frame", None)
+        if callable(recorder):
+            recorder(_env=raw_env)
+
+    def step(self, backend, **kwargs):
+        result = self._delegate.step(backend, **kwargs)
+        self._restore_robot_posture(backend)
+        return result
+
+    def recover_height(self, backend, **kwargs):
+        result = self._delegate.recover_height(backend, **kwargs)
+        if result:
+            self._posture = self._capture_robot_posture(backend)
+        return result
+
+
+def run_physical_target_alignment(
+    backend,
+    *,
+    object_name: str,
+    target_xy,
+    minimum_object_z: float,
+    target_distance: float = 0.70,
+    max_translation: float = 0.18,
+    step_size: float = 0.002,
+    max_steps: int = 200,
+    max_planar_grasp_drift: float = 0.03,
+    driver=None,
+) -> dict:
+    """Move a physically held object into the scoring radius using both arms."""
+    driver = driver or OfficialPhysicalCarryDriver()
+    target_xy = np.asarray(target_xy, dtype=float).reshape(2)
+    if (
+        not np.all(np.isfinite(target_xy))
+        or float(target_distance) <= 0.0
+        or float(max_translation) <= 0.0
+        or float(step_size) <= 0.0
+        or int(max_steps) < 1
+    ):
+        raise ValueError("physical alignment parameters must be finite and positive")
+
+    hold_targets = driver.capture_hold_targets(backend)
+    start = driver.observe(backend, object_name)
+    observation = start
+    start_xy = np.asarray(start["object_pos"][:2], dtype=float)
+    steps = 0
+    success = False
+    failure_stage = "timeout"
+    driver.record_event(
+        backend,
+        "physical_target_alignment_start",
+        object_name=object_name,
+        target_xy=target_xy.tolist(),
+    )
+
+    while steps < int(max_steps):
+        contacts = observation["contacts"]
+        if next_contact_stability(contacts, 0) == 0:
+            failure_stage = "contact"
+            break
+        if float(observation["object_pos"][2]) < float(minimum_object_z):
+            failure_stage = "object_drop"
+            break
+        grasp_drift = planar_grasp_drift(start, observation)
+        if grasp_drift > float(max_planar_grasp_drift):
+            failure_stage = "planar_grasp_drift"
+            break
+
+        current_xy = np.asarray(observation["object_pos"][:2], dtype=float)
+        error = target_xy - current_xy
+        distance = float(np.linalg.norm(error))
+        if distance <= float(target_distance):
+            success = True
+            failure_stage = None
+            break
+        translation = float(np.linalg.norm(current_xy - start_xy))
+        remaining_translation = float(max_translation) - translation
+        if remaining_translation <= 1e-9:
+            failure_stage = "translation_limit"
+            break
+        requested = min(
+            float(step_size),
+            distance - float(target_distance),
+            remaining_translation,
+        )
+        world_delta = np.array(
+            [error[0], error[1], 0.0],
+            dtype=float,
+        ) / max(distance, 1e-12) * requested
+        step_info = driver.step(
+            backend,
+            object_name=object_name,
+            base_command=np.zeros(3, dtype=float),
+            hold_targets=hold_targets,
+            arm_world_deltas={
+                "right": world_delta.copy(),
+                "left": world_delta.copy(),
+            },
+            gripper_value=1.0,
+            base_control_dt=0.05,
+        )
+        steps += 1
+        observation = driver.observe(backend, object_name)
+        if bool(step_info.get("collision", False)):
+            failure_stage = "collision"
+            break
+
+    final_xy = np.asarray(observation["object_pos"][:2], dtype=float)
+    final_distance = float(np.linalg.norm(final_xy - target_xy))
+    translation = float(np.linalg.norm(final_xy - start_xy))
+    driver.record_event(
+        backend,
+        "physical_target_alignment_end",
+        object_name=object_name,
+        success=success,
+        failure_stage=failure_stage,
+        final_distance=final_distance,
+        translation_m=translation,
+    )
+    return {
+        "success": bool(success),
+        "failure_stage": failure_stage,
+        "steps": int(steps),
+        "final_distance": final_distance,
+        "translation_m": translation,
+        "final_object_pos": np.asarray(
+            observation["object_pos"], dtype=float
+        ).tolist(),
+        "contacts": {
+            "right": bool(observation["contacts"].get("right", False)),
+            "left": bool(observation["contacts"].get("left", False)),
+        },
+    }
 
 
 def _place_result(

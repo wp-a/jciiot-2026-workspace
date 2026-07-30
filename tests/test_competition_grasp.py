@@ -501,6 +501,29 @@ class CompetitionGraspTests(unittest.TestCase):
         self.assertNotIn("attach_for_transport", source)
         self.assertNotIn("_transport_stow", source)
 
+    def test_hold_metadata_preserves_pre_lift_support_reference(self):
+        driver = self.module.OfficialScriptedGraspDriver()
+        driver._close_lift_reference = ("box", 1.00)
+        driver._helpers = lambda: {
+            "object_center": lambda _env, _name: np.array([4.0, 5.0, 1.35])
+        }
+        backend = SimpleNamespace(
+            get_base_pose=lambda: (np.array([3.0, 5.0]), 0.25),
+            env=SimpleNamespace(
+                obj_body_id={"box": 0},
+                sim=SimpleNamespace(
+                    data=SimpleNamespace(
+                        body_xpos=np.array([[4.0, 5.0, 1.20]])
+                    )
+                ),
+            ),
+        )
+
+        hold = driver.physical_hold_metadata(backend, "box")
+
+        self.assertAlmostEqual(hold["support_reference_object_z"], 1.15)
+        self.assertAlmostEqual(hold["minimum_transport_object_z"], 1.25)
+
     def test_container_profile_restores_scored_l1_grasp_parameters(self):
         config = self.module.ScriptedGraspConfig()
 
