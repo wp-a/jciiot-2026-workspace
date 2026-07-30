@@ -2163,6 +2163,7 @@ def _end_grasp_inchworm_probe(
     table_object_z: float,
     stroke_m: float,
     stroke_lift_m: float,
+    height_gain: float,
     reset_m: float,
 ) -> dict[str, Any]:
     """Probe arm-first extraction using the existing physical inchworm controller."""
@@ -2200,6 +2201,7 @@ def _end_grasp_inchworm_probe(
             config=InchwormCarryConfig(
                 stroke_distance=float(stroke_m),
                 stroke_vertical_feedforward=float(stroke_lift_m),
+                stroke_height_gain=float(height_gain),
                 reset_distance=float(reset_m),
                 max_cycles=64,
             ),
@@ -6288,6 +6290,7 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                         table_object_z=pre_grasp_z,
                         stroke_m=args.end_grasp_inchworm_stroke_m,
                         stroke_lift_m=args.end_grasp_inchworm_stroke_lift_m,
+                        height_gain=args.end_grasp_inchworm_height_gain,
                         reset_m=args.end_grasp_inchworm_reset_m,
                     )
                     record["transport_success"] = bool(probe.get("success"))
@@ -6610,6 +6613,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--end-grasp-inchworm-stroke-lift-m", type=float, default=0.015
+    )
+    parser.add_argument(
+        "--end-grasp-inchworm-height-gain", type=float, default=0.75
     )
     parser.add_argument(
         "--end-grasp-inchworm-reset-m", type=float, default=0.06
