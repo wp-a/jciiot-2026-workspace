@@ -1770,6 +1770,73 @@ def geometry_snapshot(raw_env, object_name: str) -> dict[str, Any]:
     }
 
 
+class _PostureLockedActuatedCarryDriver:
+    """Keep robot posture base-relative while delegating physical grip actions."""
+
+    def __init__(self, delegate) -> None:
+        self._delegate = delegate
+        self._posture = None
+
+    def __getattr__(self, name: str):
+        return getattr(self._delegate, name)
+
+    @staticmethod
+    def _capture_robot_posture(backend) -> dict[str, object]:
+        raw_env = backend.env
+        robot = raw_env.robots[0]
+        joint_names = list(getattr(robot, "robot_arm_joints", ()))
+        joint_names.extend(getattr(robot.robot_model, "torso_joints", ()))
+        joint_names.extend(getattr(robot.robot_model, "head_joints", ()))
+        joint_names = list(dict.fromkeys(joint_names))
+        qpos_indexes = [
+            raw_env.sim.model.get_joint_qpos_addr(name) for name in joint_names
+        ]
+        qvel_indexes = [
+            raw_env.sim.model.get_joint_qvel_addr(name) for name in joint_names
+        ]
+        return {
+            "qpos_indexes": qpos_indexes,
+            "qvel_indexes": qvel_indexes,
+            "qpos": np.asarray(
+                raw_env.sim.data.qpos[qpos_indexes], dtype=float
+            ).copy(),
+            "qvel": np.asarray(
+                raw_env.sim.data.qvel[qvel_indexes], dtype=float
+            ).copy(),
+        }
+
+    def capture_hold_targets(self, backend):
+        targets = self._delegate.capture_hold_targets(backend)
+        self._posture = self._capture_robot_posture(backend)
+        return targets
+
+    def _restore_robot_posture(self, backend) -> None:
+        if self._posture is None:
+            raise RuntimeError("robot posture must be captured before carry")
+        raw_env = backend.env
+        raw_env.sim.data.qpos[self._posture["qpos_indexes"]] = self._posture[
+            "qpos"
+        ]
+        raw_env.sim.data.qvel[self._posture["qvel_indexes"]] = self._posture[
+            "qvel"
+        ]
+        raw_env.sim.forward()
+        recorder = getattr(backend, "_record_trajectory_frame", None)
+        if callable(recorder):
+            recorder(_env=raw_env)
+
+    def step(self, backend, **kwargs):
+        result = self._delegate.step(backend, **kwargs)
+        self._restore_robot_posture(backend)
+        return result
+
+    def recover_height(self, backend, **kwargs):
+        result = self._delegate.recover_height(backend, **kwargs)
+        if result:
+            self._posture = self._capture_robot_posture(backend)
+        return result
+
+
 def _posture_locked_carry_probe(
     backend,
     object_name: str,
@@ -1780,11 +1847,13 @@ def _posture_locked_carry_probe(
     table_object_z: float,
     max_linear_m_s: float,
     actuated_gripper_hold: bool = False,
+    posture_lock_robot_joints: bool = False,
     _transport_module=None,
     _gripper_position=None,
     _contact_reader=object_robot_contacts,
     _actuated_transport=None,
     _physical_carry_config_factory=None,
+    _actuated_driver=None,
 ) -> dict[str, Any]:
     """Measure one attachment-free physical carry under posture-locked navigation."""
     requested_distance = float(distance_m)
@@ -1802,6 +1871,8 @@ def _posture_locked_carry_probe(
         )
     if (world_direction_x is None) != (world_direction_y is None):
         raise ValueError("both world direction components must be provided together")
+    if posture_lock_robot_joints and not actuated_gripper_hold:
+        raise ValueError("robot posture lock requires actuated gripper hold")
 
     if _transport_module is None:
         from robosuite.environments.factory_sorting import (
@@ -1815,12 +1886,17 @@ def _posture_locked_carry_probe(
         ]
     if actuated_gripper_hold and _actuated_transport is None:
         from robot_agent.skills.competition_transport import (
+            OfficialPhysicalCarryDriver,
             PhysicalCarryConfig,
             run_physical_transport,
         )
 
         _actuated_transport = run_physical_transport
         _physical_carry_config_factory = PhysicalCarryConfig
+        if posture_lock_robot_joints:
+            _actuated_driver = _PostureLockedActuatedCarryDriver(
+                OfficialPhysicalCarryDriver()
+            )
     if actuated_gripper_hold and _physical_carry_config_factory is None:
         raise ValueError("actuated carry requires a physical carry config factory")
 
@@ -1914,16 +1990,15 @@ def _posture_locked_carry_probe(
             legacy_active_before = legacy_transport_active()
             if not audit["active_before"] and not legacy_active_before:
                 if actuated_gripper_hold:
-                    control_result = _actuated_transport(
-                        backend,
-                        path=[target_base_xy],
-                        object_name=object_name,
-                        hold_yaw=start_base_yaw,
-                        minimum_object_z=(
+                    transport_kwargs = {
+                        "path": [target_base_xy],
+                        "object_name": object_name,
+                        "hold_yaw": start_base_yaw,
+                        "minimum_object_z": (
                             table_z
                             + POSTURE_CARRY_THRESHOLDS["final_object_lift_m"]
                         ),
-                        config=_physical_carry_config_factory(
+                        "config": _physical_carry_config_factory(
                             waypoint_tolerance=1e-4,
                             max_steps=max(
                                 80,
@@ -1933,7 +2008,7 @@ def _posture_locked_carry_probe(
                                         / (requested_max_linear * 0.05)
                                     )
                                 )
-                                * 3,
+                                * 5,
                             ),
                             max_linear=requested_max_linear,
                             max_angular=0.04,
@@ -1946,6 +2021,12 @@ def _posture_locked_carry_probe(
                                 ]
                             ),
                         ),
+                    }
+                    if _actuated_driver is not None:
+                        transport_kwargs["driver"] = _actuated_driver
+                    control_result = _actuated_transport(
+                        backend,
+                        **transport_kwargs,
                     )
                     navigation_reached = bool(
                         isinstance(control_result, Mapping)
@@ -2034,9 +2115,13 @@ def _posture_locked_carry_probe(
         "requested_distance_m": requested_distance,
         "max_linear_m_s": requested_max_linear,
         "control_mode": (
-            "actuated_gripper_hold"
-            if actuated_gripper_hold
-            else "official_follow_path"
+            "actuated_posture_lock"
+            if posture_lock_robot_joints
+            else (
+                "actuated_gripper_hold"
+                if actuated_gripper_hold
+                else "official_follow_path"
+            )
         ),
         "control_result": control_result,
         "world_direction": direction.tolist(),
@@ -6115,6 +6200,9 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                         actuated_gripper_hold=(
                             args.posture_locked_carry_actuated_gripper_hold
                         ),
+                        posture_lock_robot_joints=(
+                            args.posture_locked_carry_posture_lock_robot_joints
+                        ),
                     )
                     for key in _POSTURE_CARRY_REQUIRED_FIELDS:
                         record[key] = probe[key]
@@ -6412,6 +6500,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--posture-locked-carry-actuated-gripper-hold",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--posture-locked-carry-posture-lock-robot-joints",
         action="store_true",
     )
     parser.add_argument("--posture-locked-carry-world-direction-x", type=float)

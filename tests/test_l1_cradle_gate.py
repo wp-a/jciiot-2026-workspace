@@ -492,6 +492,106 @@ class PostureLockedCarryProbeTests(unittest.TestCase):
         self.assertEqual(result["control_mode"], "actuated_gripper_hold")
         self.assertTrue(result["posture_carry_success"])
 
+    def test_actuated_driver_restores_only_non_gripper_posture(self):
+        class Delegate:
+            @staticmethod
+            def capture_hold_targets(backend):
+                del backend
+                return {"torso": np.array([0.2])}
+
+            @staticmethod
+            def step(backend, **kwargs):
+                del kwargs
+                backend.env.sim.data.qpos[:] += 10.0
+                backend.env.sim.data.qvel[:] += 20.0
+                return {"collision": False}
+
+        forward_calls = []
+        model = SimpleNamespace(
+            get_joint_qpos_addr={
+                "arm": 0,
+                "torso": 1,
+                "head": 2,
+                "gripper": 3,
+            }.__getitem__,
+            get_joint_qvel_addr={
+                "arm": 0,
+                "torso": 1,
+                "head": 2,
+                "gripper": 3,
+            }.__getitem__,
+        )
+        robot = SimpleNamespace(
+            robot_arm_joints=["arm"],
+            robot_model=SimpleNamespace(
+                torso_joints=["torso"],
+                head_joints=["head"],
+            ),
+        )
+        backend = SimpleNamespace(
+            env=SimpleNamespace(
+                robots=[robot],
+                sim=SimpleNamespace(
+                    model=model,
+                    data=SimpleNamespace(
+                        qpos=np.array([1.0, 2.0, 3.0, 4.0]),
+                        qvel=np.array([5.0, 6.0, 7.0, 8.0]),
+                    ),
+                    forward=lambda: forward_calls.append(True),
+                ),
+            ),
+            _record_trajectory_frame=lambda **kwargs: None,
+        )
+        driver = gate_module._PostureLockedActuatedCarryDriver(Delegate())
+
+        driver.capture_hold_targets(backend)
+        result = driver.step(backend)
+
+        self.assertFalse(result["collision"])
+        np.testing.assert_allclose(backend.env.sim.data.qpos, [1, 2, 3, 14])
+        np.testing.assert_allclose(backend.env.sim.data.qvel, [5, 6, 7, 28])
+        self.assertEqual(forward_calls, [True])
+
+    def test_probe_passes_posture_locked_driver_to_actuated_transport(self):
+        backend = self.FakeBackend()
+        sentinel_driver = object()
+        received = []
+
+        def actuated_transport(selected_backend, **kwargs):
+            received.append(kwargs["driver"])
+            selected_backend.base_xy = np.asarray(
+                kwargs["path"][0], dtype=float
+            ).copy()
+            displacement = np.array([0.09, 0.0, 0.0], dtype=float)
+            selected_backend.env.sim.data.body_xpos[0] += displacement
+            for arm in selected_backend.grippers:
+                selected_backend.grippers[arm] += displacement
+            return {"success": True}
+
+        result = gate_module._posture_locked_carry_probe(
+            backend,
+            "box",
+            distance_m=0.10,
+            world_direction_x=None,
+            world_direction_y=None,
+            table_object_z=1.0,
+            max_linear_m_s=0.04,
+            actuated_gripper_hold=True,
+            posture_lock_robot_joints=True,
+            _transport_module=self.fake_transport_module(),
+            _gripper_position=self.gripper_position(backend),
+            _contact_reader=self.contacts,
+            _actuated_transport=actuated_transport,
+            _physical_carry_config_factory=lambda **kwargs: SimpleNamespace(
+                **kwargs
+            ),
+            _actuated_driver=sentinel_driver,
+        )
+
+        self.assertEqual(received, [sentinel_driver])
+        self.assertEqual(result["control_mode"], "actuated_posture_lock")
+        self.assertTrue(result["posture_carry_success"])
+
     def test_runner_selects_probe_after_physical_grasp_and_uses_its_gate(self):
         source = inspect.getsource(gate_module.run_probe)
 
@@ -1686,6 +1786,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.posture_locked_carry_distance_m, 0.0)
         self.assertAlmostEqual(args.posture_locked_carry_max_linear_m_s, 0.04)
         self.assertFalse(args.posture_locked_carry_actuated_gripper_hold)
+        self.assertFalse(args.posture_locked_carry_posture_lock_robot_joints)
         self.assertIsNone(args.posture_locked_carry_world_direction_x)
         self.assertIsNone(args.posture_locked_carry_world_direction_y)
         self.assertAlmostEqual(args.center_carry_distance_m, 0.0)
@@ -1768,6 +1869,7 @@ class JointSeedParserTests(unittest.TestCase):
                 "--posture-locked-carry-max-linear-m-s",
                 "0.02",
                 "--posture-locked-carry-actuated-gripper-hold",
+                "--posture-locked-carry-posture-lock-robot-joints",
                 "--posture-locked-carry-world-direction-x",
                 "-1.0",
                 "--posture-locked-carry-world-direction-y",
@@ -1860,6 +1962,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.posture_locked_carry_distance_m, 0.10)
         self.assertAlmostEqual(args.posture_locked_carry_max_linear_m_s, 0.02)
         self.assertTrue(args.posture_locked_carry_actuated_gripper_hold)
+        self.assertTrue(args.posture_locked_carry_posture_lock_robot_joints)
         self.assertAlmostEqual(
             args.posture_locked_carry_world_direction_x,
             -1.0,
