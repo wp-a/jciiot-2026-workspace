@@ -7,6 +7,7 @@ import numpy as np
 import scripts.run_l1_cradle_gate as gate_module
 from scripts.run_l1_cradle_gate import (
     _center_regrasp_probe,
+    _end_grasp_regrasp_probe,
     _end_grasp_setdown_probe,
     allocate_segment_steps,
     arm_transport_stroke_targets,
@@ -140,6 +141,8 @@ VALID_SETDOWN_RECORD = {
     "object_translation_m": 0.12,
     "net_projected_object_progress_m": 0.12,
     "net_lateral_object_drift_m": 0.05,
+    "requested_macro_count": 1,
+    "completed_macro_count": 1,
     "attachment_calls": 0,
     "object_pose_writes": 0,
     "collision_frames": 0,
@@ -162,6 +165,8 @@ class EndGraspSetdownGateTests(unittest.TestCase):
             "object_translation_m": 0.119999,
             "net_projected_object_progress_m": 0.119999,
             "net_lateral_object_drift_m": 0.050001,
+            "requested_macro_count": 0,
+            "completed_macro_count": 0,
             "attachment_calls": 1,
             "object_pose_writes": 1,
             "collision_frames": 1,
@@ -186,6 +191,8 @@ class EndGraspSetdownGateTests(unittest.TestCase):
             "object_translation_m",
             "net_projected_object_progress_m",
             "net_lateral_object_drift_m",
+            "requested_macro_count",
+            "completed_macro_count",
             "attachment_calls",
             "object_pose_writes",
             "collision_frames",
@@ -195,6 +202,101 @@ class EndGraspSetdownGateTests(unittest.TestCase):
                     record = dict(VALID_SETDOWN_RECORD)
                     record[key] = value
                     self.assertIn(key, setdown_gate_failures(record))
+
+    def test_setdown_gate_scales_net_progress_with_requested_macros(self):
+        record = {
+            **VALID_SETDOWN_RECORD,
+            "requested_macro_count": 2,
+            "completed_macro_count": 2,
+            "net_projected_object_progress_m": 0.239999,
+        }
+
+        self.assertIn(
+            "net_projected_object_progress_m",
+            setdown_gate_failures(record),
+        )
+        record["net_projected_object_progress_m"] = 0.24
+        self.assertEqual(setdown_gate_failures(record), [])
+
+    def test_regrasp_probe_repeats_only_after_successful_physical_release(self):
+        raw_env = SimpleNamespace(
+            obj_body_id={"box": 0},
+            sim=SimpleNamespace(
+                data=SimpleNamespace(
+                    body_xpos=np.array([[0.0, 0.0, 1.0]], dtype=float)
+                )
+            ),
+        )
+        backend = SimpleNamespace(env=raw_env)
+
+        class Driver:
+            def __init__(self):
+                self.calls = []
+                self._physical_hold = {"active": True}
+
+            def move(self, source, *, carrying, object_name):
+                self.calls.append(("move", source, carrying, object_name))
+                return True
+
+            def grasp(self, source, object_name):
+                self.calls.append(("grasp", source, object_name))
+                return {
+                    "success": True,
+                    "lift_success": True,
+                    "contacts": {"right": True, "left": True},
+                }
+
+        driver = Driver()
+        setdown_calls = []
+
+        def setdown(_backend, object_name, **kwargs):
+            setdown_calls.append((object_name, kwargs))
+            raw_env.sim.data.body_xpos[0, 0] += 0.20
+            return {
+                "success": True,
+                "failure_stage": None,
+                "transport_success": True,
+                "place_success": True,
+                "support_detected": True,
+                "released": True,
+                "world_direction": [1.0, 0.0],
+                "attachment_activations": 0,
+                "object_pose_writes": 0,
+            }
+
+        result = _end_grasp_regrasp_probe(
+            backend,
+            driver,
+            "input_5",
+            "box",
+            macro_count=2,
+            distance_m=0.14,
+            world_direction_x=1.0,
+            world_direction_y=0.0,
+            table_object_z=1.0,
+            stroke_m=0.08,
+            stroke_lift_m=0.0,
+            height_gain=0.0,
+            reset_m=0.06,
+            minimum_lift_m=0.10,
+            place_max_descent_m=0.35,
+            _setdown_probe=setdown,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["requested_macro_count"], 2)
+        self.assertEqual(result["completed_macro_count"], 2)
+        self.assertEqual(len(result["macros"]), 2)
+        self.assertEqual(len(setdown_calls), 2)
+        self.assertEqual(
+            driver.calls,
+            [
+                ("move", "input_5", False, "box"),
+                ("grasp", "input_5", "box"),
+            ],
+        )
+        self.assertIsNone(driver._physical_hold)
+        self.assertAlmostEqual(result["measured_object_translation_m"], 0.40)
 
 
 class PostureCarryGateTests(unittest.TestCase):
@@ -679,6 +781,7 @@ class PostureLockedCarryProbeTests(unittest.TestCase):
         self.assertIn("if args.end_grasp_setdown_after_inchworm", source)
         self.assertIn('record["mode"] = "end_grasp_setdown_probe"', source)
         self.assertIn("_end_grasp_setdown_probe(", source)
+        self.assertIn("_end_grasp_regrasp_probe(", source)
         self.assertIn(
             'record["gate_failures"] = posture_carry_failures(record)',
             source,
@@ -1877,6 +1980,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.end_grasp_minimum_lift_m, 0.10)
         self.assertFalse(args.end_grasp_setdown_after_inchworm)
         self.assertAlmostEqual(args.end_grasp_place_max_descent_m, 0.25)
+        self.assertEqual(args.end_grasp_regrasp_macros, 1)
         self.assertAlmostEqual(args.center_carry_distance_m, 0.0)
         self.assertFalse(args.center_carry_away_from_object)
         self.assertAlmostEqual(args.center_carry_max_linear, 0.04)
@@ -1983,6 +2087,8 @@ class JointSeedParserTests(unittest.TestCase):
                 "--end-grasp-setdown-after-inchworm",
                 "--end-grasp-place-max-descent-m",
                 "0.22",
+                "--end-grasp-regrasp-macros",
+                "2",
                 "--center-carry-away-from-object",
                 "--center-carry-corner-seat-m",
                 "0.08",
@@ -2091,6 +2197,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.end_grasp_minimum_lift_m, 0.015)
         self.assertTrue(args.end_grasp_setdown_after_inchworm)
         self.assertAlmostEqual(args.end_grasp_place_max_descent_m, 0.22)
+        self.assertEqual(args.end_grasp_regrasp_macros, 2)
         self.assertTrue(args.center_carry_away_from_object)
         self.assertAlmostEqual(args.center_carry_corner_seat_m, 0.08)
         self.assertAlmostEqual(args.center_carry_arm_stroke_m, 0.07)

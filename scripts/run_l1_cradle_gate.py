@@ -313,6 +313,8 @@ _SETDOWN_REQUIRED_FIELDS = (
     "object_translation_m",
     "net_projected_object_progress_m",
     "net_lateral_object_drift_m",
+    "requested_macro_count",
+    "completed_macro_count",
     "attachment_calls",
     "object_pose_writes",
     "collision_frames",
@@ -345,8 +347,23 @@ def setdown_gate_failures(record: Mapping[str, object]) -> list[str]:
     translation = numeric("object_translation_m")
     if translation is None or translation < 0.12:
         failures.append("object_translation_m")
+    requested_macros = numeric("requested_macro_count")
+    if (
+        requested_macros is None
+        or requested_macros < 1.0
+        or not requested_macros.is_integer()
+    ):
+        failures.append("requested_macro_count")
+        requested_macros = 1.0
+    completed_macros = numeric("completed_macro_count")
+    if (
+        completed_macros is None
+        or not completed_macros.is_integer()
+        or completed_macros != requested_macros
+    ):
+        failures.append("completed_macro_count")
     net_progress = numeric("net_projected_object_progress_m")
-    if net_progress is None or net_progress < 0.12:
+    if net_progress is None or net_progress < 0.12 * requested_macros:
         failures.append("net_projected_object_progress_m")
     net_lateral = numeric("net_lateral_object_drift_m")
     if net_lateral is None or net_lateral > 0.05:
@@ -2384,6 +2401,8 @@ def _end_grasp_setdown_probe(
     return {
         "success": success,
         "failure_stage": failure_stage,
+        "requested_macro_count": 1,
+        "completed_macro_count": int(success),
         "transport_success": transport_success,
         "place_success": place_success,
         "support_detected": support_detected,
@@ -2410,6 +2429,159 @@ def _end_grasp_setdown_probe(
             transport.get("transport_attachment_active_after", False)
         )
         or bool(place_audit["active_after"]),
+    }
+
+
+def _end_grasp_regrasp_probe(
+    backend,
+    driver,
+    source: str,
+    object_name: str,
+    *,
+    macro_count: int,
+    distance_m: float,
+    world_direction_x: float | None,
+    world_direction_y: float | None,
+    table_object_z: float,
+    stroke_m: float,
+    stroke_lift_m: float,
+    height_gain: float,
+    reset_m: float,
+    minimum_lift_m: float,
+    place_max_descent_m: float,
+    _setdown_probe=None,
+) -> dict[str, Any]:
+    """Repeat physical setdown, dynamic base repositioning, and regrasp."""
+    if isinstance(macro_count, bool) or int(macro_count) != macro_count:
+        raise ValueError("macro_count must be a positive integer")
+    requested_macros = int(macro_count)
+    if requested_macros < 1:
+        raise ValueError("macro_count must be a positive integer")
+    setdown_probe = _setdown_probe or _end_grasp_setdown_probe
+    raw_env = backend.env
+    body_id = raw_env.obj_body_id[object_name]
+    start_object = np.asarray(
+        raw_env.sim.data.body_xpos[body_id], dtype=float
+    ).copy()
+    setdown_kwargs = {
+        "distance_m": distance_m,
+        "world_direction_x": world_direction_x,
+        "world_direction_y": world_direction_y,
+        "table_object_z": table_object_z,
+        "stroke_m": stroke_m,
+        "stroke_lift_m": stroke_lift_m,
+        "height_gain": height_gain,
+        "reset_m": reset_m,
+        "minimum_lift_m": minimum_lift_m,
+        "place_max_descent_m": place_max_descent_m,
+    }
+    macros = []
+    regrasps = []
+    completed_macros = 0
+    attachment_activations = 0
+    object_pose_writes = 0
+    attachment_active_before = False
+    attachment_active_after = False
+    failure_stage = None
+
+    for macro_index in range(requested_macros):
+        macro = setdown_probe(
+            backend,
+            object_name,
+            **setdown_kwargs,
+        )
+        macros.append({"macro": macro_index + 1, **macro})
+        attachment_activations += int(macro.get("attachment_activations", 0))
+        object_pose_writes += int(macro.get("object_pose_writes", 0))
+        attachment_active_before = bool(
+            attachment_active_before
+            or macro.get("transport_attachment_active_before", False)
+        )
+        attachment_active_after = bool(
+            attachment_active_after
+            or macro.get("transport_attachment_active_after", False)
+        )
+        if not bool(macro.get("success", False)):
+            failure_stage = (
+                f"macro_{macro_index + 1}:"
+                f"{macro.get('failure_stage') or 'unknown'}"
+            )
+            break
+        completed_macros += 1
+        driver._physical_hold = None
+        if completed_macros >= requested_macros:
+            break
+
+        regrasp_start = np.asarray(
+            raw_env.sim.data.body_xpos[body_id], dtype=float
+        ).copy()
+        moved = bool(
+            driver.move(
+                source,
+                carrying=False,
+                object_name=object_name,
+            )
+        )
+        grasp = driver.grasp(source, object_name) if moved else None
+        regrasp_end = np.asarray(
+            raw_env.sim.data.body_xpos[body_id], dtype=float
+        ).copy()
+        physical_grasp = bool(
+            isinstance(grasp, Mapping)
+            and grasp.get("success")
+            and grasp.get("lift_success")
+            and all(bool(value) for value in grasp.get("contacts", {}).values())
+        )
+        regrasps.append(
+            {
+                "after_macro": macro_index + 1,
+                "move_success": moved,
+                "physical_grasp": physical_grasp,
+                "grasp": grasp,
+                "start_object_position": regrasp_start.tolist(),
+                "end_object_position": regrasp_end.tolist(),
+                "object_translation_m": float(
+                    np.linalg.norm(regrasp_end[:2] - regrasp_start[:2])
+                ),
+            }
+        )
+        if not moved:
+            failure_stage = f"regrasp_{macro_index + 1}:move"
+            break
+        if not physical_grasp:
+            failure_stage = f"regrasp_{macro_index + 1}:grasp"
+            break
+
+    end_object = np.asarray(
+        raw_env.sim.data.body_xpos[body_id], dtype=float
+    ).copy()
+    last_macro = macros[-1] if macros else {}
+    success = bool(
+        failure_stage is None and completed_macros == requested_macros
+    )
+    return {
+        "success": success,
+        "failure_stage": failure_stage,
+        "requested_macro_count": requested_macros,
+        "completed_macro_count": completed_macros,
+        "transport_success": bool(
+            macros and all(bool(macro.get("transport_success")) for macro in macros)
+        ),
+        "place_success": bool(last_macro.get("place_success", False)),
+        "support_detected": bool(last_macro.get("support_detected", False)),
+        "released": bool(last_macro.get("released", False)),
+        "macros": macros,
+        "regrasps": regrasps,
+        "world_direction": list(last_macro.get("world_direction", [])),
+        "start_object_position": start_object.tolist(),
+        "end_object_position": end_object.tolist(),
+        "measured_object_translation_m": float(
+            np.linalg.norm(end_object[:2] - start_object[:2])
+        ),
+        "attachment_activations": attachment_activations,
+        "object_pose_writes": object_pose_writes,
+        "transport_attachment_active_before": attachment_active_before,
+        "transport_attachment_active_after": attachment_active_after,
     }
 
 
@@ -6499,14 +6671,27 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                     }
                     if args.end_grasp_setdown_after_inchworm:
                         record["mode"] = "end_grasp_setdown_probe"
-                        probe = _end_grasp_setdown_probe(
-                            backend,
-                            object_name,
-                            place_max_descent_m=(
-                                args.end_grasp_place_max_descent_m
-                            ),
-                            **inchworm_kwargs,
-                        )
+                        if args.end_grasp_regrasp_macros > 1:
+                            probe = _end_grasp_regrasp_probe(
+                                backend,
+                                driver,
+                                str(task["source"]),
+                                object_name,
+                                macro_count=args.end_grasp_regrasp_macros,
+                                place_max_descent_m=(
+                                    args.end_grasp_place_max_descent_m
+                                ),
+                                **inchworm_kwargs,
+                            )
+                        else:
+                            probe = _end_grasp_setdown_probe(
+                                backend,
+                                object_name,
+                                place_max_descent_m=(
+                                    args.end_grasp_place_max_descent_m
+                                ),
+                                **inchworm_kwargs,
+                            )
                         record["transport_success"] = bool(
                             probe.get("transport_success")
                         )
@@ -6515,6 +6700,12 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                             probe.get("support_detected")
                         )
                         record["released"] = bool(probe.get("released"))
+                        record["requested_macro_count"] = int(
+                            probe.get("requested_macro_count", 1)
+                        )
+                        record["completed_macro_count"] = int(
+                            probe.get("completed_macro_count", 0)
+                        )
                     else:
                         record["mode"] = "end_grasp_inchworm_transport"
                         probe = _end_grasp_inchworm_probe(
@@ -6879,6 +7070,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--end-grasp-place-max-descent-m", type=float, default=0.25
     )
+    parser.add_argument("--end-grasp-regrasp-macros", type=int, default=1)
     parser.add_argument("--center-carry-distance-m", type=float, default=0.0)
     parser.add_argument("--center-carry-max-linear", type=float, default=0.04)
     parser.add_argument("--center-carry-away-from-object", action="store_true")
