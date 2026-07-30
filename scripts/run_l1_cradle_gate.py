@@ -109,6 +109,31 @@ def navigation_retract_targets(
     return targets
 
 
+def floor_regrasp_safe_base_xy(
+    *,
+    object_xy: object,
+    current_base_xy: object,
+    clearance_m: float,
+) -> np.ndarray:
+    """Move outward on the current object-to-base ray before changing yaw."""
+    object_position = np.asarray(object_xy, dtype=float)
+    base_position = np.asarray(current_base_xy, dtype=float)
+    clearance = float(clearance_m)
+    if object_position.shape != (2,) or base_position.shape != (2,):
+        raise ValueError("floor regrasp positions must be planar vectors")
+    if not np.all(np.isfinite(object_position)) or not np.all(
+        np.isfinite(base_position)
+    ):
+        raise ValueError("floor regrasp positions must be finite")
+    if not np.isfinite(clearance) or clearance <= 0.0:
+        raise ValueError("floor regrasp clearance must be finite and positive")
+    outward = base_position - object_position
+    distance = float(np.linalg.norm(outward))
+    if distance <= 1e-12:
+        raise ValueError("floor regrasp base must not coincide with the object")
+    return object_position + outward / distance * max(distance, clearance)
+
+
 @contextmanager
 def transport_attachment_audit(raw_env: object, transport_module: object):
     """Count transport attachment and direct object-pose operations in a scope."""
@@ -2543,6 +2568,97 @@ def _navigation_retract_probe(
     }
 
 
+def _floor_regrasp_move_probe(
+    backend,
+    driver,
+    source: str,
+    object_name: str,
+    *,
+    safe_clearance_m: float,
+) -> dict[str, Any]:
+    """Translate outward, orient in clearance, then approach a floor object."""
+    from robot_agent.skills.competition_navigation import orient_base
+
+    raw_env = backend.env
+    body_id = raw_env.obj_body_id[object_name]
+    object_xy = np.asarray(
+        raw_env.sim.data.body_xpos[body_id][:2], dtype=float
+    ).copy()
+    current_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
+    grasp_pose = driver._grasp_pose(source, object_name)
+    safe_base_xy = floor_regrasp_safe_base_xy(
+        object_xy=object_xy,
+        current_base_xy=current_base_xy,
+        clearance_m=safe_clearance_m,
+    )
+    target_base_xy = np.asarray(grasp_pose["base_xy"], dtype=float)
+    target_yaw = float(grasp_pose["yaw"])
+    marker = getattr(backend, "_mark_trajectory_event", None)
+    if callable(marker):
+        marker(
+            "floor_regrasp_move_start",
+            safe_base_xy=safe_base_xy.tolist(),
+            target_base_xy=target_base_xy.tolist(),
+            target_yaw=target_yaw,
+        )
+
+    safe_reached = bool(
+        backend.follow_path(
+            [safe_base_xy],
+            max_steps=1200,
+            waypoint_tolerance=0.03,
+        )
+    )
+    oriented = bool(safe_reached and orient_base(backend, target_yaw))
+    clearance_prepared = bool(
+        oriented and driver._prepare_grasp_clearance(object_name)
+    )
+    target_reached = bool(
+        clearance_prepared
+        and backend.follow_path(
+            [target_base_xy],
+            max_steps=1200,
+            waypoint_tolerance=0.03,
+        )
+    )
+    collision = bool(getattr(raw_env, "has_judge_collision", False))
+    success = bool(
+        safe_reached
+        and oriented
+        and clearance_prepared
+        and target_reached
+        and not collision
+    )
+    if success:
+        driver._grasp_yaw = target_yaw
+        driver._swap_arm_targets = bool(grasp_pose["swap_arm_targets"])
+        driver._clearance_prepared = True
+    if callable(marker):
+        marker(
+            "floor_regrasp_move_end",
+            success=success,
+            safe_reached=safe_reached,
+            oriented=oriented,
+            clearance_prepared=clearance_prepared,
+            target_reached=target_reached,
+            collision=collision,
+        )
+    final_base_xy, final_base_yaw = backend.get_base_pose()
+    return {
+        "success": success,
+        "collision": collision,
+        "safe_reached": safe_reached,
+        "oriented": oriented,
+        "clearance_prepared": clearance_prepared,
+        "target_reached": target_reached,
+        "safe_base_xy": safe_base_xy.tolist(),
+        "target_base_xy": target_base_xy.tolist(),
+        "target_yaw": target_yaw,
+        "final_base_xy": np.asarray(final_base_xy, dtype=float).tolist(),
+        "final_base_yaw": float(final_base_yaw),
+    }
+
+
 def _end_grasp_regrasp_probe(
     backend,
     driver,
@@ -2564,8 +2680,10 @@ def _end_grasp_regrasp_probe(
     floor_retract_lateral_m: float = 0.15,
     floor_retract_target_z: float = 1.45,
     floor_transition_margin_m: float = 0.30,
+    floor_regrasp_safe_clearance_m: float = 1.20,
     _setdown_probe=None,
     _navigation_retract=None,
+    _floor_regrasp_move=None,
 ) -> dict[str, Any]:
     """Repeat physical setdown, dynamic base repositioning, and regrasp."""
     if isinstance(macro_count, bool) or int(macro_count) != macro_count:
@@ -2575,6 +2693,7 @@ def _end_grasp_regrasp_probe(
         raise ValueError("macro_count must be a positive integer")
     setdown_probe = _setdown_probe or _end_grasp_setdown_probe
     retract_probe = _navigation_retract or _navigation_retract_probe
+    floor_move_probe = _floor_regrasp_move or _floor_regrasp_move_probe
     floor_margin = float(floor_transition_margin_m)
     if not np.isfinite(floor_margin) or floor_margin <= 0.0:
         raise ValueError("floor_transition_margin_m must be finite and positive")
@@ -2636,7 +2755,10 @@ def _end_grasp_regrasp_probe(
             raw_env.sim.data.body_xpos[body_id], dtype=float
         ).copy()
         navigation_retract = None
-        if float(regrasp_start[2]) < float(table_object_z) - floor_margin:
+        floor_transition = bool(
+            float(regrasp_start[2]) < float(table_object_z) - floor_margin
+        )
+        if floor_transition:
             navigation_retract = retract_probe(
                 backend,
                 forward_m=floor_retract_forward_m,
@@ -2658,13 +2780,24 @@ def _end_grasp_regrasp_probe(
                 )
                 failure_stage = f"regrasp_{macro_index + 1}:retract"
                 break
-        moved = bool(
-            driver.move(
+        floor_regrasp_move = None
+        if floor_transition:
+            floor_regrasp_move = floor_move_probe(
+                backend,
+                driver,
                 source,
-                carrying=False,
-                object_name=object_name,
+                object_name,
+                safe_clearance_m=floor_regrasp_safe_clearance_m,
             )
-        )
+            moved = bool(floor_regrasp_move.get("success", False))
+        else:
+            moved = bool(
+                driver.move(
+                    source,
+                    carrying=False,
+                    object_name=object_name,
+                )
+            )
         grasp = driver.grasp(source, object_name) if moved else None
         regrasp_end = np.asarray(
             raw_env.sim.data.body_xpos[body_id], dtype=float
@@ -2679,6 +2812,7 @@ def _end_grasp_regrasp_probe(
             {
                 "after_macro": macro_index + 1,
                 "navigation_retract": navigation_retract,
+                "floor_regrasp_move": floor_regrasp_move,
                 "move_success": moved,
                 "physical_grasp": physical_grasp,
                 "grasp": grasp,
@@ -6837,6 +6971,9 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                                 floor_transition_margin_m=(
                                     args.floor_transition_margin_m
                                 ),
+                                floor_regrasp_safe_clearance_m=(
+                                    args.floor_regrasp_safe_clearance_m
+                                ),
                                 **inchworm_kwargs,
                             )
                         else:
@@ -7238,6 +7375,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--floor-transition-margin-m", type=float, default=0.30
+    )
+    parser.add_argument(
+        "--floor-regrasp-safe-clearance-m", type=float, default=1.20
     )
     parser.add_argument("--center-carry-distance-m", type=float, default=0.0)
     parser.add_argument("--center-carry-max-linear", type=float, default=0.04)
