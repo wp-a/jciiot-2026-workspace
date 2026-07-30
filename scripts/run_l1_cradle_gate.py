@@ -2153,6 +2153,71 @@ def _posture_locked_carry_probe(
     }
 
 
+def _end_grasp_inchworm_probe(
+    backend,
+    object_name: str,
+    *,
+    distance_m: float,
+    world_direction_x: float | None,
+    world_direction_y: float | None,
+    table_object_z: float,
+    stroke_m: float,
+    reset_m: float,
+) -> dict[str, Any]:
+    """Probe arm-first extraction using the existing physical inchworm controller."""
+    from robosuite.environments.factory_sorting import transport_attachment
+    from robot_agent.skills.competition_transport import (
+        InchwormCarryConfig,
+        run_inchworm_transport,
+    )
+
+    if (world_direction_x is None) != (world_direction_y is None):
+        raise ValueError("both inchworm direction components must be provided together")
+    raw_env = backend.env
+    body_id = raw_env.obj_body_id[object_name]
+    start_object = np.asarray(raw_env.sim.data.body_xpos[body_id], dtype=float).copy()
+    start_base = np.asarray(backend.get_base_pose()[0], dtype=float).copy()
+    if world_direction_x is None:
+        direction = start_object[:2] - start_base
+    else:
+        direction = np.array(
+            [float(world_direction_x), float(world_direction_y)],
+            dtype=float,
+        )
+    direction_norm = float(np.linalg.norm(direction))
+    if direction_norm <= 0.0 or not np.all(np.isfinite(direction)):
+        raise ValueError("inchworm direction must be finite and non-zero")
+    direction /= direction_norm
+
+    with transport_attachment_audit(raw_env, transport_attachment) as audit:
+        result = run_inchworm_transport(
+            backend,
+            object_name=object_name,
+            travel_direction=direction,
+            travel_distance=float(distance_m),
+            minimum_object_z=float(table_object_z) + 0.10,
+            config=InchwormCarryConfig(
+                stroke_distance=float(stroke_m),
+                reset_distance=float(reset_m),
+                max_cycles=64,
+            ),
+        )
+    end_object = np.asarray(raw_env.sim.data.body_xpos[body_id], dtype=float).copy()
+    return {
+        **result,
+        "world_direction": direction.tolist(),
+        "start_object_position": start_object.tolist(),
+        "end_object_position": end_object.tolist(),
+        "measured_object_translation_m": float(
+            np.linalg.norm(end_object[:2] - start_object[:2])
+        ),
+        "attachment_activations": int(audit["attachment_activations"]),
+        "object_pose_writes": int(audit["object_pose_writes"]),
+        "transport_attachment_active_before": bool(audit["active_before"]),
+        "transport_attachment_active_after": bool(audit["active_after"]),
+    }
+
+
 def _hold_probe(backend, object_name: str, *, steps: int) -> dict[str, Any]:
     from robot_agent.skills.competition_grasp import OfficialScriptedGraspDriver
     from robot_agent.skills.competition_transport import (
@@ -6206,6 +6271,32 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                     )
                     for key in _POSTURE_CARRY_REQUIRED_FIELDS:
                         record[key] = probe[key]
+                elif args.end_grasp_inchworm_distance_m > 0.0:
+                    record["mode"] = "end_grasp_inchworm_transport"
+                    probe = _end_grasp_inchworm_probe(
+                        backend,
+                        object_name,
+                        distance_m=args.end_grasp_inchworm_distance_m,
+                        world_direction_x=(
+                            args.end_grasp_inchworm_world_direction_x
+                        ),
+                        world_direction_y=(
+                            args.end_grasp_inchworm_world_direction_y
+                        ),
+                        table_object_z=pre_grasp_z,
+                        stroke_m=args.end_grasp_inchworm_stroke_m,
+                        reset_m=args.end_grasp_inchworm_reset_m,
+                    )
+                    record["transport_success"] = bool(probe.get("success"))
+                    record["object_translation_m"] = float(
+                        probe.get("measured_object_translation_m", 0.0)
+                    )
+                    record["attachment_calls"] = int(
+                        probe.get("attachment_activations", 0)
+                    )
+                    record["object_pose_writes"] = int(
+                        probe.get("object_pose_writes", 0)
+                    )
                 elif args.physical_push:
                     probe = _physical_push_probe(
                         backend,
@@ -6508,6 +6599,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--posture-locked-carry-world-direction-x", type=float)
     parser.add_argument("--posture-locked-carry-world-direction-y", type=float)
+    parser.add_argument(
+        "--end-grasp-inchworm-distance-m", type=float, default=0.0
+    )
+    parser.add_argument(
+        "--end-grasp-inchworm-stroke-m", type=float, default=0.08
+    )
+    parser.add_argument(
+        "--end-grasp-inchworm-reset-m", type=float, default=0.06
+    )
+    parser.add_argument("--end-grasp-inchworm-world-direction-x", type=float)
+    parser.add_argument("--end-grasp-inchworm-world-direction-y", type=float)
     parser.add_argument("--center-carry-distance-m", type=float, default=0.0)
     parser.add_argument("--center-carry-max-linear", type=float, default=0.04)
     parser.add_argument("--center-carry-away-from-object", action="store_true")

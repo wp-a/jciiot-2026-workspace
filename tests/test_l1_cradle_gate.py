@@ -598,10 +598,16 @@ class PostureLockedCarryProbeTests(unittest.TestCase):
         posture_index = source.index(
             "if args.posture_locked_carry_distance_m > 0.0"
         )
+        inchworm_index = source.index(
+            "elif args.end_grasp_inchworm_distance_m > 0.0"
+        )
         push_index = source.index("elif args.physical_push")
-        self.assertLess(posture_index, push_index)
+        self.assertLess(posture_index, inchworm_index)
+        self.assertLess(inchworm_index, push_index)
         self.assertIn('record["mode"] = "posture_locked_physical_carry"', source)
         self.assertIn("_posture_locked_carry_probe(", source)
+        self.assertIn('record["mode"] = "end_grasp_inchworm_transport"', source)
+        self.assertIn("_end_grasp_inchworm_probe(", source)
         self.assertIn(
             'record["gate_failures"] = posture_carry_failures(record)',
             source,
@@ -1789,6 +1795,11 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertFalse(args.posture_locked_carry_posture_lock_robot_joints)
         self.assertIsNone(args.posture_locked_carry_world_direction_x)
         self.assertIsNone(args.posture_locked_carry_world_direction_y)
+        self.assertAlmostEqual(args.end_grasp_inchworm_distance_m, 0.0)
+        self.assertAlmostEqual(args.end_grasp_inchworm_stroke_m, 0.08)
+        self.assertAlmostEqual(args.end_grasp_inchworm_reset_m, 0.06)
+        self.assertIsNone(args.end_grasp_inchworm_world_direction_x)
+        self.assertIsNone(args.end_grasp_inchworm_world_direction_y)
         self.assertAlmostEqual(args.center_carry_distance_m, 0.0)
         self.assertFalse(args.center_carry_away_from_object)
         self.assertAlmostEqual(args.center_carry_max_linear, 0.04)
@@ -1874,6 +1885,16 @@ class JointSeedParserTests(unittest.TestCase):
                 "-1.0",
                 "--posture-locked-carry-world-direction-y",
                 "0.25",
+                "--end-grasp-inchworm-distance-m",
+                "0.07",
+                "--end-grasp-inchworm-stroke-m",
+                "0.08",
+                "--end-grasp-inchworm-reset-m",
+                "0.05",
+                "--end-grasp-inchworm-world-direction-x",
+                "1.0",
+                "--end-grasp-inchworm-world-direction-y",
+                "0.0",
                 "--center-carry-away-from-object",
                 "--center-carry-corner-seat-m",
                 "0.08",
@@ -1971,6 +1992,11 @@ class JointSeedParserTests(unittest.TestCase):
             args.posture_locked_carry_world_direction_y,
             0.25,
         )
+        self.assertAlmostEqual(args.end_grasp_inchworm_distance_m, 0.07)
+        self.assertAlmostEqual(args.end_grasp_inchworm_stroke_m, 0.08)
+        self.assertAlmostEqual(args.end_grasp_inchworm_reset_m, 0.05)
+        self.assertAlmostEqual(args.end_grasp_inchworm_world_direction_x, 1.0)
+        self.assertAlmostEqual(args.end_grasp_inchworm_world_direction_y, 0.0)
         self.assertTrue(args.center_carry_away_from_object)
         self.assertAlmostEqual(args.center_carry_corner_seat_m, 0.08)
         self.assertAlmostEqual(args.center_carry_arm_stroke_m, 0.07)
