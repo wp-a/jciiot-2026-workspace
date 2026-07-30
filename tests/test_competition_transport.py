@@ -113,21 +113,6 @@ class PhysicalTransportGeometryTests(unittest.TestCase):
         self.assertAlmostEqual(steady, 0.0004)
         self.assertAlmostEqual(correcting, 0.0020)
 
-    def test_planar_clamp_deltas_are_symmetric_along_gripper_axis(self):
-        module = load_module()
-
-        deltas = module.symmetric_planar_clamp_deltas(
-            {
-                "right": np.array([7.4, 4.7, 1.3]),
-                "left": np.array([7.4, 4.5, 1.3]),
-            },
-            inward_delta=0.003,
-        )
-
-        np.testing.assert_allclose(deltas["right"], [0.0, -0.003])
-        np.testing.assert_allclose(deltas["left"], [0.0, 0.003])
-        np.testing.assert_allclose(deltas["right"], -deltas["left"])
-
     def test_direct_base_step_rotates_command_and_bounds_displacement(self):
         module = load_module()
 
@@ -280,7 +265,6 @@ class FakePhysicalTransportDriver:
         recover_success=True,
         recovered_height_result=None,
         planar_slip_per_step=0.0,
-        gripper_xy_offsets=None,
     ):
         self.base_xy = np.zeros(2, dtype=float)
         self.object_xy = np.array([0.5, 0.0], dtype=float)
@@ -295,10 +279,6 @@ class FakePhysicalTransportDriver:
         self.recovered_height = None
         self.recover_calls = []
         self.gripper_z = {"right": 1.01, "left": 1.01}
-        self.gripper_xy_offsets = gripper_xy_offsets or {
-            "right": np.zeros(2),
-            "left": np.zeros(2),
-        }
         self.steps = []
 
     def capture_hold_targets(self, _backend):
@@ -324,9 +304,8 @@ class FakePhysicalTransportDriver:
                 arm: np.array(
                     [
                         self.object_xy[0]
-                        + self.gripper_xy_offsets[arm][0]
                         + len(self.steps) * self.planar_slip_per_step,
-                        self.object_xy[1] + self.gripper_xy_offsets[arm][1],
+                        self.object_xy[1],
                         self.gripper_z[arm],
                     ],
                     dtype=float,
@@ -594,34 +573,6 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
         np.testing.assert_allclose(
             driver.steps[0]["arm_world_deltas"]["right"][:2], np.zeros(2)
         )
-
-    def test_configured_planar_clamp_preloads_both_arms_inward(self):
-        driver = FakePhysicalTransportDriver(
-            gripper_xy_offsets={
-                "right": np.array([0.0, -0.2]),
-                "left": np.array([0.0, 0.2]),
-            }
-        )
-        config = self.module.PhysicalCarryConfig(
-            waypoint_tolerance=0.02,
-            max_steps=10,
-            k_linear=1.0,
-            max_linear=0.08,
-            max_linear_delta=0.08,
-            planar_clamp_inward_delta=0.003,
-        )
-
-        result = self.run_transport(
-            driver,
-            path=[np.array([0.08, 0.0])],
-            config=config,
-        )
-
-        self.assertTrue(result["success"])
-        right = driver.steps[0]["arm_world_deltas"]["right"][:2]
-        left = driver.steps[0]["arm_world_deltas"]["left"][:2]
-        np.testing.assert_allclose(right, [0.0, 0.003])
-        np.testing.assert_allclose(left, [0.0, -0.003])
 
     def test_object_slip_triggers_a_physical_height_recovery(self):
         driver = FakePhysicalTransportDriver(

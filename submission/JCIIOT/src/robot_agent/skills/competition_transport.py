@@ -293,7 +293,6 @@ class PhysicalCarryConfig:
         base_control_dt: float = 0.05,
         yaw_tolerance: float = 0.04,
         object_drop_tolerance: float = 0.025,
-        planar_clamp_inward_delta: float = 0.0,
         vertical_hold_feedforward: float = 0.0,
         vertical_hold_gain: float = 0.0,
         max_vertical_hold_delta: float = 0.0,
@@ -324,7 +323,6 @@ class PhysicalCarryConfig:
         self.base_control_dt = float(base_control_dt)
         self.yaw_tolerance = float(yaw_tolerance)
         self.object_drop_tolerance = float(object_drop_tolerance)
-        self.planar_clamp_inward_delta = float(planar_clamp_inward_delta)
         self.vertical_hold_feedforward = float(vertical_hold_feedforward)
         self.vertical_hold_gain = float(vertical_hold_gain)
         self.max_vertical_hold_delta = float(max_vertical_hold_delta)
@@ -463,29 +461,6 @@ def vertical_hold_delta(
         float(target_z) - float(current_z)
     )
     return float(np.clip(requested, 0.0, float(max_delta)))
-
-
-def symmetric_planar_clamp_deltas(
-    gripper_positions,
-    *,
-    inward_delta: float,
-) -> dict[str, np.ndarray]:
-    """Preload both arms inward along their measured planar separation axis."""
-    requested = float(inward_delta)
-    if requested < 0.0 or not np.isfinite(requested):
-        raise ValueError("inward clamp delta must be finite and non-negative")
-    right = np.asarray(gripper_positions["right"], dtype=float)[:2]
-    left = np.asarray(gripper_positions["left"], dtype=float)[:2]
-    separation = right - left
-    distance = float(np.linalg.norm(separation))
-    if distance <= 1e-12 or requested == 0.0:
-        zero = np.zeros(2, dtype=float)
-        return {"right": zero.copy(), "left": zero.copy()}
-    axis = separation / distance
-    return {
-        "right": -axis * requested,
-        "left": axis * requested,
-    }
 
 
 def slew_limited_command(previous, requested, max_delta) -> np.ndarray:
@@ -924,17 +899,9 @@ def run_physical_transport(
                 gain=config.vertical_hold_gain,
                 max_delta=config.max_vertical_hold_delta,
             )
-            clamp_deltas = symmetric_planar_clamp_deltas(
-                observation["gripper_positions"],
-                inward_delta=config.planar_clamp_inward_delta,
-            )
             arm_world_deltas = {
                 arm: np.array(
-                    [
-                        phase_arm_xy[0] + clamp_deltas[arm][0],
-                        phase_arm_xy[1] + clamp_deltas[arm][1],
-                        hold_delta,
-                    ],
+                    [phase_arm_xy[0], phase_arm_xy[1], hold_delta],
                     dtype=float,
                 )
                 for arm in ("right", "left")
