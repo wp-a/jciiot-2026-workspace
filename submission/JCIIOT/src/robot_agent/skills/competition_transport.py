@@ -292,6 +292,8 @@ class PhysicalCarryConfig:
         max_angular_delta: float = 0.01,
         base_control_dt: float = 0.05,
         yaw_tolerance: float = 0.04,
+        align_heading_to_path: bool = False,
+        heading_translation_tolerance: float = 0.05,
         object_drop_tolerance: float = 0.025,
         vertical_hold_feedforward: float = 0.0,
         vertical_hold_gain: float = 0.0,
@@ -322,6 +324,10 @@ class PhysicalCarryConfig:
         self.max_angular_delta = float(max_angular_delta)
         self.base_control_dt = float(base_control_dt)
         self.yaw_tolerance = float(yaw_tolerance)
+        self.align_heading_to_path = bool(align_heading_to_path)
+        self.heading_translation_tolerance = float(
+            heading_translation_tolerance
+        )
         self.object_drop_tolerance = float(object_drop_tolerance)
         self.vertical_hold_feedforward = float(vertical_hold_feedforward)
         self.vertical_hold_gain = float(vertical_hold_gain)
@@ -507,9 +513,11 @@ def next_contact_stability(contacts, stable_steps: int) -> int:
 
 
 def planar_grasp_drift(start_observation, observation) -> float:
-    """Measure object-to-gripper planar offset change from transport start."""
+    """Measure base-relative object-to-gripper planar offset change."""
     start_object = np.asarray(start_observation["object_pos"], dtype=float)[:2]
     object_xy = np.asarray(observation["object_pos"], dtype=float)[:2]
+    start_yaw = float(start_observation.get("base_yaw", 0.0))
+    current_yaw = float(observation.get("base_yaw", 0.0))
     drifts = []
     for arm in ("right", "left"):
         start_gripper = np.asarray(
@@ -520,8 +528,14 @@ def planar_grasp_drift(start_observation, observation) -> float:
             observation["gripper_positions"][arm],
             dtype=float,
         )[:2]
-        start_offset = start_gripper - start_object
-        current_offset = gripper_xy - object_xy
+        start_offset = world_velocity_to_base_frame(
+            start_gripper - start_object,
+            start_yaw,
+        )
+        current_offset = world_velocity_to_base_frame(
+            gripper_xy - object_xy,
+            current_yaw,
+        )
         drifts.append(float(np.linalg.norm(current_offset - start_offset)))
     return max(drifts)
 
@@ -648,6 +662,14 @@ def run_physical_transport(
     hold_targets = driver.capture_hold_targets(backend)
     observation = driver.observe(backend, object_name)
     start_observation = observation
+    object_offset_base = world_velocity_to_base_frame(
+        np.asarray(observation["object_pos"][:2], dtype=float)
+        - np.asarray(observation["base_xy"], dtype=float),
+        float(observation["base_yaw"]),
+    )
+    carried_object_angle = float(
+        math.atan2(object_offset_base[1], object_offset_base[0])
+    )
     target_object_z = float(minimum_object_z) + config.object_drop_tolerance
     gripper_z_offsets = {
         arm: float(observation["gripper_positions"][arm][2])
@@ -849,13 +871,28 @@ def run_physical_transport(
             failure_stage = None
             break
 
-        speed = min(config.k_linear * final_distance, config.max_linear)
+        desired_yaw = float(hold_yaw)
+        if config.align_heading_to_path:
+            desired_yaw = float(math.atan2(delta[1], delta[0])) - (
+                carried_object_angle
+            )
+        yaw_error = _shortest_angle(
+            desired_yaw - float(observation["base_yaw"])
+        )
+        heading_aligned = bool(
+            not config.align_heading_to_path
+            or abs(yaw_error) <= config.heading_translation_tolerance
+        )
+        speed = (
+            min(config.k_linear * final_distance, config.max_linear)
+            if heading_aligned
+            else 0.0
+        )
         world_velocity = speed * delta / max(final_distance, 1e-12)
         base_velocity = world_velocity_to_base_frame(
             world_velocity,
             float(observation["base_yaw"]),
         )
-        yaw_error = _shortest_angle(float(hold_yaw) - float(observation["base_yaw"]))
         angular = float(
             np.clip(
                 config.k_angular * yaw_error,
@@ -879,6 +916,8 @@ def run_physical_transport(
                 dtype=float,
             ),
         )
+        if not heading_aligned:
+            command[:2] = 0.0
         base_xy = np.asarray(observation["base_xy"], dtype=float)
         world_step = direct_base_step_target(
             base_xy=base_xy,

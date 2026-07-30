@@ -92,6 +92,27 @@ class PhysicalTransportGeometryTests(unittest.TestCase):
             0,
         )
 
+    def test_planar_grasp_drift_is_invariant_to_rigid_base_rotation(self):
+        module = load_module()
+        start = {
+            "base_yaw": 0.0,
+            "object_pos": np.array([0.5, 0.0, 1.0]),
+            "gripper_positions": {
+                "right": np.array([0.5, -0.2, 1.0]),
+                "left": np.array([0.5, 0.2, 1.0]),
+            },
+        }
+        rotated = {
+            "base_yaw": math.pi / 2.0,
+            "object_pos": np.array([0.0, 0.5, 1.0]),
+            "gripper_positions": {
+                "right": np.array([0.2, 0.5, 1.0]),
+                "left": np.array([-0.2, 0.5, 1.0]),
+            },
+        }
+
+        self.assertAlmostEqual(module.planar_grasp_drift(start, rotated), 0.0)
+
     def test_vertical_hold_delta_adds_feedforward_and_corrects_height_error(self):
         module = load_module()
 
@@ -376,6 +397,54 @@ class FakePhysicalTransportDriver:
         return self.recover_success
 
 
+class FakeHeadingAlignedTransportDriver(FakePhysicalTransportDriver):
+    def __init__(self):
+        super().__init__()
+        self.relative_object = np.array([0.5, 0.0], dtype=float)
+        self.gripper_offsets = {
+            "right": np.array([0.5, -0.2], dtype=float),
+            "left": np.array([0.5, 0.2], dtype=float),
+        }
+
+    def _rotation(self):
+        return np.array(
+            [
+                [math.cos(self.yaw), -math.sin(self.yaw)],
+                [math.sin(self.yaw), math.cos(self.yaw)],
+            ]
+        )
+
+    def observe(self, _backend, _object_name):
+        rotation = self._rotation()
+        object_xy = self.base_xy + rotation @ self.relative_object
+        return {
+            "base_xy": self.base_xy.copy(),
+            "base_yaw": self.yaw,
+            "object_pos": np.array([*object_xy, 1.0]),
+            "contacts": {"right": True, "left": True},
+            "gripper_positions": {
+                arm: np.array(
+                    [*(self.base_xy + rotation @ offset), 1.01]
+                )
+                for arm, offset in self.gripper_offsets.items()
+            },
+        }
+
+    def step(self, _backend, **kwargs):
+        command = np.asarray(kwargs["base_command"], dtype=float)
+        dt = float(kwargs.get("base_control_dt", 0.05))
+        rotation = self._rotation()
+        self.base_xy += rotation @ command[:2] * dt
+        self.yaw += command[2] * dt
+        self.steps.append(
+            {
+                "base_command": command.copy(),
+                "arm_world_deltas": kwargs["arm_world_deltas"],
+            }
+        )
+        return {"collision": False}
+
+
 class FakeInchwormDriver:
     def __init__(self):
         self.base_xy = np.zeros(2, dtype=float)
@@ -572,6 +641,50 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
         self.assertGreater(driver.steps[0]["base_command"][0], 0.0)
         np.testing.assert_allclose(
             driver.steps[0]["arm_world_deltas"]["right"][:2], np.zeros(2)
+        )
+
+    def test_heading_aligned_mode_rotates_before_translating(self):
+        driver = FakeHeadingAlignedTransportDriver()
+        config = self.module.PhysicalCarryConfig(
+            waypoint_tolerance=0.01,
+            max_steps=500,
+            max_linear=0.10,
+            max_angular=0.50,
+            max_linear_delta=0.10,
+            max_angular_delta=0.50,
+            base_control_dt=0.05,
+            align_heading_to_path=True,
+            heading_translation_tolerance=0.05,
+        )
+
+        result = self.run_transport(
+            driver,
+            path=[np.array([0.0, 0.10])],
+            config=config,
+        )
+
+        self.assertTrue(result["success"])
+        rotating = [
+            step for step in driver.steps if abs(step["base_command"][2]) > 0.01
+        ]
+        translating = [
+            step
+            for step in driver.steps
+            if np.linalg.norm(step["base_command"][:2]) > 0.01
+        ]
+        self.assertTrue(rotating)
+        self.assertTrue(translating)
+        first_translation = next(
+            index
+            for index, step in enumerate(driver.steps)
+            if np.linalg.norm(step["base_command"][:2]) > 0.01
+        )
+        self.assertGreater(first_translation, 0)
+        self.assertTrue(
+            all(
+                np.allclose(step["base_command"][:2], 0.0)
+                for step in driver.steps[:first_translation]
+            )
         )
 
     def test_object_slip_triggers_a_physical_height_recovery(self):
