@@ -414,6 +414,10 @@ class CompetitionFlowTests(unittest.TestCase):
             captured["transport"]["config"].max_linear_delta,
             0.005,
         )
+        self.assertAlmostEqual(
+            captured["transport"]["config"].max_planar_grasp_drift,
+            0.12,
+        )
 
     def test_carrying_move_propagates_physical_contact_failure(self):
         driver = object.__new__(self.module.OfficialCompetitionDriver)

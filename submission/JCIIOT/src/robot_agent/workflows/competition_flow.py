@@ -439,7 +439,7 @@ class OfficialCompetitionDriver:
             max_linear_delta=0.005,
             max_angular_delta=0.01,
             base_control_dt=control_dt,
-            max_planar_grasp_drift=0.03,
+            max_planar_grasp_drift=0.12,
         )
         self._last_transport = run_physical_transport(
             self.backend,

@@ -959,6 +959,7 @@ def run_physical_transport(
         failure_stage=failure_stage,
         steps=steps,
         minimum_object_z=minimum_observed_z,
+        max_planar_grasp_drift_m=maximum_planar_grasp_drift,
     )
     return _transport_result(
         success=success,
