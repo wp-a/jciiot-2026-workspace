@@ -77,6 +77,7 @@ class ScriptedGraspConfig:
         close_increment_interval: int = 20,
         max_action: float = 0.65,
         lift_height: float = 0.04,
+        container_lift_height_override: float | None = None,
         lift_steps: int = 300,
         lift_hold_steps: int = 0,
         lift_tolerance: float = 0.01,
@@ -118,6 +119,11 @@ class ScriptedGraspConfig:
         self.close_increment_interval = int(close_increment_interval)
         self.max_action = float(max_action)
         self.lift_height = float(lift_height)
+        self.container_lift_height_override = (
+            None
+            if container_lift_height_override is None
+            else float(container_lift_height_override)
+        )
         self.lift_steps = int(lift_steps)
         self.lift_hold_steps = int(lift_hold_steps)
         self.lift_tolerance = float(lift_tolerance)
@@ -337,6 +343,13 @@ def apply_object_grasp_profile(
 ) -> ScriptedGraspConfig:
     """Apply parameters validated for an official object geometry family."""
     if uses_legacy_container_grasp(object_name):
+        lift_height = config.container_lift_height_override
+        if lift_height is not None and (
+            not np.isfinite(lift_height) or lift_height <= 0.0
+        ):
+            raise ValueError(
+                "container_lift_height_override must be finite and positive"
+            )
         config.site_below_offset = 0.035
         config.approach_tolerance = config.position_tolerance
         config.close_steps = 80
@@ -345,7 +358,7 @@ def apply_object_grasp_profile(
         config.hold_close_pose = False
         config.face_insertion = 0.0
         config.wrist_height_trigger = float("inf")
-        config.lift_height = 0.15
+        config.lift_height = 0.15 if lift_height is None else lift_height
         config.lift_hold_steps = 20
         config.lift_tolerance = 0.02
     elif uses_station_side_tote_grasp(object_name):

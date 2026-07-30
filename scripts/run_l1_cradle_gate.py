@@ -2226,6 +2226,7 @@ def _end_grasp_inchworm_probe(
     stroke_lift_m: float,
     height_gain: float,
     reset_m: float,
+    minimum_lift_m: float,
 ) -> dict[str, Any]:
     """Probe arm-first extraction using the existing physical inchworm controller."""
     from robosuite.environments.factory_sorting import transport_attachment
@@ -2251,6 +2252,9 @@ def _end_grasp_inchworm_probe(
     if direction_norm <= 0.0 or not np.all(np.isfinite(direction)):
         raise ValueError("inchworm direction must be finite and non-zero")
     direction /= direction_norm
+    minimum_lift = float(minimum_lift_m)
+    if not np.isfinite(minimum_lift) or minimum_lift <= 0.0:
+        raise ValueError("minimum_lift_m must be finite and positive")
 
     with transport_attachment_audit(raw_env, transport_attachment) as audit:
         result = run_inchworm_transport(
@@ -2258,7 +2262,7 @@ def _end_grasp_inchworm_probe(
             object_name=object_name,
             travel_direction=direction,
             travel_distance=float(distance_m),
-            minimum_object_z=float(table_object_z) + 0.10,
+            minimum_object_z=float(table_object_z) + minimum_lift,
             config=InchwormCarryConfig(
                 stroke_distance=float(stroke_m),
                 stroke_vertical_feedforward=float(stroke_lift_m),
@@ -2295,6 +2299,7 @@ def _end_grasp_setdown_probe(
     stroke_lift_m: float,
     height_gain: float,
     reset_m: float,
+    minimum_lift_m: float,
     place_max_descent_m: float,
 ) -> dict[str, Any]:
     """Extract with the end grasp, then physically support and release the object."""
@@ -2319,6 +2324,7 @@ def _end_grasp_setdown_probe(
         stroke_lift_m=stroke_lift_m,
         height_gain=height_gain,
         reset_m=reset_m,
+        minimum_lift_m=minimum_lift_m,
     )
     raw_env = backend.env
     body_id = raw_env.obj_body_id[object_name]
@@ -6314,12 +6320,21 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
     }
     try:
         backend, scene_context, grid = _load_scene(app_dir, task, args.seed)
+        from robot_agent.skills.competition_grasp import ScriptedGraspConfig
         from robot_agent.workflows.competition_flow import OfficialCompetitionDriver
 
+        grasp_config = None
+        if args.container_grasp_lift_height_m is not None:
+            grasp_config = ScriptedGraspConfig(
+                container_lift_height_override=(
+                    args.container_grasp_lift_height_m
+                )
+            )
         driver = OfficialCompetitionDriver(
             backend=backend,
             scene_context=scene_context,
             grid=grid,
+            grasp_config=grasp_config,
         )
         candidates = driver.rank_objects(str(task["source"]), task["object"])
         if not candidates:
@@ -6480,6 +6495,7 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                         "stroke_lift_m": args.end_grasp_inchworm_stroke_lift_m,
                         "height_gain": args.end_grasp_inchworm_height_gain,
                         "reset_m": args.end_grasp_inchworm_reset_m,
+                        "minimum_lift_m": args.end_grasp_minimum_lift_m,
                     }
                     if args.end_grasp_setdown_after_inchworm:
                         record["mode"] = "end_grasp_setdown_probe"
@@ -6840,6 +6856,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--posture-locked-carry-world-direction-y", type=float)
     parser.add_argument(
         "--end-grasp-inchworm-distance-m", type=float, default=0.0
+    )
+    parser.add_argument("--container-grasp-lift-height-m", type=float)
+    parser.add_argument(
+        "--end-grasp-minimum-lift-m", type=float, default=0.10
     )
     parser.add_argument(
         "--end-grasp-inchworm-stroke-m", type=float, default=0.08

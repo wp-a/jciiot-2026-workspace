@@ -126,6 +126,7 @@ class CompetitionGraspTests(unittest.TestCase):
 
         self.assertEqual(config.lift_height, 0.04)
         self.assertEqual(config.lift_hold_steps, 0)
+        self.assertIsNone(config.container_lift_height_override)
 
     def test_independent_gripper_action_keeps_stationary_arm_closed(self):
         robot = SimpleNamespace(
@@ -543,6 +544,31 @@ class CompetitionGraspTests(unittest.TestCase):
         self.assertEqual(config.lift_height, 0.15)
         self.assertEqual(config.lift_hold_steps, 20)
         self.assertEqual(config.lift_tolerance, 0.02)
+
+    def test_container_profile_respects_explicit_research_lift_override(self):
+        config = self.module.ScriptedGraspConfig(
+            container_lift_height_override=0.04
+        )
+
+        profiled = self.module.apply_object_grasp_profile(
+            config,
+            "line_5_container_h01_near",
+        )
+
+        self.assertIs(profiled, config)
+        self.assertEqual(profiled.lift_height, 0.04)
+
+    def test_container_profile_rejects_invalid_research_lift_override(self):
+        for value in (0.0, -0.01, np.nan, np.inf):
+            with self.subTest(value=value):
+                config = self.module.ScriptedGraspConfig(
+                    container_lift_height_override=value
+                )
+                with self.assertRaises(ValueError):
+                    self.module.apply_object_grasp_profile(
+                        config,
+                        "line_5_container_h01_near",
+                    )
 
     def test_close_pose_can_hold_post_adjustment_gripper_positions(self):
         current = {

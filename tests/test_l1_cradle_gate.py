@@ -1873,6 +1873,8 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.end_grasp_inchworm_reset_m, 0.06)
         self.assertIsNone(args.end_grasp_inchworm_world_direction_x)
         self.assertIsNone(args.end_grasp_inchworm_world_direction_y)
+        self.assertIsNone(args.container_grasp_lift_height_m)
+        self.assertAlmostEqual(args.end_grasp_minimum_lift_m, 0.10)
         self.assertFalse(args.end_grasp_setdown_after_inchworm)
         self.assertAlmostEqual(args.end_grasp_place_max_descent_m, 0.25)
         self.assertAlmostEqual(args.center_carry_distance_m, 0.0)
@@ -1974,6 +1976,10 @@ class JointSeedParserTests(unittest.TestCase):
                 "1.0",
                 "--end-grasp-inchworm-world-direction-y",
                 "0.0",
+                "--container-grasp-lift-height-m",
+                "0.04",
+                "--end-grasp-minimum-lift-m",
+                "0.015",
                 "--end-grasp-setdown-after-inchworm",
                 "--end-grasp-place-max-descent-m",
                 "0.22",
@@ -2081,6 +2087,8 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.end_grasp_inchworm_reset_m, 0.05)
         self.assertAlmostEqual(args.end_grasp_inchworm_world_direction_x, 1.0)
         self.assertAlmostEqual(args.end_grasp_inchworm_world_direction_y, 0.0)
+        self.assertAlmostEqual(args.container_grasp_lift_height_m, 0.04)
+        self.assertAlmostEqual(args.end_grasp_minimum_lift_m, 0.015)
         self.assertTrue(args.end_grasp_setdown_after_inchworm)
         self.assertAlmostEqual(args.end_grasp_place_max_descent_m, 0.22)
         self.assertTrue(args.center_carry_away_from_object)
