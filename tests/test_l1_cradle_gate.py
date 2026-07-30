@@ -27,6 +27,7 @@ from scripts.run_l1_cradle_gate import (
     joint_seed_node_failure,
     joint_seed_objective_residual,
     minimum_undirected_axis_rotation,
+    navigation_retract_targets,
     nearest_directed_axis_target,
     next_joint_seed_path_state,
     next_orientation_alignment_state,
@@ -151,6 +152,18 @@ VALID_SETDOWN_RECORD = {
 
 
 class EndGraspSetdownGateTests(unittest.TestCase):
+    def test_navigation_retract_targets_are_base_relative_and_compact(self):
+        targets = navigation_retract_targets(
+            base_xy=[8.20, 4.60],
+            base_yaw=np.pi,
+            forward_m=0.20,
+            lateral_m=0.15,
+            target_z=1.45,
+        )
+
+        np.testing.assert_allclose(targets["right"], [8.00, 4.75, 1.45])
+        np.testing.assert_allclose(targets["left"], [8.00, 4.45, 1.45])
+
     def test_setdown_gate_accepts_every_inclusive_boundary(self):
         self.assertEqual(setdown_gate_failures(VALID_SETDOWN_RECORD), [])
         self.assertTrue(setdown_gate_accepted(VALID_SETDOWN_RECORD))
@@ -297,6 +310,82 @@ class EndGraspSetdownGateTests(unittest.TestCase):
         )
         self.assertIsNone(driver._physical_hold)
         self.assertAlmostEqual(result["measured_object_translation_m"], 0.40)
+
+    def test_floor_regrasp_physically_retracts_before_navigation(self):
+        raw_env = SimpleNamespace(
+            obj_body_id={"box": 0},
+            sim=SimpleNamespace(
+                data=SimpleNamespace(
+                    body_xpos=np.array([[0.0, 0.0, 0.20]], dtype=float)
+                )
+            ),
+        )
+        backend = SimpleNamespace(env=raw_env)
+        calls = []
+
+        class Driver:
+            _physical_hold = {"active": True}
+
+            def move(self, source, *, carrying, object_name):
+                calls.append("move")
+                return True
+
+            def grasp(self, source, object_name):
+                calls.append("grasp")
+                return {
+                    "success": True,
+                    "lift_success": True,
+                    "contacts": {"right": True, "left": True},
+                }
+
+        def setdown(_backend, object_name, **kwargs):
+            calls.append("setdown")
+            raw_env.sim.data.body_xpos[0, 0] += 0.20
+            return {
+                "success": True,
+                "transport_success": True,
+                "place_success": True,
+                "support_detected": True,
+                "released": True,
+                "world_direction": [1.0, 0.0],
+                "attachment_activations": 0,
+                "object_pose_writes": 0,
+            }
+
+        def retract(_backend, **kwargs):
+            calls.append("retract")
+            return {"success": True, "collision": False, "targets": {}}
+
+        result = _end_grasp_regrasp_probe(
+            backend,
+            Driver(),
+            "input_5",
+            "box",
+            macro_count=2,
+            distance_m=0.14,
+            world_direction_x=1.0,
+            world_direction_y=0.0,
+            table_object_z=1.0,
+            stroke_m=0.08,
+            stroke_lift_m=0.0,
+            height_gain=0.0,
+            reset_m=0.06,
+            minimum_lift_m=0.10,
+            place_max_descent_m=0.45,
+            floor_retract_forward_m=0.20,
+            floor_retract_lateral_m=0.15,
+            floor_retract_target_z=1.45,
+            floor_transition_margin_m=0.30,
+            _setdown_probe=setdown,
+            _navigation_retract=retract,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(
+            calls,
+            ["setdown", "retract", "move", "grasp", "setdown"],
+        )
+        self.assertTrue(result["regrasps"][0]["navigation_retract"]["success"])
 
 
 class PostureCarryGateTests(unittest.TestCase):
@@ -1981,6 +2070,10 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertFalse(args.end_grasp_setdown_after_inchworm)
         self.assertAlmostEqual(args.end_grasp_place_max_descent_m, 0.25)
         self.assertEqual(args.end_grasp_regrasp_macros, 1)
+        self.assertAlmostEqual(args.floor_regrasp_retract_forward_m, 0.20)
+        self.assertAlmostEqual(args.floor_regrasp_retract_lateral_m, 0.15)
+        self.assertAlmostEqual(args.floor_regrasp_retract_target_z, 1.45)
+        self.assertAlmostEqual(args.floor_transition_margin_m, 0.30)
         self.assertAlmostEqual(args.center_carry_distance_m, 0.0)
         self.assertFalse(args.center_carry_away_from_object)
         self.assertAlmostEqual(args.center_carry_max_linear, 0.04)
@@ -2089,6 +2182,14 @@ class JointSeedParserTests(unittest.TestCase):
                 "0.22",
                 "--end-grasp-regrasp-macros",
                 "2",
+                "--floor-regrasp-retract-forward-m",
+                "0.18",
+                "--floor-regrasp-retract-lateral-m",
+                "0.14",
+                "--floor-regrasp-retract-target-z",
+                "1.40",
+                "--floor-transition-margin-m",
+                "0.25",
                 "--center-carry-away-from-object",
                 "--center-carry-corner-seat-m",
                 "0.08",
@@ -2198,6 +2299,10 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertTrue(args.end_grasp_setdown_after_inchworm)
         self.assertAlmostEqual(args.end_grasp_place_max_descent_m, 0.22)
         self.assertEqual(args.end_grasp_regrasp_macros, 2)
+        self.assertAlmostEqual(args.floor_regrasp_retract_forward_m, 0.18)
+        self.assertAlmostEqual(args.floor_regrasp_retract_lateral_m, 0.14)
+        self.assertAlmostEqual(args.floor_regrasp_retract_target_z, 1.40)
+        self.assertAlmostEqual(args.floor_transition_margin_m, 0.25)
         self.assertTrue(args.center_carry_away_from_object)
         self.assertAlmostEqual(args.center_carry_corner_seat_m, 0.08)
         self.assertAlmostEqual(args.center_carry_arm_stroke_m, 0.07)

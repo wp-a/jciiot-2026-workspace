@@ -73,6 +73,42 @@ def directed_planar_progress(
     return progress, lateral
 
 
+def navigation_retract_targets(
+    *,
+    base_xy: object,
+    base_yaw: float,
+    forward_m: float,
+    lateral_m: float,
+    target_z: float,
+) -> dict[str, np.ndarray]:
+    """Return compact, base-relative end-effector targets for safe navigation."""
+    base = np.asarray(base_xy, dtype=float)
+    values = np.asarray(
+        [base_yaw, forward_m, lateral_m, target_z], dtype=float
+    )
+    if base.shape != (2,) or not np.all(np.isfinite(base)):
+        raise ValueError("base_xy must be a finite planar vector")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("navigation retract parameters must be finite")
+    if float(forward_m) <= 0.0 or float(lateral_m) <= 0.0:
+        raise ValueError("navigation retract offsets must be positive")
+    cosine = float(np.cos(float(base_yaw)))
+    sine = float(np.sin(float(base_yaw)))
+    rotation = np.array([[cosine, -sine], [sine, cosine]], dtype=float)
+    targets = {}
+    for arm, local_lateral in (
+        ("right", -float(lateral_m)),
+        ("left", float(lateral_m)),
+    ):
+        planar = base + rotation @ np.array(
+            [float(forward_m), local_lateral], dtype=float
+        )
+        targets[arm] = np.array(
+            [planar[0], planar[1], float(target_z)], dtype=float
+        )
+    return targets
+
+
 @contextmanager
 def transport_attachment_audit(raw_env: object, transport_module: object):
     """Count transport attachment and direct object-pose operations in a scope."""
@@ -2432,6 +2468,81 @@ def _end_grasp_setdown_probe(
     }
 
 
+def _navigation_retract_probe(
+    backend,
+    *,
+    forward_m: float,
+    lateral_m: float,
+    target_z: float,
+) -> dict[str, Any]:
+    """Physically retract both open grippers before floor-level navigation."""
+    from robot_agent.skills.competition_grasp import (
+        OfficialScriptedGraspDriver,
+        ScriptedGraspConfig,
+    )
+
+    base_xy, base_yaw = backend.get_base_pose()
+    targets = navigation_retract_targets(
+        base_xy=base_xy,
+        base_yaw=base_yaw,
+        forward_m=forward_m,
+        lateral_m=lateral_m,
+        target_z=target_z,
+    )
+    retract_driver = OfficialScriptedGraspDriver()
+    config = ScriptedGraspConfig(
+        max_action=0.30,
+        position_tolerance=0.02,
+    )
+    marker = getattr(backend, "_mark_trajectory_event", None)
+    if callable(marker):
+        marker(
+            "navigation_retract_start",
+            targets={arm: target.tolist() for arm, target in targets.items()},
+        )
+    reached = bool(
+        retract_driver._move_to_targets(
+            backend,
+            targets,
+            config,
+            max_steps=240,
+            gripper_value=-1.0,
+            tolerance=config.position_tolerance,
+        )
+    )
+    helpers = retract_driver._helpers()
+    raw_env = backend.env
+    robot = raw_env.robots[0]
+    final_positions = {
+        arm: np.asarray(
+            helpers["gripper_position"](raw_env, robot, arm), dtype=float
+        ).copy()
+        for arm in ("right", "left")
+    }
+    maximum_error = max(
+        float(np.linalg.norm(final_positions[arm] - targets[arm]))
+        for arm in ("right", "left")
+    )
+    collision = bool(getattr(raw_env, "has_judge_collision", False))
+    success = bool(reached and not collision)
+    if callable(marker):
+        marker(
+            "navigation_retract_end",
+            success=success,
+            maximum_error_m=maximum_error,
+            collision=collision,
+        )
+    return {
+        "success": success,
+        "collision": collision,
+        "maximum_error_m": maximum_error,
+        "targets": {arm: target.tolist() for arm, target in targets.items()},
+        "final_positions": {
+            arm: position.tolist() for arm, position in final_positions.items()
+        },
+    }
+
+
 def _end_grasp_regrasp_probe(
     backend,
     driver,
@@ -2449,7 +2560,12 @@ def _end_grasp_regrasp_probe(
     reset_m: float,
     minimum_lift_m: float,
     place_max_descent_m: float,
+    floor_retract_forward_m: float = 0.20,
+    floor_retract_lateral_m: float = 0.15,
+    floor_retract_target_z: float = 1.45,
+    floor_transition_margin_m: float = 0.30,
     _setdown_probe=None,
+    _navigation_retract=None,
 ) -> dict[str, Any]:
     """Repeat physical setdown, dynamic base repositioning, and regrasp."""
     if isinstance(macro_count, bool) or int(macro_count) != macro_count:
@@ -2458,6 +2574,10 @@ def _end_grasp_regrasp_probe(
     if requested_macros < 1:
         raise ValueError("macro_count must be a positive integer")
     setdown_probe = _setdown_probe or _end_grasp_setdown_probe
+    retract_probe = _navigation_retract or _navigation_retract_probe
+    floor_margin = float(floor_transition_margin_m)
+    if not np.isfinite(floor_margin) or floor_margin <= 0.0:
+        raise ValueError("floor_transition_margin_m must be finite and positive")
     raw_env = backend.env
     body_id = raw_env.obj_body_id[object_name]
     start_object = np.asarray(
@@ -2515,6 +2635,29 @@ def _end_grasp_regrasp_probe(
         regrasp_start = np.asarray(
             raw_env.sim.data.body_xpos[body_id], dtype=float
         ).copy()
+        navigation_retract = None
+        if float(regrasp_start[2]) < float(table_object_z) - floor_margin:
+            navigation_retract = retract_probe(
+                backend,
+                forward_m=floor_retract_forward_m,
+                lateral_m=floor_retract_lateral_m,
+                target_z=floor_retract_target_z,
+            )
+            if not bool(navigation_retract.get("success", False)):
+                regrasps.append(
+                    {
+                        "after_macro": macro_index + 1,
+                        "navigation_retract": navigation_retract,
+                        "move_success": False,
+                        "physical_grasp": False,
+                        "grasp": None,
+                        "start_object_position": regrasp_start.tolist(),
+                        "end_object_position": regrasp_start.tolist(),
+                        "object_translation_m": 0.0,
+                    }
+                )
+                failure_stage = f"regrasp_{macro_index + 1}:retract"
+                break
         moved = bool(
             driver.move(
                 source,
@@ -2535,6 +2678,7 @@ def _end_grasp_regrasp_probe(
         regrasps.append(
             {
                 "after_macro": macro_index + 1,
+                "navigation_retract": navigation_retract,
                 "move_success": moved,
                 "physical_grasp": physical_grasp,
                 "grasp": grasp,
@@ -6681,6 +6825,18 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                                 place_max_descent_m=(
                                     args.end_grasp_place_max_descent_m
                                 ),
+                                floor_retract_forward_m=(
+                                    args.floor_regrasp_retract_forward_m
+                                ),
+                                floor_retract_lateral_m=(
+                                    args.floor_regrasp_retract_lateral_m
+                                ),
+                                floor_retract_target_z=(
+                                    args.floor_regrasp_retract_target_z
+                                ),
+                                floor_transition_margin_m=(
+                                    args.floor_transition_margin_m
+                                ),
                                 **inchworm_kwargs,
                             )
                         else:
@@ -7071,6 +7227,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--end-grasp-place-max-descent-m", type=float, default=0.25
     )
     parser.add_argument("--end-grasp-regrasp-macros", type=int, default=1)
+    parser.add_argument(
+        "--floor-regrasp-retract-forward-m", type=float, default=0.20
+    )
+    parser.add_argument(
+        "--floor-regrasp-retract-lateral-m", type=float, default=0.15
+    )
+    parser.add_argument(
+        "--floor-regrasp-retract-target-z", type=float, default=1.45
+    )
+    parser.add_argument(
+        "--floor-transition-margin-m", type=float, default=0.30
+    )
     parser.add_argument("--center-carry-distance-m", type=float, default=0.0)
     parser.add_argument("--center-carry-max-linear", type=float, default=0.04)
     parser.add_argument("--center-carry-away-from-object", action="store_true")
