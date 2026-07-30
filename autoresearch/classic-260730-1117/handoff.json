@@ -1,0 +1,22 @@
+{
+  "status": "progressed",
+  "mode": "classic",
+  "goal": "Reach verified full official JCIIOT score with physical manipulation",
+  "metric": "L1 attachment-free physical carry gate",
+  "incumbent_commit": "8ade96f",
+  "incumbent_runner_sha256": "e5bb55bc53a5cfa9eef8dba84f0705b4bdc68bb53981c48e6066a48b90da8abd",
+  "verified": [
+    "0.10 m physical carry pass",
+    "0.10 m clean-process deterministic repeat pass",
+    "0.25 m physical carry pass",
+    "zero collision, attachment, legacy teleport, and object-pose writes"
+  ],
+  "units_remaining": [
+    "L1 collision-checked route",
+    "L1 physical placement",
+    "L1 official 10/10 scorer pass",
+    "L2-L5 generalization",
+    "five-level official and perturbation verification"
+  ],
+  "next": "Build and verify the L1 segmented route without changing protected files or the running 8502 service"
+}

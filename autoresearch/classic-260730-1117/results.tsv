@@ -1,0 +1,8 @@
+iteration	variant	requested_m	base_progress_m	object_progress_m	lateral_drift_m	gripper_drift_m	final_lift_m	bilateral_contact	collision_frames	attachment_activations	legacy_teleports	object_pose_writes	accepted	status
+1	official-follow-path-v0p70	0.10	0.099987	0.124749	0.001663	0.024822	-0.001116	false	0	0	0	0	false	discard-drop
+2	official-follow-path-v0p04	0.10	0.099987	0.088810	0.004557	0.012058	-0.000009	false	0	0	0	0	false	discard-drop
+3	static-actuated-hold40	0.00	0.000000	0.000000	0.000000	0.000000	0.184836	true	0	0	0	0	false	diagnostic-only
+4	actuated-gripper-v0p04	0.10	0.099649	0.067252	0.001206	0.007212	0.155729	true	0	0	0	0	false	discard-progress
+5	actuated-posture-lock-v0p04	0.10	0.099901	0.107038	0.000028	0.006114	0.164493	true	0	0	0	0	true	keep
+6	actuated-posture-lock-v0p04-repeat1	0.10	0.099901	0.107038	0.000028	0.006114	0.164493	true	0	0	0	0	true	keep-deterministic
+7	actuated-posture-lock-v0p04	0.25	0.249901	0.253854	0.000499	0.003868	0.191040	true	0	0	0	0	true	keep-scale-up
