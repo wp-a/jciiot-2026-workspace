@@ -7,6 +7,7 @@ import numpy as np
 import scripts.run_l1_cradle_gate as gate_module
 from scripts.run_l1_cradle_gate import (
     _center_regrasp_probe,
+    _end_grasp_floor_push_probe,
     _end_grasp_regrasp_probe,
     _end_grasp_setdown_probe,
     allocate_segment_steps,
@@ -18,6 +19,7 @@ from scripts.run_l1_cradle_gate import (
     cradle_gate_failures,
     eef_site_pose,
     floor_regrasp_safe_base_xy,
+    floor_push_staging_targets,
     geometry_snapshot,
     has_bilateral_object_contact,
     interior_joint_bounds,
@@ -42,6 +44,8 @@ from scripts.run_l1_cradle_gate import (
     parse_args,
     push_gate_accepted,
     push_gate_failures,
+    hybrid_exit_gate_accepted,
+    hybrid_exit_gate_failures,
     setdown_gate_accepted,
     setdown_gate_failures,
     projected_planar_motion,
@@ -70,6 +74,20 @@ VALID_PUSH_RECORD = {
     "physical_contact_steps": 20,
     "object_translation_m": 0.50,
     "base_translation_m": 0.30,
+    "attachment_calls": 0,
+    "object_pose_writes": 0,
+    "collision_frames": 0,
+    "infrastructure_error": None,
+}
+
+VALID_HYBRID_EXIT_RECORD = {
+    "physical_grasp": True,
+    "extraction_success": True,
+    "floor_transition_detected": True,
+    "navigation_retract_success": True,
+    "floor_push_success": True,
+    "physical_contact_steps": 20,
+    "maximum_axis_displacement_m": 1.000001,
     "attachment_calls": 0,
     "object_pose_writes": 0,
     "collision_frames": 0,
@@ -178,6 +196,58 @@ class EndGraspSetdownGateTests(unittest.TestCase):
         self.assertAlmostEqual(np.linalg.norm(safe_xy - object_xy), 1.20)
         self.assertGreater(safe_xy[0], current_base_xy[0])
         self.assertGreater(safe_xy[1], current_base_xy[1])
+
+    def test_floor_push_staging_targets_preserve_safe_lane_offset(self):
+        targets = floor_push_staging_targets(
+            object_xy=[7.784, 4.482],
+            current_base_xy=[8.210, 4.605],
+            push_direction_xy=[0.0, -1.0],
+            base_standoff_m=0.85,
+            maximum_lateral_offset_m=0.25,
+            face_offset_m=0.24,
+            hand_separation_m=0.28,
+            hand_height_m=0.38,
+            precontact_clearance_m=0.08,
+        )
+
+        np.testing.assert_allclose(targets["direction"], [0.0, -1.0])
+        np.testing.assert_allclose(targets["stage_base_xy"], [8.034, 5.332])
+        np.testing.assert_allclose(targets["contact"]["right"], [7.644, 4.722, 0.38])
+        np.testing.assert_allclose(targets["contact"]["left"], [7.924, 4.722, 0.38])
+        np.testing.assert_allclose(
+            targets["precontact"]["right"],
+            [7.644, 4.802, 0.46],
+        )
+        np.testing.assert_allclose(
+            targets["precontact"]["left"],
+            [7.924, 4.802, 0.46],
+        )
+        self.assertAlmostEqual(targets["target_yaw"], -np.pi / 2.0)
+        self.assertAlmostEqual(targets["lateral_offset_m"], 0.25)
+
+    def test_hybrid_exit_gate_requires_strict_official_exit_and_physics(self):
+        self.assertEqual(hybrid_exit_gate_failures(VALID_HYBRID_EXIT_RECORD), [])
+        self.assertTrue(hybrid_exit_gate_accepted(VALID_HYBRID_EXIT_RECORD))
+
+        invalid_values = {
+            "physical_grasp": False,
+            "extraction_success": False,
+            "floor_transition_detected": False,
+            "navigation_retract_success": False,
+            "floor_push_success": False,
+            "physical_contact_steps": 19,
+            "maximum_axis_displacement_m": 1.0,
+            "attachment_calls": 1,
+            "object_pose_writes": 1,
+            "collision_frames": 1,
+            "infrastructure_error": "RuntimeError: failed",
+        }
+        for key, value in invalid_values.items():
+            with self.subTest(key=key):
+                record = dict(VALID_HYBRID_EXIT_RECORD)
+                record[key] = value
+                self.assertIn(key, hybrid_exit_gate_failures(record))
+                self.assertFalse(hybrid_exit_gate_accepted(record))
 
     def test_setdown_gate_accepts_every_inclusive_boundary(self):
         self.assertEqual(setdown_gate_failures(VALID_SETDOWN_RECORD), [])
@@ -406,6 +476,70 @@ class EndGraspSetdownGateTests(unittest.TestCase):
             ["setdown", "retract", "floor_move", "grasp", "setdown"],
         )
         self.assertTrue(result["regrasps"][0]["navigation_retract"]["success"])
+
+    def test_floor_push_runs_only_after_extraction_and_physical_retract(self):
+        raw_env = SimpleNamespace(
+            obj_body_id={"box": 0},
+            sim=SimpleNamespace(
+                data=SimpleNamespace(
+                    body_xpos=np.array([[0.0, 0.0, 1.0]], dtype=float)
+                )
+            ),
+        )
+        backend = SimpleNamespace(env=raw_env)
+        calls = []
+
+        def extraction(_backend, _driver, source, object_name, **kwargs):
+            calls.append("extraction")
+            raw_env.sim.data.body_xpos[0] = [0.72, -0.14, 0.20]
+            return {
+                "success": True,
+                "start_object_position": [0.0, 0.0, 1.0],
+                "end_object_position": [0.72, -0.14, 0.20],
+                "requested_macro_count": 2,
+                "completed_macro_count": 2,
+                "transport_success": True,
+                "place_success": True,
+                "support_detected": True,
+                "released": True,
+                "attachment_activations": 0,
+                "object_pose_writes": 0,
+            }
+
+        def retract(_backend, **kwargs):
+            calls.append("retract")
+            return {"success": True, "collision": False}
+
+        def floor_push(_backend, object_name, **kwargs):
+            calls.append("floor_push")
+            raw_env.sim.data.body_xpos[0] = [0.72, -1.01, 0.20]
+            return {
+                "success": True,
+                "failure_stage": None,
+                "physical_contact_steps": 30,
+                "object_progress_m": 0.87,
+            }
+
+        result = _end_grasp_floor_push_probe(
+            backend,
+            SimpleNamespace(),
+            "input_5",
+            "box",
+            macro_count=2,
+            table_object_z=1.0,
+            floor_transition_margin_m=0.30,
+            push_direction_x=0.0,
+            push_direction_y=-1.0,
+            _extraction_probe=extraction,
+            _navigation_retract=retract,
+            _floor_push=floor_push,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(calls, ["extraction", "retract", "floor_push"])
+        self.assertTrue(result["floor_transition_detected"])
+        self.assertAlmostEqual(result["maximum_axis_displacement_m"], 1.01)
+        self.assertEqual(result["physical_contact_steps"], 30)
 
 
 class PostureCarryGateTests(unittest.TestCase):
@@ -2095,6 +2229,18 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.floor_regrasp_retract_target_z, 1.45)
         self.assertAlmostEqual(args.floor_transition_margin_m, 0.30)
         self.assertAlmostEqual(args.floor_regrasp_safe_clearance_m, 1.20)
+        self.assertFalse(args.floor_corridor_push)
+        self.assertIsNone(args.floor_push_world_direction_x)
+        self.assertIsNone(args.floor_push_world_direction_y)
+        self.assertAlmostEqual(args.floor_push_distance_m, 1.05)
+        self.assertAlmostEqual(args.floor_push_base_standoff_m, 0.85)
+        self.assertAlmostEqual(args.floor_push_maximum_lateral_offset_m, 0.25)
+        self.assertAlmostEqual(args.floor_push_face_offset_m, 0.24)
+        self.assertAlmostEqual(args.floor_push_hand_separation_m, 0.28)
+        self.assertAlmostEqual(args.floor_push_hand_height_m, 0.38)
+        self.assertAlmostEqual(args.floor_push_precontact_clearance_m, 0.08)
+        self.assertAlmostEqual(args.floor_push_base_speed_m_s, 0.025)
+        self.assertEqual(args.floor_push_max_steps, 1200)
         self.assertAlmostEqual(args.center_carry_distance_m, 0.0)
         self.assertFalse(args.center_carry_away_from_object)
         self.assertAlmostEqual(args.center_carry_max_linear, 0.04)
@@ -2213,6 +2359,29 @@ class JointSeedParserTests(unittest.TestCase):
                 "0.25",
                 "--floor-regrasp-safe-clearance-m",
                 "1.10",
+                "--floor-corridor-push",
+                "--floor-push-world-direction-x",
+                "0.0",
+                "--floor-push-world-direction-y",
+                "-1.0",
+                "--floor-push-distance-m",
+                "0.95",
+                "--floor-push-base-standoff-m",
+                "0.90",
+                "--floor-push-maximum-lateral-offset-m",
+                "0.22",
+                "--floor-push-face-offset-m",
+                "0.21",
+                "--floor-push-hand-separation-m",
+                "0.26",
+                "--floor-push-hand-height-m",
+                "0.40",
+                "--floor-push-precontact-clearance-m",
+                "0.07",
+                "--floor-push-base-speed-m-s",
+                "0.02",
+                "--floor-push-max-steps",
+                "900",
                 "--center-carry-away-from-object",
                 "--center-carry-corner-seat-m",
                 "0.08",
@@ -2327,6 +2496,18 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.floor_regrasp_retract_target_z, 1.40)
         self.assertAlmostEqual(args.floor_transition_margin_m, 0.25)
         self.assertAlmostEqual(args.floor_regrasp_safe_clearance_m, 1.10)
+        self.assertTrue(args.floor_corridor_push)
+        self.assertAlmostEqual(args.floor_push_world_direction_x, 0.0)
+        self.assertAlmostEqual(args.floor_push_world_direction_y, -1.0)
+        self.assertAlmostEqual(args.floor_push_distance_m, 0.95)
+        self.assertAlmostEqual(args.floor_push_base_standoff_m, 0.90)
+        self.assertAlmostEqual(args.floor_push_maximum_lateral_offset_m, 0.22)
+        self.assertAlmostEqual(args.floor_push_face_offset_m, 0.21)
+        self.assertAlmostEqual(args.floor_push_hand_separation_m, 0.26)
+        self.assertAlmostEqual(args.floor_push_hand_height_m, 0.40)
+        self.assertAlmostEqual(args.floor_push_precontact_clearance_m, 0.07)
+        self.assertAlmostEqual(args.floor_push_base_speed_m_s, 0.02)
+        self.assertEqual(args.floor_push_max_steps, 900)
         self.assertTrue(args.center_carry_away_from_object)
         self.assertAlmostEqual(args.center_carry_corner_seat_m, 0.08)
         self.assertAlmostEqual(args.center_carry_arm_stroke_m, 0.07)

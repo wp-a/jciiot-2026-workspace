@@ -134,6 +134,88 @@ def floor_regrasp_safe_base_xy(
     return object_position + outward / distance * max(distance, clearance)
 
 
+def floor_push_staging_targets(
+    *,
+    object_xy: object,
+    current_base_xy: object,
+    push_direction_xy: object,
+    base_standoff_m: float,
+    maximum_lateral_offset_m: float,
+    face_offset_m: float,
+    hand_separation_m: float,
+    hand_height_m: float,
+    precontact_clearance_m: float,
+) -> dict[str, Any]:
+    """Build a lane-preserving base pose and paired floor-push targets."""
+    object_position = np.asarray(object_xy, dtype=float)
+    base_position = np.asarray(current_base_xy, dtype=float)
+    direction = np.asarray(push_direction_xy, dtype=float)
+    if any(value.shape != (2,) for value in (object_position, base_position, direction)):
+        raise ValueError("floor push positions and direction must be planar vectors")
+    if not all(
+        np.all(np.isfinite(value))
+        for value in (object_position, base_position, direction)
+    ):
+        raise ValueError("floor push positions and direction must be finite")
+    direction_norm = float(np.linalg.norm(direction))
+    if direction_norm <= 1e-12:
+        raise ValueError("floor push direction must be non-zero")
+    direction /= direction_norm
+
+    parameters = {
+        "base_standoff_m": float(base_standoff_m),
+        "maximum_lateral_offset_m": float(maximum_lateral_offset_m),
+        "face_offset_m": float(face_offset_m),
+        "hand_separation_m": float(hand_separation_m),
+        "hand_height_m": float(hand_height_m),
+        "precontact_clearance_m": float(precontact_clearance_m),
+    }
+    if any(not np.isfinite(value) or value <= 0.0 for value in parameters.values()):
+        raise ValueError("floor push geometry parameters must be finite and positive")
+
+    left_axis = np.array([-direction[1], direction[0]], dtype=float)
+    raw_lateral_offset = float(np.dot(base_position - object_position, left_axis))
+    lateral_offset = float(
+        np.clip(
+            raw_lateral_offset,
+            -parameters["maximum_lateral_offset_m"],
+            parameters["maximum_lateral_offset_m"],
+        )
+    )
+    stage_base_xy = (
+        object_position
+        - direction * parameters["base_standoff_m"]
+        + left_axis * lateral_offset
+    )
+    contact_center = object_position - direction * parameters["face_offset_m"]
+    half_separation = parameters["hand_separation_m"] / 2.0
+    contact = {
+        "right": np.r_[
+            contact_center - left_axis * half_separation,
+            parameters["hand_height_m"],
+        ],
+        "left": np.r_[
+            contact_center + left_axis * half_separation,
+            parameters["hand_height_m"],
+        ],
+    }
+    precontact_offset = np.r_[
+        -direction * parameters["precontact_clearance_m"],
+        parameters["precontact_clearance_m"],
+    ]
+    return {
+        "direction": direction,
+        "left_axis": left_axis,
+        "stage_base_xy": stage_base_xy,
+        "target_yaw": float(np.arctan2(direction[1], direction[0])),
+        "lateral_offset_m": lateral_offset,
+        "contact": contact,
+        "precontact": {
+            arm: target + precontact_offset for arm, target in contact.items()
+        },
+    }
+
+
 @contextmanager
 def transport_attachment_audit(raw_env: object, transport_module: object):
     """Count transport attachment and direct object-pose operations in a scope."""
@@ -488,6 +570,64 @@ def push_gate_failures(record: Mapping[str, object]) -> list[str]:
 def push_gate_accepted(record: Mapping[str, object]) -> bool:
     """Accept only complete, collision-free physical-push evidence."""
     return not push_gate_failures(record)
+
+
+_HYBRID_EXIT_REQUIRED_FIELDS = (
+    "physical_grasp",
+    "extraction_success",
+    "floor_transition_detected",
+    "navigation_retract_success",
+    "floor_push_success",
+    "physical_contact_steps",
+    "maximum_axis_displacement_m",
+    "attachment_calls",
+    "object_pose_writes",
+    "collision_frames",
+    "infrastructure_error",
+)
+
+
+def hybrid_exit_gate_failures(record: Mapping[str, object]) -> list[str]:
+    """Require physical evidence for the official strict one-metre exit rule."""
+    failures = [key for key in _HYBRID_EXIT_REQUIRED_FIELDS if key not in record]
+    for key in (
+        "physical_grasp",
+        "extraction_success",
+        "floor_transition_detected",
+        "navigation_retract_success",
+        "floor_push_success",
+    ):
+        if record.get(key) is not True:
+            failures.append(key)
+
+    def numeric(key: str) -> float | None:
+        value = record.get(key)
+        if isinstance(value, bool):
+            return None
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return None
+        return number if np.isfinite(number) else None
+
+    contact_steps = numeric("physical_contact_steps")
+    if contact_steps is None or contact_steps < 20.0:
+        failures.append("physical_contact_steps")
+    displacement = numeric("maximum_axis_displacement_m")
+    if displacement is None or displacement <= 1.0:
+        failures.append("maximum_axis_displacement_m")
+    for key in ("attachment_calls", "object_pose_writes", "collision_frames"):
+        value = numeric(key)
+        if value is None or value != 0.0:
+            failures.append(key)
+    if record.get("infrastructure_error") is not None:
+        failures.append("infrastructure_error")
+    return list(dict.fromkeys(failures))
+
+
+def hybrid_exit_gate_accepted(record: Mapping[str, object]) -> bool:
+    """Accept only a collision-free, attachment-free physical scene exit."""
+    return not hybrid_exit_gate_failures(record)
 
 
 _UNDERCUT_REQUIRED_FIELDS = (
@@ -2659,6 +2799,243 @@ def _floor_regrasp_move_probe(
     }
 
 
+def _floor_corridor_push_probe(
+    backend,
+    object_name: str,
+    *,
+    push_direction_x: float,
+    push_direction_y: float,
+    push_distance_m: float,
+    base_standoff_m: float,
+    maximum_lateral_offset_m: float,
+    face_offset_m: float,
+    hand_separation_m: float,
+    hand_height_m: float,
+    precontact_clearance_m: float,
+    base_speed_m_s: float,
+    max_steps: int,
+) -> dict[str, Any]:
+    """Push a floor object through its current lane using two actuated arms."""
+    from robot_agent.skills.competition_grasp import (
+        OfficialScriptedGraspDriver,
+        ScriptedGraspConfig,
+    )
+    from robot_agent.skills.competition_navigation import orient_base
+    from robot_agent.skills.competition_transport import (
+        OfficialPhysicalCarryDriver,
+        world_velocity_to_base_frame,
+    )
+
+    requested_distance = float(push_distance_m)
+    requested_speed = float(base_speed_m_s)
+    requested_steps = int(max_steps)
+    if not np.isfinite(requested_distance) or requested_distance <= 0.0:
+        raise ValueError("floor push distance must be finite and positive")
+    if not np.isfinite(requested_speed) or requested_speed <= 0.0:
+        raise ValueError("floor push speed must be finite and positive")
+    if isinstance(max_steps, bool) or requested_steps != max_steps or requested_steps < 1:
+        raise ValueError("floor push max_steps must be a positive integer")
+
+    raw_env = backend.env
+    robot = raw_env.robots[0]
+    body_id = raw_env.obj_body_id[object_name]
+    start_object = np.asarray(raw_env.sim.data.body_xpos[body_id], dtype=float).copy()
+    start_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
+    targets = floor_push_staging_targets(
+        object_xy=start_object[:2],
+        current_base_xy=start_base_xy,
+        push_direction_xy=[push_direction_x, push_direction_y],
+        base_standoff_m=base_standoff_m,
+        maximum_lateral_offset_m=maximum_lateral_offset_m,
+        face_offset_m=face_offset_m,
+        hand_separation_m=hand_separation_m,
+        hand_height_m=hand_height_m,
+        precontact_clearance_m=precontact_clearance_m,
+    )
+    direction = np.asarray(targets["direction"], dtype=float)
+    marker = getattr(backend, "_mark_trajectory_event", None)
+    if callable(marker):
+        marker(
+            "floor_corridor_push_start",
+            object_name=object_name,
+            stage_base_xy=targets["stage_base_xy"].tolist(),
+            push_direction=direction.tolist(),
+            requested_distance_m=requested_distance,
+        )
+
+    stage_reached = bool(
+        backend.follow_path(
+            [targets["stage_base_xy"]],
+            max_steps=1200,
+            waypoint_tolerance=0.03,
+        )
+    )
+    oriented = bool(stage_reached and orient_base(backend, targets["target_yaw"]))
+    position_driver = OfficialScriptedGraspDriver()
+    position_config = ScriptedGraspConfig(
+        max_action=0.30,
+        position_tolerance=0.03,
+    )
+    precontact_reached = bool(
+        oriented
+        and position_driver._move_to_targets(
+            backend,
+            targets["precontact"],
+            position_config,
+            max_steps=480,
+            gripper_value=-1.0,
+            tolerance=position_config.position_tolerance,
+        )
+    )
+    contact_reached = bool(
+        precontact_reached
+        and position_driver._move_to_targets(
+            backend,
+            targets["contact"],
+            position_config,
+            max_steps=360,
+            gripper_value=1.0,
+            tolerance=0.04,
+        )
+    )
+    collision = bool(getattr(raw_env, "has_judge_collision", False))
+    failure_stage = None
+    if not stage_reached:
+        failure_stage = "stage_base"
+    elif not oriented:
+        failure_stage = "orient"
+    elif not precontact_reached:
+        failure_stage = "precontact"
+    elif not contact_reached:
+        failure_stage = "contact_pose"
+    elif collision:
+        failure_stage = "collision"
+
+    observations = []
+    stable_contact_steps = 0
+    maximum_contact_steps = 0
+    no_contact_steps = 0
+    object_progress = 0.0
+    lateral_drift = 0.0
+    base_progress = 0.0
+    steps = 0
+    if failure_stage is None:
+        carry_driver = OfficialPhysicalCarryDriver()
+        hold_targets = carry_driver.capture_hold_targets(backend)
+        base_control_dt = 0.05
+        arm_step = direction * requested_speed * base_control_dt
+        for step in range(requested_steps):
+            _, base_yaw = backend.get_base_pose()
+            base_velocity = world_velocity_to_base_frame(
+                direction * requested_speed,
+                base_yaw,
+            )
+            step_info = carry_driver.step(
+                backend,
+                object_name=object_name,
+                base_command=np.array(
+                    [base_velocity[0], base_velocity[1], 0.0],
+                    dtype=float,
+                ),
+                hold_targets=hold_targets,
+                arm_world_deltas={
+                    "right": np.r_[arm_step, 0.0],
+                    "left": np.r_[arm_step, 0.0],
+                },
+                gripper_value=1.0,
+                base_control_dt=base_control_dt,
+            )
+            steps = step + 1
+            collision = bool(step_info.get("collision", False))
+            contacts = object_robot_contacts(raw_env, object_name)
+            has_contact = any(contacts[arm] for arm in ("right", "left"))
+            stable_contact_steps = stable_contact_steps + 1 if has_contact else 0
+            maximum_contact_steps = max(maximum_contact_steps, stable_contact_steps)
+            no_contact_steps = 0 if has_contact else no_contact_steps + 1
+            object_position = np.asarray(
+                raw_env.sim.data.body_xpos[body_id], dtype=float
+            ).copy()
+            object_delta = object_position[:2] - start_object[:2]
+            object_progress = float(np.dot(object_delta, direction))
+            lateral_drift = abs(
+                float(np.dot(object_delta, np.asarray(targets["left_axis"])))
+            )
+            base_delta = np.asarray(backend.get_base_pose()[0], dtype=float) - start_base_xy
+            base_progress = float(np.dot(base_delta, direction))
+            if step % 10 == 0 or collision or object_progress >= requested_distance:
+                observations.append(
+                    {
+                        "step": steps,
+                        "object_position": object_position.tolist(),
+                        "object_progress_m": object_progress,
+                        "lateral_drift_m": lateral_drift,
+                        "base_progress_m": base_progress,
+                        "contacts": {arm: list(contacts[arm]) for arm in contacts},
+                        "judge_collision": collision,
+                    }
+                )
+            if collision:
+                failure_stage = "collision"
+                break
+            if lateral_drift > 0.30:
+                failure_stage = "lateral_drift"
+                break
+            if object_progress >= requested_distance and maximum_contact_steps >= 20:
+                failure_stage = None
+                break
+            if maximum_contact_steps >= 20 and no_contact_steps >= 80:
+                failure_stage = "contact_lost"
+                break
+        else:
+            failure_stage = "timeout"
+
+    success = bool(
+        failure_stage is None
+        and object_progress >= requested_distance
+        and maximum_contact_steps >= 20
+        and not collision
+    )
+    final_object = np.asarray(raw_env.sim.data.body_xpos[body_id], dtype=float).copy()
+    if callable(marker):
+        marker(
+            "floor_corridor_push_end",
+            object_name=object_name,
+            success=success,
+            failure_stage=failure_stage,
+            object_progress_m=object_progress,
+            physical_contact_steps=maximum_contact_steps,
+        )
+    return {
+        "success": success,
+        "failure_stage": failure_stage,
+        "stage_reached": stage_reached,
+        "oriented": oriented,
+        "precontact_reached": precontact_reached,
+        "contact_reached": contact_reached,
+        "collision": collision,
+        "steps": steps,
+        "physical_contact_steps": maximum_contact_steps,
+        "object_progress_m": object_progress,
+        "lateral_drift_m": lateral_drift,
+        "base_progress_m": base_progress,
+        "start_object_position": start_object.tolist(),
+        "end_object_position": final_object.tolist(),
+        "targets": {
+            "stage_base_xy": targets["stage_base_xy"].tolist(),
+            "target_yaw": float(targets["target_yaw"]),
+            "lateral_offset_m": float(targets["lateral_offset_m"]),
+            "precontact": {
+                arm: target.tolist()
+                for arm, target in targets["precontact"].items()
+            },
+            "contact": {
+                arm: target.tolist() for arm, target in targets["contact"].items()
+            },
+        },
+        "observations": observations,
+    }
+
+
 def _end_grasp_regrasp_probe(
     backend,
     driver,
@@ -2860,6 +3237,152 @@ def _end_grasp_regrasp_probe(
         "object_pose_writes": object_pose_writes,
         "transport_attachment_active_before": attachment_active_before,
         "transport_attachment_active_after": attachment_active_after,
+    }
+
+
+def _end_grasp_floor_push_probe(
+    backend,
+    driver,
+    source: str,
+    object_name: str,
+    *,
+    macro_count: int = 2,
+    distance_m: float = 0.14,
+    world_direction_x: float | None = 1.0,
+    world_direction_y: float | None = 0.0,
+    table_object_z: float,
+    stroke_m: float = 0.08,
+    stroke_lift_m: float = 0.0,
+    height_gain: float = 0.0,
+    reset_m: float = 0.06,
+    minimum_lift_m: float = 0.10,
+    place_max_descent_m: float = 0.45,
+    floor_retract_forward_m: float = 0.20,
+    floor_retract_lateral_m: float = 0.15,
+    floor_retract_target_z: float = 1.45,
+    floor_transition_margin_m: float = 0.30,
+    push_direction_x: float,
+    push_direction_y: float,
+    push_distance_m: float = 1.05,
+    push_base_standoff_m: float = 0.85,
+    push_maximum_lateral_offset_m: float = 0.25,
+    push_face_offset_m: float = 0.24,
+    push_hand_separation_m: float = 0.28,
+    push_hand_height_m: float = 0.38,
+    push_precontact_clearance_m: float = 0.08,
+    push_base_speed_m_s: float = 0.025,
+    push_max_steps: int = 1200,
+    _extraction_probe=None,
+    _navigation_retract=None,
+    _floor_push=None,
+) -> dict[str, Any]:
+    """Extract from the table, retract, then physically push along a floor lane."""
+    extraction_probe = _extraction_probe or _end_grasp_regrasp_probe
+    retract_probe = _navigation_retract or _navigation_retract_probe
+    floor_push_probe = _floor_push or _floor_corridor_push_probe
+    raw_env = backend.env
+    body_id = raw_env.obj_body_id[object_name]
+    start_object = np.asarray(raw_env.sim.data.body_xpos[body_id], dtype=float).copy()
+    extraction = extraction_probe(
+        backend,
+        driver,
+        source,
+        object_name,
+        macro_count=macro_count,
+        distance_m=distance_m,
+        world_direction_x=world_direction_x,
+        world_direction_y=world_direction_y,
+        table_object_z=table_object_z,
+        stroke_m=stroke_m,
+        stroke_lift_m=stroke_lift_m,
+        height_gain=height_gain,
+        reset_m=reset_m,
+        minimum_lift_m=minimum_lift_m,
+        place_max_descent_m=place_max_descent_m,
+        floor_retract_forward_m=floor_retract_forward_m,
+        floor_retract_lateral_m=floor_retract_lateral_m,
+        floor_retract_target_z=floor_retract_target_z,
+        floor_transition_margin_m=floor_transition_margin_m,
+    )
+    after_extraction = np.asarray(
+        raw_env.sim.data.body_xpos[body_id], dtype=float
+    ).copy()
+    floor_transition = bool(
+        after_extraction[2]
+        < float(table_object_z) - float(floor_transition_margin_m)
+    )
+    navigation_retract = None
+    floor_push = None
+    failure_stage = None
+    if not bool(extraction.get("success", False)):
+        failure_stage = "extraction"
+    elif not floor_transition:
+        failure_stage = "floor_transition"
+    else:
+        navigation_retract = retract_probe(
+            backend,
+            forward_m=floor_retract_forward_m,
+            lateral_m=floor_retract_lateral_m,
+            target_z=floor_retract_target_z,
+        )
+        if not bool(navigation_retract.get("success", False)):
+            failure_stage = "navigation_retract"
+        else:
+            floor_push = floor_push_probe(
+                backend,
+                object_name,
+                push_direction_x=push_direction_x,
+                push_direction_y=push_direction_y,
+                push_distance_m=push_distance_m,
+                base_standoff_m=push_base_standoff_m,
+                maximum_lateral_offset_m=push_maximum_lateral_offset_m,
+                face_offset_m=push_face_offset_m,
+                hand_separation_m=push_hand_separation_m,
+                hand_height_m=push_hand_height_m,
+                precontact_clearance_m=push_precontact_clearance_m,
+                base_speed_m_s=push_base_speed_m_s,
+                max_steps=push_max_steps,
+            )
+            if not bool(floor_push.get("success", False)):
+                failure_stage = f"floor_push:{floor_push.get('failure_stage') or 'unknown'}"
+
+    end_object = np.asarray(raw_env.sim.data.body_xpos[body_id], dtype=float).copy()
+    displacement = end_object[:2] - start_object[:2]
+    success = bool(failure_stage is None)
+    return {
+        "success": success,
+        "failure_stage": failure_stage,
+        "extraction_success": bool(extraction.get("success", False)),
+        "floor_transition_detected": floor_transition,
+        "navigation_retract_success": bool(
+            isinstance(navigation_retract, Mapping)
+            and navigation_retract.get("success", False)
+        ),
+        "floor_push_success": bool(
+            isinstance(floor_push, Mapping) and floor_push.get("success", False)
+        ),
+        "physical_contact_steps": int(
+            floor_push.get("physical_contact_steps", 0)
+            if isinstance(floor_push, Mapping)
+            else 0
+        ),
+        "maximum_axis_displacement_m": float(np.max(np.abs(displacement))),
+        "start_object_position": start_object.tolist(),
+        "after_extraction_object_position": after_extraction.tolist(),
+        "end_object_position": end_object.tolist(),
+        "measured_object_translation_m": float(np.linalg.norm(displacement)),
+        "requested_macro_count": int(extraction.get("requested_macro_count", 0)),
+        "completed_macro_count": int(extraction.get("completed_macro_count", 0)),
+        "transport_success": bool(extraction.get("transport_success", False)),
+        "place_success": bool(extraction.get("place_success", False)),
+        "support_detected": bool(extraction.get("support_detected", False)),
+        "released": bool(extraction.get("released", False)),
+        "world_direction": [float(push_direction_x), float(push_direction_y)],
+        "attachment_activations": int(extraction.get("attachment_activations", 0)),
+        "object_pose_writes": int(extraction.get("object_pose_writes", 0)),
+        "extraction": extraction,
+        "navigation_retract": navigation_retract,
+        "floor_push": floor_push,
     }
 
 
@@ -6949,7 +7472,82 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                     }
                     if args.end_grasp_setdown_after_inchworm:
                         record["mode"] = "end_grasp_setdown_probe"
-                        if args.end_grasp_regrasp_macros > 1:
+                        if args.floor_corridor_push:
+                            if (
+                                args.floor_push_world_direction_x is None
+                                or args.floor_push_world_direction_y is None
+                            ):
+                                raise ValueError(
+                                    "floor corridor push requires both world direction components"
+                                )
+                            record["mode"] = "end_grasp_floor_push_probe"
+                            probe = _end_grasp_floor_push_probe(
+                                backend,
+                                driver,
+                                str(task["source"]),
+                                object_name,
+                                macro_count=args.end_grasp_regrasp_macros,
+                                place_max_descent_m=(
+                                    args.end_grasp_place_max_descent_m
+                                ),
+                                floor_retract_forward_m=(
+                                    args.floor_regrasp_retract_forward_m
+                                ),
+                                floor_retract_lateral_m=(
+                                    args.floor_regrasp_retract_lateral_m
+                                ),
+                                floor_retract_target_z=(
+                                    args.floor_regrasp_retract_target_z
+                                ),
+                                floor_transition_margin_m=(
+                                    args.floor_transition_margin_m
+                                ),
+                                push_direction_x=(
+                                    args.floor_push_world_direction_x
+                                ),
+                                push_direction_y=(
+                                    args.floor_push_world_direction_y
+                                ),
+                                push_distance_m=args.floor_push_distance_m,
+                                push_base_standoff_m=(
+                                    args.floor_push_base_standoff_m
+                                ),
+                                push_maximum_lateral_offset_m=(
+                                    args.floor_push_maximum_lateral_offset_m
+                                ),
+                                push_face_offset_m=args.floor_push_face_offset_m,
+                                push_hand_separation_m=(
+                                    args.floor_push_hand_separation_m
+                                ),
+                                push_hand_height_m=args.floor_push_hand_height_m,
+                                push_precontact_clearance_m=(
+                                    args.floor_push_precontact_clearance_m
+                                ),
+                                push_base_speed_m_s=(
+                                    args.floor_push_base_speed_m_s
+                                ),
+                                push_max_steps=args.floor_push_max_steps,
+                                **inchworm_kwargs,
+                            )
+                            record["extraction_success"] = bool(
+                                probe.get("extraction_success", False)
+                            )
+                            record["floor_transition_detected"] = bool(
+                                probe.get("floor_transition_detected", False)
+                            )
+                            record["navigation_retract_success"] = bool(
+                                probe.get("navigation_retract_success", False)
+                            )
+                            record["floor_push_success"] = bool(
+                                probe.get("floor_push_success", False)
+                            )
+                            record["physical_contact_steps"] = int(
+                                probe.get("physical_contact_steps", 0)
+                            )
+                            record["maximum_axis_displacement_m"] = float(
+                                probe.get("maximum_axis_displacement_m", 0.0)
+                            )
+                        elif args.end_grasp_regrasp_macros > 1:
                             probe = _end_grasp_regrasp_probe(
                                 backend,
                                 driver,
@@ -7247,6 +7845,15 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
             final_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
             record["final_object_z"] = final_z
             record["final_object_position"] = final_object_position.tolist()
+            if record.get("mode") == "end_grasp_floor_push_probe":
+                record["maximum_axis_displacement_m"] = float(
+                    np.max(
+                        np.abs(
+                            final_object_position[:2]
+                            - pre_grasp_object_position[:2]
+                        )
+                    )
+                )
             direction = np.asarray(
                 record.get("transport_world_direction", []), dtype=float
             )
@@ -7286,6 +7893,8 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
         record["gate_failures"] = posture_carry_failures(record)
     elif record.get("mode") == "end_grasp_setdown_probe":
         record["gate_failures"] = setdown_gate_failures(record)
+    elif record.get("mode") == "end_grasp_floor_push_probe":
+        record["gate_failures"] = hybrid_exit_gate_failures(record)
     elif record.get("mode") == "physical_push_probe":
         record["gate_failures"] = push_gate_failures(record)
     elif record.get("mode") == "center_grasp_physical_transport":
@@ -7379,6 +7988,28 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--floor-regrasp-safe-clearance-m", type=float, default=1.20
     )
+    parser.add_argument("--floor-corridor-push", action="store_true")
+    parser.add_argument("--floor-push-world-direction-x", type=float)
+    parser.add_argument("--floor-push-world-direction-y", type=float)
+    parser.add_argument("--floor-push-distance-m", type=float, default=1.05)
+    parser.add_argument(
+        "--floor-push-base-standoff-m", type=float, default=0.85
+    )
+    parser.add_argument(
+        "--floor-push-maximum-lateral-offset-m", type=float, default=0.25
+    )
+    parser.add_argument("--floor-push-face-offset-m", type=float, default=0.24)
+    parser.add_argument(
+        "--floor-push-hand-separation-m", type=float, default=0.28
+    )
+    parser.add_argument("--floor-push-hand-height-m", type=float, default=0.38)
+    parser.add_argument(
+        "--floor-push-precontact-clearance-m", type=float, default=0.08
+    )
+    parser.add_argument(
+        "--floor-push-base-speed-m-s", type=float, default=0.025
+    )
+    parser.add_argument("--floor-push-max-steps", type=int, default=1200)
     parser.add_argument("--center-carry-distance-m", type=float, default=0.0)
     parser.add_argument("--center-carry-max-linear", type=float, default=0.04)
     parser.add_argument("--center-carry-away-from-object", action="store_true")
