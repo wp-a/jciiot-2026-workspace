@@ -1,7 +1,12 @@
 import importlib.util
 import math
+import sys
 import unittest
 from pathlib import Path
+from types import ModuleType, SimpleNamespace
+from unittest.mock import patch
+
+import numpy as np
 
 
 MODULE_PATH = (
@@ -110,6 +115,61 @@ class CompetitionNavigationTests(unittest.TestCase):
         )
 
         self.assertAlmostEqual(next_yaw, 1.7201)
+
+    def test_orient_base_preserves_world_xy_during_every_yaw_step(self):
+        backend = SimpleNamespace(
+            xy=np.array([8.034, 5.332], dtype=float),
+            yaw=-math.pi,
+        )
+        raw_env = SimpleNamespace(
+            robots=[object()],
+            action_spec=(np.zeros(1), np.ones(1)),
+        )
+        backend.env = raw_env
+        backend.get_base_pose = lambda: (backend.xy.copy(), backend.yaw)
+        anchors = []
+
+        def set_yaw(_env, _robot, yaw):
+            backend.yaw = float(yaw)
+            backend.xy += np.array([0.10, -0.10])
+
+        def set_xy(_env, _robot, xy):
+            anchors.append(np.asarray(xy, dtype=float).copy())
+            backend.xy = np.asarray(xy, dtype=float).copy()
+
+        raw_env.step = lambda _action: (None, None, None, {"has_judge_collision": False})
+        private_backend = ModuleType("robot_agent.environments.robosuite_backend")
+        private_backend._capture_upper_body_posture = lambda _env, _robot: {}
+        private_backend._restore_upper_body_posture = lambda _env, _posture: None
+        private_backend._shortest_angle = lambda angle: (
+            float(angle) + math.pi
+        ) % (2.0 * math.pi) - math.pi
+        private_backend._set_base_world_yaw_direct = set_yaw
+        private_backend._set_base_xy_direct = set_xy
+        robot_agent = ModuleType("robot_agent")
+        environments = ModuleType("robot_agent.environments")
+
+        with patch.dict(
+            sys.modules,
+            {
+                "robot_agent": robot_agent,
+                "robot_agent.environments": environments,
+                "robot_agent.environments.robosuite_backend": private_backend,
+            },
+        ):
+            reached = self.module.orient_base(
+                backend,
+                -math.pi / 2.0,
+                tolerance=0.001,
+                max_steps=100,
+                max_yaw_step=0.025,
+            )
+
+        self.assertTrue(reached)
+        np.testing.assert_allclose(backend.xy, [8.034, 5.332])
+        self.assertGreater(len(anchors), 5)
+        for anchor in anchors:
+            np.testing.assert_allclose(anchor, [8.034, 5.332])
 
     def test_reached_base_orientation_faces_grasp_center(self):
         orientation = self.module.grasp_orientation_from_base(

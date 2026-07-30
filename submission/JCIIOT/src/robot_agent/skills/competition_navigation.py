@@ -221,11 +221,14 @@ def orient_base(
         _capture_upper_body_posture,
         _restore_upper_body_posture,
         _shortest_angle,
+        _set_base_xy_direct,
         _set_base_world_yaw_direct,
     )
 
     raw_env = backend.env
     robot = raw_env.robots[0]
+    anchor_xy, _ = backend.get_base_pose()
+    anchor_xy = np.asarray(anchor_xy, dtype=float).copy()
     posture = _capture_upper_body_posture(raw_env, robot)
     recorder = getattr(backend, "_record_trajectory_frame", None)
     idle_action = np.zeros_like(raw_env.action_spec[0])
@@ -243,16 +246,20 @@ def orient_base(
             max_step=max_yaw_step,
         )
         _set_base_world_yaw_direct(raw_env, robot, next_yaw)
+        _set_base_xy_direct(raw_env, robot, anchor_xy)
         _, _, _, info = raw_env.step(idle_action)
         _restore_upper_body_posture(raw_env, posture)
+        _set_base_xy_direct(raw_env, robot, anchor_xy)
         if callable(recorder):
             recorder(_env=raw_env)
         if bool((info or {}).get("has_judge_collision", False)):
             return False
 
     for _ in range(5):
+        _set_base_xy_direct(raw_env, robot, anchor_xy)
         raw_env.step(idle_action)
         _restore_upper_body_posture(raw_env, posture)
+        _set_base_xy_direct(raw_env, robot, anchor_xy)
         if callable(recorder):
             recorder(_env=raw_env)
     return reached
