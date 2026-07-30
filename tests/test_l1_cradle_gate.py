@@ -138,6 +138,8 @@ VALID_SETDOWN_RECORD = {
     "support_detected": True,
     "released": True,
     "object_translation_m": 0.12,
+    "net_projected_object_progress_m": 0.12,
+    "net_lateral_object_drift_m": 0.05,
     "attachment_calls": 0,
     "object_pose_writes": 0,
     "collision_frames": 0,
@@ -158,6 +160,8 @@ class EndGraspSetdownGateTests(unittest.TestCase):
             "support_detected": False,
             "released": False,
             "object_translation_m": 0.119999,
+            "net_projected_object_progress_m": 0.119999,
+            "net_lateral_object_drift_m": 0.050001,
             "attachment_calls": 1,
             "object_pose_writes": 1,
             "collision_frames": 1,
@@ -180,6 +184,8 @@ class EndGraspSetdownGateTests(unittest.TestCase):
 
         for key in (
             "object_translation_m",
+            "net_projected_object_progress_m",
+            "net_lateral_object_drift_m",
             "attachment_calls",
             "object_pose_writes",
             "collision_frames",

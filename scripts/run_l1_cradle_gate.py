@@ -311,6 +311,8 @@ _SETDOWN_REQUIRED_FIELDS = (
     "support_detected",
     "released",
     "object_translation_m",
+    "net_projected_object_progress_m",
+    "net_lateral_object_drift_m",
     "attachment_calls",
     "object_pose_writes",
     "collision_frames",
@@ -343,6 +345,12 @@ def setdown_gate_failures(record: Mapping[str, object]) -> list[str]:
     translation = numeric("object_translation_m")
     if translation is None or translation < 0.12:
         failures.append("object_translation_m")
+    net_progress = numeric("net_projected_object_progress_m")
+    if net_progress is None or net_progress < 0.12:
+        failures.append("net_projected_object_progress_m")
+    net_lateral = numeric("net_lateral_object_drift_m")
+    if net_lateral is None or net_lateral > 0.05:
+        failures.append("net_lateral_object_drift_m")
     for key in ("attachment_calls", "object_pose_writes", "collision_frames"):
         value = numeric(key)
         if value is None or value != 0.0:
@@ -6328,7 +6336,10 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
         )
         record["move_success"] = bool(moved)
         if moved:
-            pre_grasp_z = float(backend.env.sim.data.body_xpos[body_id][2])
+            pre_grasp_object_position = np.asarray(
+                backend.env.sim.data.body_xpos[body_id], dtype=float
+            ).copy()
+            pre_grasp_z = float(pre_grasp_object_position[2])
             pre_grasp_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
             grasp = (
                 driver.grasp(str(task["source"]), object_name)
@@ -6348,6 +6359,9 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                 and all(bool(value) for value in grasp.get("contacts", {}).values())
             )
             record["pre_grasp_object_z"] = pre_grasp_z
+            record["pre_grasp_object_position"] = (
+                pre_grasp_object_position.tolist()
+            )
             record["post_grasp_object_z"] = post_grasp_z
             record["lift_m"] = post_grasp_z - pre_grasp_z
             record["post_grasp_geometry"] = geometry_snapshot(
@@ -6495,6 +6509,9 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                         record["transport_success"] = bool(probe.get("success"))
                     record["object_translation_m"] = float(
                         probe.get("measured_object_translation_m", 0.0)
+                    )
+                    record["transport_world_direction"] = list(
+                        probe.get("world_direction", [])
                     )
                     record["attachment_calls"] = int(
                         probe.get("attachment_activations", 0)
@@ -6719,13 +6736,28 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                 record["support_contact_steps"] = int(
                     probe.get("support_contact_steps", 0)
                 )
-            final_z = float(backend.env.sim.data.body_xpos[body_id][2])
+            final_object_position = np.asarray(
+                backend.env.sim.data.body_xpos[body_id], dtype=float
+            ).copy()
+            final_z = float(final_object_position[2])
             record["final_geometry"] = geometry_snapshot(
                 backend.env,
                 object_name,
             )
             final_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
             record["final_object_z"] = final_z
+            record["final_object_position"] = final_object_position.tolist()
+            direction = np.asarray(
+                record.get("transport_world_direction", []), dtype=float
+            )
+            if direction.shape == (2,) and np.all(np.isfinite(direction)):
+                net_progress, net_lateral = directed_planar_progress(
+                    start_xy=pre_grasp_object_position[:2],
+                    end_xy=final_object_position[:2],
+                    direction_xy=direction,
+                )
+                record["net_projected_object_progress_m"] = net_progress
+                record["net_lateral_object_drift_m"] = net_lateral
             record["base_translation_m"] = float(
                 np.linalg.norm(final_base_xy - pre_grasp_base_xy)
             )
