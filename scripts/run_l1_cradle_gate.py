@@ -2932,6 +2932,18 @@ def _floor_corridor_push_probe(
         )
     )
     collision = bool(getattr(raw_env, "has_judge_collision", False))
+    collision_pairs = []
+    if collision:
+        from robot_agent.environments.robosuite_backend import _navigation_collisions
+
+        collision_pairs = [
+            list(pair)
+            for pair in _navigation_collisions(
+                raw_env,
+                robot,
+                getattr(backend, "_ignore_collision_geom", ()),
+            )
+        ]
     failure_stage = None
     if not orientation_stage_reached:
         failure_stage = "orientation_stage_base"
@@ -3054,6 +3066,7 @@ def _floor_corridor_push_probe(
         "precontact_reached": precontact_reached,
         "contact_reached": contact_reached,
         "collision": collision,
+        "collision_pairs": collision_pairs,
         "steps": steps,
         "physical_contact_steps": maximum_contact_steps,
         "object_progress_m": object_progress,
