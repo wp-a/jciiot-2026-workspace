@@ -140,6 +140,7 @@ def floor_push_staging_targets(
     current_base_xy: object,
     push_direction_xy: object,
     base_standoff_m: float,
+    orientation_clearance_m: float,
     maximum_lateral_offset_m: float,
     face_offset_m: float,
     hand_separation_m: float,
@@ -164,6 +165,7 @@ def floor_push_staging_targets(
 
     parameters = {
         "base_standoff_m": float(base_standoff_m),
+        "orientation_clearance_m": float(orientation_clearance_m),
         "maximum_lateral_offset_m": float(maximum_lateral_offset_m),
         "face_offset_m": float(face_offset_m),
         "hand_separation_m": float(hand_separation_m),
@@ -207,6 +209,9 @@ def floor_push_staging_targets(
         "direction": direction,
         "left_axis": left_axis,
         "stage_base_xy": stage_base_xy,
+        "orientation_base_xy": (
+            stage_base_xy - direction * parameters["orientation_clearance_m"]
+        ),
         "target_yaw": float(np.arctan2(direction[1], direction[0])),
         "lateral_offset_m": lateral_offset,
         "contact": contact,
@@ -2807,6 +2812,10 @@ def _floor_corridor_push_probe(
     push_direction_y: float,
     push_distance_m: float,
     base_standoff_m: float,
+    orientation_clearance_m: float,
+    oriented_retract_forward_m: float,
+    oriented_retract_lateral_m: float,
+    oriented_retract_target_z: float,
     maximum_lateral_offset_m: float,
     face_offset_m: float,
     hand_separation_m: float,
@@ -2846,6 +2855,7 @@ def _floor_corridor_push_probe(
         current_base_xy=start_base_xy,
         push_direction_xy=[push_direction_x, push_direction_y],
         base_standoff_m=base_standoff_m,
+        orientation_clearance_m=orientation_clearance_m,
         maximum_lateral_offset_m=maximum_lateral_offset_m,
         face_offset_m=face_offset_m,
         hand_separation_m=hand_separation_m,
@@ -2858,26 +2868,49 @@ def _floor_corridor_push_probe(
         marker(
             "floor_corridor_push_start",
             object_name=object_name,
+            orientation_base_xy=targets["orientation_base_xy"].tolist(),
             stage_base_xy=targets["stage_base_xy"].tolist(),
             push_direction=direction.tolist(),
             requested_distance_m=requested_distance,
         )
 
-    stage_reached = bool(
+    orientation_stage_reached = bool(
         backend.follow_path(
+            [targets["orientation_base_xy"]],
+            max_steps=1200,
+            waypoint_tolerance=0.03,
+        )
+    )
+    oriented = bool(
+        orientation_stage_reached
+        and orient_base(backend, targets["target_yaw"])
+    )
+    oriented_retract = (
+        _navigation_retract_probe(
+            backend,
+            forward_m=oriented_retract_forward_m,
+            lateral_m=oriented_retract_lateral_m,
+            target_z=oriented_retract_target_z,
+        )
+        if oriented
+        else None
+    )
+    stage_reached = bool(
+        isinstance(oriented_retract, Mapping)
+        and oriented_retract.get("success", False)
+        and backend.follow_path(
             [targets["stage_base_xy"]],
             max_steps=1200,
             waypoint_tolerance=0.03,
         )
     )
-    oriented = bool(stage_reached and orient_base(backend, targets["target_yaw"]))
     position_driver = OfficialScriptedGraspDriver()
     position_config = ScriptedGraspConfig(
         max_action=0.30,
         position_tolerance=0.03,
     )
     precontact_reached = bool(
-        oriented
+        stage_reached
         and position_driver._move_to_targets(
             backend,
             targets["precontact"],
@@ -2900,10 +2933,16 @@ def _floor_corridor_push_probe(
     )
     collision = bool(getattr(raw_env, "has_judge_collision", False))
     failure_stage = None
-    if not stage_reached:
-        failure_stage = "stage_base"
+    if not orientation_stage_reached:
+        failure_stage = "orientation_stage_base"
     elif not oriented:
         failure_stage = "orient"
+    elif not isinstance(oriented_retract, Mapping) or not oriented_retract.get(
+        "success", False
+    ):
+        failure_stage = "oriented_retract"
+    elif not stage_reached:
+        failure_stage = "stage_base"
     elif not precontact_reached:
         failure_stage = "precontact"
     elif not contact_reached:
@@ -3008,8 +3047,10 @@ def _floor_corridor_push_probe(
     return {
         "success": success,
         "failure_stage": failure_stage,
+        "orientation_stage_reached": orientation_stage_reached,
         "stage_reached": stage_reached,
         "oriented": oriented,
+        "oriented_retract": oriented_retract,
         "precontact_reached": precontact_reached,
         "contact_reached": contact_reached,
         "collision": collision,
@@ -3021,6 +3062,7 @@ def _floor_corridor_push_probe(
         "start_object_position": start_object.tolist(),
         "end_object_position": final_object.tolist(),
         "targets": {
+            "orientation_base_xy": targets["orientation_base_xy"].tolist(),
             "stage_base_xy": targets["stage_base_xy"].tolist(),
             "target_yaw": float(targets["target_yaw"]),
             "lateral_offset_m": float(targets["lateral_offset_m"]),
@@ -3265,6 +3307,9 @@ def _end_grasp_floor_push_probe(
     push_direction_y: float,
     push_distance_m: float = 1.05,
     push_base_standoff_m: float = 0.85,
+    push_orientation_clearance_m: float = 0.35,
+    push_oriented_retract_forward_m: float = 0.20,
+    push_oriented_retract_lateral_m: float = 0.08,
     push_maximum_lateral_offset_m: float = 0.25,
     push_face_offset_m: float = 0.24,
     push_hand_separation_m: float = 0.28,
@@ -3335,6 +3380,10 @@ def _end_grasp_floor_push_probe(
                 push_direction_y=push_direction_y,
                 push_distance_m=push_distance_m,
                 base_standoff_m=push_base_standoff_m,
+                orientation_clearance_m=push_orientation_clearance_m,
+                oriented_retract_forward_m=push_oriented_retract_forward_m,
+                oriented_retract_lateral_m=push_oriented_retract_lateral_m,
+                oriented_retract_target_z=floor_retract_target_z,
                 maximum_lateral_offset_m=push_maximum_lateral_offset_m,
                 face_offset_m=push_face_offset_m,
                 hand_separation_m=push_hand_separation_m,
@@ -7512,6 +7561,15 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                                 push_base_standoff_m=(
                                     args.floor_push_base_standoff_m
                                 ),
+                                push_orientation_clearance_m=(
+                                    args.floor_push_orientation_clearance_m
+                                ),
+                                push_oriented_retract_forward_m=(
+                                    args.floor_push_oriented_retract_forward_m
+                                ),
+                                push_oriented_retract_lateral_m=(
+                                    args.floor_push_oriented_retract_lateral_m
+                                ),
                                 push_maximum_lateral_offset_m=(
                                     args.floor_push_maximum_lateral_offset_m
                                 ),
@@ -7994,6 +8052,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--floor-push-distance-m", type=float, default=1.05)
     parser.add_argument(
         "--floor-push-base-standoff-m", type=float, default=0.85
+    )
+    parser.add_argument(
+        "--floor-push-orientation-clearance-m", type=float, default=0.35
+    )
+    parser.add_argument(
+        "--floor-push-oriented-retract-forward-m", type=float, default=0.20
+    )
+    parser.add_argument(
+        "--floor-push-oriented-retract-lateral-m", type=float, default=0.08
     )
     parser.add_argument(
         "--floor-push-maximum-lateral-offset-m", type=float, default=0.25

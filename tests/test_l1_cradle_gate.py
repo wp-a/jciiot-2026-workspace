@@ -203,6 +203,7 @@ class EndGraspSetdownGateTests(unittest.TestCase):
             current_base_xy=[8.210, 4.605],
             push_direction_xy=[0.0, -1.0],
             base_standoff_m=0.85,
+            orientation_clearance_m=0.35,
             maximum_lateral_offset_m=0.25,
             face_offset_m=0.24,
             hand_separation_m=0.28,
@@ -212,6 +213,10 @@ class EndGraspSetdownGateTests(unittest.TestCase):
 
         np.testing.assert_allclose(targets["direction"], [0.0, -1.0])
         np.testing.assert_allclose(targets["stage_base_xy"], [8.034, 5.332])
+        np.testing.assert_allclose(
+            targets["orientation_base_xy"],
+            [8.034, 5.682],
+        )
         np.testing.assert_allclose(targets["contact"]["right"], [7.644, 4.722, 0.38])
         np.testing.assert_allclose(targets["contact"]["left"], [7.924, 4.722, 0.38])
         np.testing.assert_allclose(
@@ -2234,6 +2239,9 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertIsNone(args.floor_push_world_direction_y)
         self.assertAlmostEqual(args.floor_push_distance_m, 1.05)
         self.assertAlmostEqual(args.floor_push_base_standoff_m, 0.85)
+        self.assertAlmostEqual(args.floor_push_orientation_clearance_m, 0.35)
+        self.assertAlmostEqual(args.floor_push_oriented_retract_forward_m, 0.20)
+        self.assertAlmostEqual(args.floor_push_oriented_retract_lateral_m, 0.08)
         self.assertAlmostEqual(args.floor_push_maximum_lateral_offset_m, 0.25)
         self.assertAlmostEqual(args.floor_push_face_offset_m, 0.24)
         self.assertAlmostEqual(args.floor_push_hand_separation_m, 0.28)
@@ -2368,6 +2376,12 @@ class JointSeedParserTests(unittest.TestCase):
                 "0.95",
                 "--floor-push-base-standoff-m",
                 "0.90",
+                "--floor-push-orientation-clearance-m",
+                "0.40",
+                "--floor-push-oriented-retract-forward-m",
+                "0.18",
+                "--floor-push-oriented-retract-lateral-m",
+                "0.07",
                 "--floor-push-maximum-lateral-offset-m",
                 "0.22",
                 "--floor-push-face-offset-m",
@@ -2501,6 +2515,9 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.floor_push_world_direction_y, -1.0)
         self.assertAlmostEqual(args.floor_push_distance_m, 0.95)
         self.assertAlmostEqual(args.floor_push_base_standoff_m, 0.90)
+        self.assertAlmostEqual(args.floor_push_orientation_clearance_m, 0.40)
+        self.assertAlmostEqual(args.floor_push_oriented_retract_forward_m, 0.18)
+        self.assertAlmostEqual(args.floor_push_oriented_retract_lateral_m, 0.07)
         self.assertAlmostEqual(args.floor_push_maximum_lateral_offset_m, 0.22)
         self.assertAlmostEqual(args.floor_push_face_offset_m, 0.21)
         self.assertAlmostEqual(args.floor_push_hand_separation_m, 0.26)
