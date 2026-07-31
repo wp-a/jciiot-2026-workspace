@@ -471,6 +471,16 @@ class CompetitionGraspTests(unittest.TestCase):
         self.assertAlmostEqual(profiled.station_side_reach_offset, 0.04)
         self.assertEqual(profiled.clearance_translate_steps, 360)
 
+    def test_green_tote_profile_requires_precise_final_approach(self):
+        config = self.module.ScriptedGraspConfig()
+
+        profiled = self.module.apply_object_grasp_profile(
+            config,
+            "green_tote_b01_lower",
+        )
+
+        self.assertAlmostEqual(profiled.approach_tolerance, 0.025)
+
     def test_l5_followup_totes_use_a_full_upper_body_clearance_seed(self):
         self.assertIsNone(
             self.module.station_side_clearance_joint_seed(
