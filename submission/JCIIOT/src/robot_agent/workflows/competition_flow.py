@@ -725,10 +725,14 @@ def run_official_task(
         grasp_config=grasp_config,
     )
     ranked_candidates = driver.rank_objects(str(task["source"]), candidates)
+    ranked_candidate_set = set(ranked_candidates)
+    validated_candidates = [
+        name for name in candidates if name in ranked_candidate_set
+    ]
     object_names = (
-        ranked_candidates
+        validated_candidates
         if task.get("level") == "L5"
-        else ranked_candidates[:1]
+        else validated_candidates[:1]
     )
     return CompetitionFlow(driver, max_attempts=max_attempts).run(
         source=str(task["source"]),

@@ -250,6 +250,44 @@ class CompetitionFlowTests(unittest.TestCase):
 
         self.assertEqual(ranked, ["box_near"])
 
+    def test_official_task_preserves_scored_object_order_after_validation(self):
+        captured = {}
+
+        class Driver:
+            def __init__(self, **_kwargs):
+                pass
+
+            def rank_objects(self, _source, _object_names):
+                return ["tote_lower", "tote_upper"]
+
+        class Flow:
+            def __init__(self, _driver, *, max_attempts):
+                captured["max_attempts"] = max_attempts
+
+            def run(self, **kwargs):
+                captured.update(kwargs)
+                return {"success": True}
+
+        task = {
+            "level": "L2",
+            "source": "input_6",
+            "target": "output_4",
+            "object": ["tote_upper", "tote_lower"],
+        }
+
+        with (
+            patch.object(self.module, "OfficialCompetitionDriver", Driver),
+            patch.object(self.module, "CompetitionFlow", Flow),
+        ):
+            self.module.run_official_task(
+                backend=object(),
+                scene_context=object(),
+                grid=object(),
+                task=task,
+            )
+
+        self.assertEqual(captured["object_names"], ["tote_upper"])
+
     def test_auxiliary_source_uses_verified_upper_crossing_corridor(self):
         detour = self.module.auxiliary_source_detour(
             target="aux_input_1",
