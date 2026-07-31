@@ -401,7 +401,7 @@ def floor_base_tracking_velocity(
     controlled_error = np.sign(error) * max(abs(error) - deadband, 0.0)
     desired_contact_offset = float(
         np.clip(
-            -gain * controlled_error,
+            gain * controlled_error,
             -maximum_contact_offset,
             maximum_contact_offset,
         )

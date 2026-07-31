@@ -303,7 +303,7 @@ class EndGraspSetdownGateTests(unittest.TestCase):
             maximum_lateral_speed_m_s=0.02,
         )
 
-        np.testing.assert_allclose(velocity, [-0.0125, -0.04])
+        np.testing.assert_allclose(velocity, [0.0125, -0.04])
 
         recenter_velocity = floor_base_tracking_velocity(
             push_direction_xy=[0.0, -1.0],
