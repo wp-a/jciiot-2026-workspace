@@ -331,10 +331,17 @@ class CompetitionFlowTests(unittest.TestCase):
             )
         )
 
-    def test_carrying_move_routes_through_official_attachment_navigation(self):
+    def test_carrying_move_targets_attachment_aligned_base_pose(self):
         calls = []
         driver = object.__new__(self.module.OfficialCompetitionDriver)
-        driver.backend = object()
+        driver.backend = SimpleNamespace(
+            get_base_pose=lambda: (np.array([1.0, 2.0]), 0.25),
+        )
+        driver.scene_context = SimpleNamespace(
+            output_ports={
+                "output_5": SimpleNamespace(center=np.array([4.0, -7.0]))
+            }
+        )
         driver._physical_hold = {
             "base_yaw": 0.25,
             "object_pos": [1.5, 2.2, 1.1],
@@ -352,7 +359,7 @@ class CompetitionFlowTests(unittest.TestCase):
         success = driver.move("output_5", carrying=True, object_name="box")
 
         self.assertTrue(success)
-        self.assertEqual(calls, [("output_5", True)])
+        self.assertEqual(calls, [("3.500000, -7.200000", True)])
 
     def test_carrying_move_stops_without_verified_attachment(self):
         driver = object.__new__(self.module.OfficialCompetitionDriver)

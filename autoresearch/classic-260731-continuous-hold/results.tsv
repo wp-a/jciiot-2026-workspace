@@ -1,3 +1,4 @@
 iteration	candidate	official_score	collision_frames	min_transport_object_base_distance_m	relative_xy_range_m	owned_tests	hard_violations	decision	notes
 0	legacy-held-plus-relative-attachment	10	0	0.000000	0.950804	363_passed	0	reject	The legacy held-crate callback overwrote the official relative attachment and moved the tote to the base center during recorded transport frames.
-1	release-boundary-legacy-handle	pending	pending	pending	pending	363_passed	0	promote	Legacy held-crate state is disabled during navigation and enabled only at the official constrained-lowering boundary.
+1	release-boundary-legacy-handle	10	0	0.949757	0.001391,0.078847	363_passed	0	keep-not-gate	The tote never returns to the base center and remains between both grippers, but the default output pose still requires a 180-degree place turn with a 7.9 cm pre-sync lateral transient.
+2	attachment-aligned-output-base-goal	pending	pending	pending	pending	pending	pending	promote	Preserve the measured grasp offset when selecting the output base goal so official placement starts already facing the table and avoids the large terminal turn.

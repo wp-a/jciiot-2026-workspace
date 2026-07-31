@@ -423,7 +423,29 @@ class OfficialCompetitionDriver:
                     "method": "official_transport_attachment",
                 }
                 return False
-            success = self._move_to(target, carrying=True)
+            import numpy as np
+
+            from robot_agent.skills.competition_transport import (
+                transport_base_goal,
+            )
+
+            station = self.scene_context.output_ports.get(target)
+            if station is None:
+                return False
+            base_xy, _ = self.backend.get_base_pose()
+            hold = self._physical_hold
+            object_target_xy = delivery_slot_target(
+                station.center[:2],
+                object_name,
+            )
+            goal_xy = transport_base_goal(
+                object_target_xy=object_target_xy,
+                base_xy=np.asarray(base_xy, dtype=float),
+                base_yaw=float(hold["base_yaw"]),
+                object_xy=np.asarray(hold["object_pos"], dtype=float)[:2],
+            )
+            resolved_target = f"{goal_xy[0]:.6f}, {goal_xy[1]:.6f}"
+            success = self._move_to(resolved_target, carrying=True)
             self._last_transport = {
                 "success": bool(success),
                 "failure_stage": None if success else "navigation",
