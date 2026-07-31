@@ -218,6 +218,7 @@ class EndGraspSetdownGateTests(unittest.TestCase):
             targets["orientation_base_xy"],
             [8.034, 5.682],
         )
+        np.testing.assert_allclose(targets["escape_base_xy"], [8.210, 5.682])
         np.testing.assert_allclose(targets["contact"]["right"], [7.644, 4.722, 0.38])
         np.testing.assert_allclose(targets["contact"]["left"], [7.924, 4.722, 0.38])
         np.testing.assert_allclose(

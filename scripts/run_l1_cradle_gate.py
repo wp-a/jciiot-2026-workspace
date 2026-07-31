@@ -215,13 +215,18 @@ def floor_push_staging_targets(
         -direction * parameters["precontact_clearance_m"],
         parameters["precontact_clearance_m"],
     ]
+    orientation_base_xy = (
+        stage_base_xy - direction * parameters["orientation_clearance_m"]
+    )
+    escape_base_xy = base_position + direction * float(
+        np.dot(orientation_base_xy - base_position, direction)
+    )
     return {
         "direction": direction,
         "left_axis": left_axis,
         "stage_base_xy": stage_base_xy,
-        "orientation_base_xy": (
-            stage_base_xy - direction * parameters["orientation_clearance_m"]
-        ),
+        "escape_base_xy": escape_base_xy,
+        "orientation_base_xy": orientation_base_xy,
         "target_yaw": float(np.arctan2(direction[1], direction[0])),
         "lateral_offset_m": lateral_offset,
         "contact": contact,
@@ -2884,14 +2889,23 @@ def _floor_corridor_push_probe(
         marker(
             "floor_corridor_push_start",
             object_name=object_name,
+            escape_base_xy=targets["escape_base_xy"].tolist(),
             orientation_base_xy=targets["orientation_base_xy"].tolist(),
             stage_base_xy=targets["stage_base_xy"].tolist(),
             push_direction=direction.tolist(),
             requested_distance_m=requested_distance,
         )
 
-    orientation_stage_reached = bool(
+    escape_stage_reached = bool(
         backend.follow_path(
+            [targets["escape_base_xy"]],
+            max_steps=1200,
+            waypoint_tolerance=0.03,
+        )
+    )
+    orientation_stage_reached = bool(
+        escape_stage_reached
+        and backend.follow_path(
             [targets["orientation_base_xy"]],
             max_steps=1200,
             waypoint_tolerance=0.03,
@@ -3019,7 +3033,9 @@ def _floor_corridor_push_probe(
             )
         ]
     failure_stage = None
-    if not orientation_stage_reached:
+    if not escape_stage_reached:
+        failure_stage = "escape_stage_base"
+    elif not orientation_stage_reached:
         failure_stage = "orientation_stage_base"
     elif not oriented:
         failure_stage = "orient"
@@ -3127,6 +3143,7 @@ def _floor_corridor_push_probe(
     return {
         "success": success,
         "failure_stage": failure_stage,
+        "escape_stage_reached": escape_stage_reached,
         "orientation_stage_reached": orientation_stage_reached,
         "stage_reached": stage_reached,
         "torso_lowered": torso_lowered,
@@ -3145,6 +3162,7 @@ def _floor_corridor_push_probe(
         "start_object_position": start_object.tolist(),
         "end_object_position": final_object.tolist(),
         "targets": {
+            "escape_base_xy": targets["escape_base_xy"].tolist(),
             "orientation_base_xy": targets["orientation_base_xy"].tolist(),
             "stage_base_xy": targets["stage_base_xy"].tolist(),
             "target_yaw": float(targets["target_yaw"]),
