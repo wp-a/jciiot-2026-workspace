@@ -367,7 +367,7 @@ class CompetitionFlowTests(unittest.TestCase):
 
         self.assertFalse(success)
 
-    def test_successful_grasp_activates_attachment_only_after_physical_gate(self):
+    def test_successful_grasp_keeps_legacy_crate_teleport_disabled(self):
         calls = []
         hold = {
             "base_yaw": 0.4,
@@ -428,8 +428,8 @@ class CompetitionFlowTests(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertEqual(driver._physical_hold, hold)
         self.assertTrue(driver._transport_attached)
-        self.assertEqual(driver.backend._held_crate_name, "box")
-        self.assertEqual(driver.backend._held_crate_body_id, 7)
+        self.assertIsNone(driver.backend._held_crate_name)
+        self.assertIsNone(driver.backend._held_crate_body_id)
         self.assertEqual(calls, ["physical_grasp", ("attachment", "box")])
         self.assertEqual(events[-1][0], "transport_attachment_enabled")
 
@@ -541,12 +541,21 @@ class CompetitionFlowTests(unittest.TestCase):
         self.assertIsNone(driver._physical_hold)
         self.assertIsNone(driver.backend._held_crate_name)
 
-    def test_place_uses_official_constrained_lowering_and_clears_hold(self):
+    def test_place_enables_legacy_crate_handle_only_at_release_boundary(self):
         calls = []
         driver = object.__new__(self.module.OfficialCompetitionDriver)
-        driver.backend = SimpleNamespace(
-            place_object_physics=lambda target: calls.append(target) or True,
+        backend = SimpleNamespace(
+            env=SimpleNamespace(obj_body_id={"blue_tote": 9}),
+            _held_crate_name=None,
+            _held_crate_body_id=None,
         )
+        backend.place_object_physics = lambda target: (
+            calls.append(
+                (target, backend._held_crate_name, backend._held_crate_body_id)
+            )
+            or True
+        )
+        driver.backend = backend
         driver.scene_context = SimpleNamespace(
             output_ports={
                 "output_5": SimpleNamespace(center=np.array([4.0, -7.0]))
@@ -565,7 +574,7 @@ class CompetitionFlowTests(unittest.TestCase):
         success = driver.place("output_5", "blue_tote")
 
         self.assertTrue(success)
-        self.assertEqual(calls, ["output_5"])
+        self.assertEqual(calls, [("output_5", "blue_tote", 9)])
         self.assertIsNone(driver._physical_hold)
         self.assertFalse(driver._transport_attached)
 

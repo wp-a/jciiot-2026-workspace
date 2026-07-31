@@ -281,13 +281,6 @@ class OfficialCompetitionDriver:
 
             self._transport_attachment = attachment
             self._transport_attached = True
-            self.backend._held_crate_name = object_name
-            body_ids = getattr(self.backend.env, "obj_body_id", {})
-            self.backend._held_crate_body_id = (
-                body_ids.get(object_name)
-                if hasattr(body_ids, "get")
-                else None
-            )
             marker = getattr(self.backend, "_mark_trajectory_event", None)
             if callable(marker):
                 marker(
@@ -645,6 +638,12 @@ class OfficialCompetitionDriver:
         ):
             return False
         place_object_physics = getattr(self.backend, "place_object_physics", None)
+        body_ids = getattr(self.backend.env, "obj_body_id", {})
+        body_id = body_ids.get(object_name) if hasattr(body_ids, "get") else None
+        if body_id is None:
+            return False
+        self.backend._held_crate_name = object_name
+        self.backend._held_crate_body_id = body_id
         success = bool(
             callable(place_object_physics)
             and place_object_physics(target)
@@ -656,8 +655,7 @@ class OfficialCompetitionDriver:
         }
         if success:
             self._physical_hold = None
-            self._transport_attached = False
-            self._transport_attachment = None
+            self._reset_transport_attachment()
         return success
 
     def verify(self, target: str, object_name: str) -> bool:
