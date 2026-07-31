@@ -174,6 +174,13 @@ class PhysicalTransportGeometryTests(unittest.TestCase):
 
 
 class PostureLockedPhysicalCarryDriverTests(unittest.TestCase):
+    def test_declares_that_locked_posture_skips_arm_recenter(self):
+        module = load_module()
+
+        self.assertFalse(
+            module.PostureLockedPhysicalCarryDriver.requires_height_recenter
+        )
+
     def test_restores_only_non_gripper_robot_posture_after_actuated_step(self):
         module = load_module()
         forward_calls = []
@@ -753,6 +760,24 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertEqual(len(driver.recover_calls), 1)
         self.assertAlmostEqual(driver.recover_calls[0]["lift_height"], 0.015)
+
+    def test_locked_posture_skips_recenter_before_height_recovery(self):
+        driver = FakePhysicalTransportDriver(
+            object_heights=[1.0, 0.985, 0.985, 0.985]
+        )
+        driver.requires_height_recenter = False
+
+        result = self.run_transport(driver)
+
+        self.assertTrue(result["success"])
+        self.assertEqual(len(driver.recover_calls), 1)
+        self.assertFalse(
+            any(
+                step["arm_world_deltas"]["right"][2] < 0.0
+                or step["arm_world_deltas"]["left"][2] < 0.0
+                for step in driver.steps
+            )
+        )
 
     def test_failed_height_recovery_stops_transport_without_fallback(self):
         driver = FakePhysicalTransportDriver(

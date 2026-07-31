@@ -732,8 +732,12 @@ def run_physical_transport(
                 "physical_height_recenter_start",
                 object_name=object_name,
             )
-            recentered = False
-            for _ in range(config.height_recenter_steps):
+            recentered = not bool(
+                getattr(driver, "requires_height_recenter", True)
+            )
+            for _ in range(
+                0 if recentered else config.height_recenter_steps
+            ):
                 observation = driver.observe(backend, object_name)
                 recenter_deltas = {
                     arm: (
@@ -1527,6 +1531,8 @@ class OfficialPhysicalCarryDriver:
 
 class PostureLockedPhysicalCarryDriver:
     """Keep upper-body posture base-relative while grip actuators stay active."""
+
+    requires_height_recenter = False
 
     def __init__(self, delegate=None) -> None:
         self._delegate = delegate or OfficialPhysicalCarryDriver()
