@@ -415,7 +415,7 @@ class InchwormCarryConfig:
         reset_max_linear: float = 0.04,
         reset_control_dt: float = 0.05,
         reset_position_tolerance: float = 1e-4,
-        reset_max_gripper_drift: float = 0.03,
+        reset_max_gripper_drift: float = 0.06,
         max_lateral_drift: float = 0.03,
         minimum_macro_progress: float = 0.02,
         max_cycles: int = 64,
