@@ -2824,6 +2824,7 @@ def _floor_corridor_push_probe(
     base_standoff_m: float,
     orientation_clearance_m: float,
     lateral_offset_m: float | None,
+    torso_drop_m: float,
     oriented_retract_forward_m: float,
     oriented_retract_lateral_m: float,
     oriented_retract_target_z: float,
@@ -2848,11 +2849,14 @@ def _floor_corridor_push_probe(
 
     requested_distance = float(push_distance_m)
     requested_speed = float(base_speed_m_s)
+    requested_torso_drop = float(torso_drop_m)
     requested_steps = int(max_steps)
     if not np.isfinite(requested_distance) or requested_distance <= 0.0:
         raise ValueError("floor push distance must be finite and positive")
     if not np.isfinite(requested_speed) or requested_speed <= 0.0:
         raise ValueError("floor push speed must be finite and positive")
+    if not np.isfinite(requested_torso_drop) or requested_torso_drop <= 0.0:
+        raise ValueError("floor push torso drop must be finite and positive")
     if isinstance(max_steps, bool) or requested_steps != max_steps or requested_steps < 1:
         raise ValueError("floor push max_steps must be a positive integer")
 
@@ -2920,9 +2924,16 @@ def _floor_corridor_push_probe(
     position_config = ScriptedGraspConfig(
         max_action=0.30,
         position_tolerance=0.03,
+        torso_drop=requested_torso_drop,
+        torso_minimum=0.10,
+        torso_steps=160,
+    )
+    torso_lowered = bool(
+        stage_reached
+        and position_driver.lower_torso_for_reach(backend, position_config)
     )
     precontact_reached = bool(
-        stage_reached
+        torso_lowered
         and position_driver._move_to_targets(
             backend,
             targets["precontact"],
@@ -2967,6 +2978,8 @@ def _floor_corridor_push_probe(
         failure_stage = "oriented_retract"
     elif not stage_reached:
         failure_stage = "stage_base"
+    elif not torso_lowered:
+        failure_stage = "lower_torso"
     elif not precontact_reached:
         failure_stage = "precontact"
     elif not contact_reached:
@@ -3073,6 +3086,7 @@ def _floor_corridor_push_probe(
         "failure_stage": failure_stage,
         "orientation_stage_reached": orientation_stage_reached,
         "stage_reached": stage_reached,
+        "torso_lowered": torso_lowered,
         "oriented": oriented,
         "oriented_retract": oriented_retract,
         "precontact_reached": precontact_reached,
@@ -3336,6 +3350,7 @@ def _end_grasp_floor_push_probe(
     push_oriented_retract_forward_m: float = 0.20,
     push_oriented_retract_lateral_m: float = 0.08,
     push_lateral_offset_m: float | None = None,
+    push_torso_drop_m: float = 0.24,
     push_maximum_lateral_offset_m: float = 0.25,
     push_face_offset_m: float = 0.24,
     push_hand_separation_m: float = 0.28,
@@ -3408,6 +3423,7 @@ def _end_grasp_floor_push_probe(
                 base_standoff_m=push_base_standoff_m,
                 orientation_clearance_m=push_orientation_clearance_m,
                 lateral_offset_m=push_lateral_offset_m,
+                torso_drop_m=push_torso_drop_m,
                 oriented_retract_forward_m=push_oriented_retract_forward_m,
                 oriented_retract_lateral_m=push_oriented_retract_lateral_m,
                 oriented_retract_target_z=floor_retract_target_z,
@@ -7600,6 +7616,7 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                                 push_lateral_offset_m=(
                                     args.floor_push_lateral_offset_m
                                 ),
+                                push_torso_drop_m=args.floor_push_torso_drop_m,
                                 push_maximum_lateral_offset_m=(
                                     args.floor_push_maximum_lateral_offset_m
                                 ),
@@ -8093,6 +8110,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--floor-push-oriented-retract-lateral-m", type=float, default=0.08
     )
     parser.add_argument("--floor-push-lateral-offset-m", type=float)
+    parser.add_argument("--floor-push-torso-drop-m", type=float, default=0.24)
     parser.add_argument(
         "--floor-push-maximum-lateral-offset-m", type=float, default=0.25
     )
