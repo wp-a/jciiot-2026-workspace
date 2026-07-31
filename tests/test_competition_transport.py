@@ -174,6 +174,34 @@ class PhysicalTransportGeometryTests(unittest.TestCase):
 
         self.assertLessEqual(float(np.linalg.norm(target)), 0.006 + 1e-12)
 
+    def test_pivot_compensation_preserves_object_offset_during_turn(self):
+        module = load_module()
+        base_xy = np.array([0.0, 0.0])
+        pivot_xy = np.array([1.0, 0.0])
+
+        base_velocity = module.pivot_compensated_base_velocity(
+            base_xy=base_xy,
+            base_yaw=0.0,
+            pivot_xy=pivot_xy,
+            angular_velocity=math.pi / 2.0,
+            control_dt=1.0,
+        )
+        target_base = module.direct_base_step_target(
+            base_xy=base_xy,
+            base_yaw=0.0,
+            base_command=np.array(
+                [base_velocity[0], base_velocity[1], math.pi / 2.0]
+            ),
+            control_dt=1.0,
+        )
+
+        np.testing.assert_allclose(target_base, [1.0, -1.0], atol=1e-9)
+        rotated_offset = module.world_velocity_to_base_frame(
+            pivot_xy - target_base,
+            math.pi / 2.0,
+        )
+        np.testing.assert_allclose(rotated_offset, [1.0, 0.0], atol=1e-9)
+
     def test_long_route_step_budget_covers_slow_physical_carry(self):
         module = load_module()
 
@@ -770,7 +798,7 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
             driver.steps[0]["arm_world_deltas"]["right"][:2], np.zeros(2)
         )
 
-    def test_heading_aligned_mode_rotates_before_translating(self):
+    def test_heading_aligned_mode_pivots_around_object_before_path_motion(self):
         driver = FakeHeadingAlignedTransportDriver()
         config = self.module.PhysicalCarryConfig(
             waypoint_tolerance=0.01,
@@ -806,13 +834,8 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
             for index, step in enumerate(driver.steps)
             if np.linalg.norm(step["base_command"][:2]) > 0.01
         )
-        self.assertGreater(first_translation, 0)
-        self.assertTrue(
-            all(
-                np.allclose(step["base_command"][:2], 0.0)
-                for step in driver.steps[:first_translation]
-            )
-        )
+        self.assertEqual(first_translation, 0)
+        self.assertGreater(abs(driver.steps[0]["base_command"][2]), 0.01)
 
     def test_object_slip_triggers_a_physical_height_recovery(self):
         driver = FakePhysicalTransportDriver(

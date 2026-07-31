@@ -462,6 +462,40 @@ def direct_base_step_target(
     return base_xy + world_velocity * float(control_dt)
 
 
+def pivot_compensated_base_velocity(
+    *,
+    base_xy,
+    base_yaw: float,
+    pivot_xy,
+    angular_velocity: float,
+    control_dt: float,
+) -> np.ndarray:
+    """Return base-frame velocity that rotates the base around a world pivot."""
+    dt = float(control_dt)
+    if dt <= 0.0 or not np.isfinite(dt):
+        raise ValueError("pivot control dt must be positive and finite")
+    base_xy = np.asarray(base_xy, dtype=float).reshape(2)
+    pivot_xy = np.asarray(pivot_xy, dtype=float).reshape(2)
+    yaw = float(base_yaw)
+    next_yaw = yaw + float(angular_velocity) * dt
+    pivot_offset_base = world_velocity_to_base_frame(
+        pivot_xy - base_xy,
+        yaw,
+    )
+    cosine = math.cos(next_yaw)
+    sine = math.sin(next_yaw)
+    next_offset_world = np.array(
+        [
+            cosine * pivot_offset_base[0] - sine * pivot_offset_base[1],
+            sine * pivot_offset_base[0] + cosine * pivot_offset_base[1],
+        ],
+        dtype=float,
+    )
+    target_base_xy = pivot_xy - next_offset_world
+    world_velocity = (target_base_xy - base_xy) / dt
+    return world_velocity_to_base_frame(world_velocity, yaw)
+
+
 def vertical_hold_delta(
     *,
     current_z: float,
@@ -1036,7 +1070,13 @@ def run_physical_transport(
             ),
         )
         if not heading_aligned:
-            command[:2] = 0.0
+            command[:2] = pivot_compensated_base_velocity(
+                base_xy=observation["base_xy"],
+                base_yaw=float(observation["base_yaw"]),
+                pivot_xy=observation["object_pos"][:2],
+                angular_velocity=float(command[2]),
+                control_dt=config.base_control_dt,
+            )
         base_xy = np.asarray(observation["base_xy"], dtype=float)
         world_step = direct_base_step_target(
             base_xy=base_xy,
