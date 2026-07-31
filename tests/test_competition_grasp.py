@@ -615,6 +615,27 @@ class CompetitionGraspTests(unittest.TestCase):
         np.testing.assert_allclose(inserted["right"], [12.03, 3.01, 1.38])
         np.testing.assert_allclose(inserted["left"], [11.70, 3.01, 1.38])
 
+    def test_face_insertion_is_applied_only_to_active_close_targets(self):
+        current = {
+            "right": np.array([12.05, 2.99, 1.44]),
+            "left": np.array([11.69, 2.99, 1.32]),
+        }
+        requested = {
+            "right": np.array([12.03, 2.98, 1.38]),
+            "left": np.array([11.70, 2.98, 1.38]),
+        }
+
+        targets = self.module.close_grasp_targets(
+            current,
+            requested,
+            object_xy=np.array([11.865, 3.195]),
+            insertion=0.03,
+            hold_current=True,
+        )
+
+        np.testing.assert_allclose(targets["right"], [12.03, 3.01, 1.38])
+        np.testing.assert_allclose(targets["left"], current["left"])
+
     def test_close_follow_offset_is_bounded_without_changing_direction(self):
         offset = self.module.bounded_planar_follow_offset(
             np.array([0.03, 0.04]),

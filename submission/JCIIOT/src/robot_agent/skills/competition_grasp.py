@@ -512,6 +512,27 @@ def inward_face_targets(
     return copied
 
 
+def close_grasp_targets(
+    current: Mapping[str, np.ndarray],
+    requested: Mapping[str, np.ndarray],
+    *,
+    object_xy: np.ndarray,
+    insertion: float,
+    hold_current: bool,
+) -> dict[str, np.ndarray]:
+    """Apply face insertion only when building the active close targets."""
+    inserted = inward_face_targets(
+        requested,
+        object_xy=object_xy,
+        insertion=insertion,
+    )
+    return close_pose_targets(
+        current,
+        inserted,
+        hold_current=hold_current,
+    )
+
+
 def bounded_planar_follow_offset(delta: np.ndarray, *, max_distance: float) -> np.ndarray:
     """Bound object-relative close tracking without changing its direction."""
     delta = np.asarray(delta, dtype=float).reshape(2)
@@ -845,12 +866,6 @@ class OfficialScriptedGraspDriver:
                 requested=config.swap_arm_targets,
             ),
         )
-        object_xy = backend.env.sim.data.body_xpos[body_id][:2]
-        grasp_targets = inward_face_targets(
-            grasp_targets,
-            object_xy=object_xy,
-            insertion=config.face_insertion,
-        )
         offset = np.array([0.0, 0.0, float(height_offset)], dtype=float)
         return {
             arm: np.asarray(grasp_targets[arm], dtype=float) + offset
@@ -1129,12 +1144,14 @@ class OfficialScriptedGraspDriver:
             arm: helpers["gripper_position"](raw_env, robot, arm)
             for arm in ARMS
         }
-        grasp_targets = close_pose_targets(
+        body_id = raw_env.obj_body_id[object_name]
+        grasp_targets = close_grasp_targets(
             current_positions,
             grasp_targets,
+            object_xy=raw_env.sim.data.body_xpos[body_id][:2],
+            insertion=config.face_insertion,
             hold_current=config.hold_close_pose,
         )
-        body_id = raw_env.obj_body_id[object_name]
         start_object_xy = raw_env.sim.data.body_xpos[body_id][:2].copy()
         self._close_lift_reference = (
             object_name,
