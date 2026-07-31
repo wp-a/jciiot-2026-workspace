@@ -141,6 +141,7 @@ def floor_push_staging_targets(
     push_direction_xy: object,
     base_standoff_m: float,
     orientation_clearance_m: float,
+    lateral_offset_m: float | None,
     maximum_lateral_offset_m: float,
     face_offset_m: float,
     hand_separation_m: float,
@@ -176,14 +177,23 @@ def floor_push_staging_targets(
         raise ValueError("floor push geometry parameters must be finite and positive")
 
     left_axis = np.array([-direction[1], direction[0]], dtype=float)
-    raw_lateral_offset = float(np.dot(base_position - object_position, left_axis))
-    lateral_offset = float(
-        np.clip(
-            raw_lateral_offset,
-            -parameters["maximum_lateral_offset_m"],
-            parameters["maximum_lateral_offset_m"],
+    if lateral_offset_m is None:
+        raw_lateral_offset = float(np.dot(base_position - object_position, left_axis))
+        lateral_offset = float(
+            np.clip(
+                raw_lateral_offset,
+                -parameters["maximum_lateral_offset_m"],
+                parameters["maximum_lateral_offset_m"],
+            )
         )
-    )
+    else:
+        lateral_offset = float(lateral_offset_m)
+        if not np.isfinite(lateral_offset):
+            raise ValueError("requested floor push lateral offset must be finite")
+        if abs(lateral_offset) > parameters["maximum_lateral_offset_m"]:
+            raise ValueError(
+                "requested floor push lateral offset exceeds configured maximum"
+            )
     stage_base_xy = (
         object_position
         - direction * parameters["base_standoff_m"]
@@ -2813,6 +2823,7 @@ def _floor_corridor_push_probe(
     push_distance_m: float,
     base_standoff_m: float,
     orientation_clearance_m: float,
+    lateral_offset_m: float | None,
     oriented_retract_forward_m: float,
     oriented_retract_lateral_m: float,
     oriented_retract_target_z: float,
@@ -2856,6 +2867,7 @@ def _floor_corridor_push_probe(
         push_direction_xy=[push_direction_x, push_direction_y],
         base_standoff_m=base_standoff_m,
         orientation_clearance_m=orientation_clearance_m,
+        lateral_offset_m=lateral_offset_m,
         maximum_lateral_offset_m=maximum_lateral_offset_m,
         face_offset_m=face_offset_m,
         hand_separation_m=hand_separation_m,
@@ -3323,6 +3335,7 @@ def _end_grasp_floor_push_probe(
     push_orientation_clearance_m: float = 0.35,
     push_oriented_retract_forward_m: float = 0.20,
     push_oriented_retract_lateral_m: float = 0.08,
+    push_lateral_offset_m: float | None = None,
     push_maximum_lateral_offset_m: float = 0.25,
     push_face_offset_m: float = 0.24,
     push_hand_separation_m: float = 0.28,
@@ -3394,6 +3407,7 @@ def _end_grasp_floor_push_probe(
                 push_distance_m=push_distance_m,
                 base_standoff_m=push_base_standoff_m,
                 orientation_clearance_m=push_orientation_clearance_m,
+                lateral_offset_m=push_lateral_offset_m,
                 oriented_retract_forward_m=push_oriented_retract_forward_m,
                 oriented_retract_lateral_m=push_oriented_retract_lateral_m,
                 oriented_retract_target_z=floor_retract_target_z,
@@ -7583,6 +7597,9 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                                 push_oriented_retract_lateral_m=(
                                     args.floor_push_oriented_retract_lateral_m
                                 ),
+                                push_lateral_offset_m=(
+                                    args.floor_push_lateral_offset_m
+                                ),
                                 push_maximum_lateral_offset_m=(
                                     args.floor_push_maximum_lateral_offset_m
                                 ),
@@ -8075,6 +8092,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--floor-push-oriented-retract-lateral-m", type=float, default=0.08
     )
+    parser.add_argument("--floor-push-lateral-offset-m", type=float)
     parser.add_argument(
         "--floor-push-maximum-lateral-offset-m", type=float, default=0.25
     )
