@@ -299,6 +299,9 @@ class PhysicalCarryConfig:
         vertical_hold_gain: float = 0.0,
         max_vertical_hold_delta: float = 0.0,
         max_planar_grasp_drift: float = 0.04,
+        planar_recovery_trigger: float = 0.0,
+        planar_recovery_steps: int = 0,
+        planar_recovery_inward_delta: float = 0.0,
         height_recovery_trigger: float = 0.01,
         height_recovery_steps: int = 80,
         height_recovery_max_action: float = 0.65,
@@ -333,6 +336,11 @@ class PhysicalCarryConfig:
         self.vertical_hold_gain = float(vertical_hold_gain)
         self.max_vertical_hold_delta = float(max_vertical_hold_delta)
         self.max_planar_grasp_drift = float(max_planar_grasp_drift)
+        self.planar_recovery_trigger = float(planar_recovery_trigger)
+        self.planar_recovery_steps = int(planar_recovery_steps)
+        self.planar_recovery_inward_delta = float(
+            planar_recovery_inward_delta
+        )
         self.height_recovery_trigger = float(height_recovery_trigger)
         self.height_recovery_steps = int(height_recovery_steps)
         self.height_recovery_max_action = float(height_recovery_max_action)
@@ -540,6 +548,29 @@ def planar_grasp_drift(start_observation, observation) -> float:
     return max(drifts)
 
 
+def symmetric_planar_reseat_deltas(
+    gripper_positions,
+    *,
+    inward_delta: float,
+) -> dict[str, np.ndarray]:
+    """Move both grippers inward along their measured planar separation."""
+    requested = float(inward_delta)
+    if requested < 0.0 or not np.isfinite(requested):
+        raise ValueError("inward reseat delta must be finite and non-negative")
+    right = np.asarray(gripper_positions["right"], dtype=float)[:2]
+    left = np.asarray(gripper_positions["left"], dtype=float)[:2]
+    separation = right - left
+    distance = float(np.linalg.norm(separation))
+    if distance <= 1e-12 or requested == 0.0:
+        zero = np.zeros(2, dtype=float)
+        return {"right": zero.copy(), "left": zero.copy()}
+    axis = separation / distance
+    return {
+        "right": -axis * requested,
+        "left": axis * requested,
+    }
+
+
 def physical_action_parts(
     robot,
     *,
@@ -662,6 +693,7 @@ def run_physical_transport(
     hold_targets = driver.capture_hold_targets(backend)
     observation = driver.observe(backend, object_name)
     start_observation = observation
+    planar_reference_observation = observation
     object_offset_base = world_velocity_to_base_frame(
         np.asarray(observation["object_pos"][:2], dtype=float)
         - np.asarray(observation["base_xy"], dtype=float),
@@ -722,6 +754,81 @@ def run_physical_transport(
         if float(observation["object_pos"][2]) < float(minimum_object_z):
             failure_stage = "object_drop"
             break
+        planar_recovery_drift = planar_grasp_drift(
+            planar_reference_observation,
+            observation,
+        )
+        if (
+            float(config.planar_recovery_trigger) > 0.0
+            and planar_recovery_drift
+            >= float(config.planar_recovery_trigger)
+        ):
+            driver.record_event(
+                backend,
+                "physical_planar_recovery_start",
+                object_name=object_name,
+                drift_m=planar_recovery_drift,
+            )
+            recovery_failure = None
+            recovery_steps = 0
+            for _ in range(max(0, int(config.planar_recovery_steps))):
+                observation = driver.observe(backend, object_name)
+                reseat_deltas = symmetric_planar_reseat_deltas(
+                    observation["gripper_positions"],
+                    inward_delta=float(config.planar_recovery_inward_delta),
+                )
+                step_info = driver.recover_planar(
+                    backend,
+                    object_name=object_name,
+                    base_command=np.zeros(3, dtype=float),
+                    hold_targets=hold_targets,
+                    arm_world_deltas={
+                        arm: np.array(
+                            [reseat_deltas[arm][0], reseat_deltas[arm][1], 0.0],
+                            dtype=float,
+                        )
+                        for arm in ("right", "left")
+                    },
+                    gripper_value=1.0,
+                    base_control_dt=config.base_control_dt,
+                )
+                steps += 1
+                recovery_steps += 1
+                observation = driver.observe(backend, object_name)
+                minimum_observed_z = min(
+                    minimum_observed_z,
+                    float(observation["object_pos"][2]),
+                )
+                maximum_planar_grasp_drift = max(
+                    maximum_planar_grasp_drift,
+                    planar_grasp_drift(start_observation, observation),
+                )
+                if bool(step_info.get("collision", False)):
+                    recovery_failure = "collision"
+                    break
+                if next_contact_stability(observation["contacts"], 0) == 0:
+                    recovery_failure = "contact"
+                    break
+                if float(observation["object_pos"][2]) < float(
+                    minimum_object_z
+                ):
+                    recovery_failure = "object_drop"
+                    break
+            if recovery_steps == 0 and recovery_failure is None:
+                recovery_failure = "planar_recovery"
+            planar_recovery_success = recovery_failure is None
+            driver.record_event(
+                backend,
+                "physical_planar_recovery_end",
+                object_name=object_name,
+                success=planar_recovery_success,
+                failure_stage=recovery_failure,
+                steps=recovery_steps,
+            )
+            if recovery_failure is not None:
+                failure_stage = recovery_failure
+                break
+            planar_reference_observation = observation
         if maximum_planar_grasp_drift > config.max_planar_grasp_drift:
             failure_stage = "planar_grasp_drift"
             break
@@ -1593,6 +1700,11 @@ class PostureLockedPhysicalCarryDriver:
 
     def recover_height(self, backend, **kwargs):
         result = self._delegate.recover_height(backend, **kwargs)
+        self._posture = self._capture_robot_posture(backend)
+        return result
+
+    def recover_planar(self, backend, **kwargs):
+        result = self._delegate.step(backend, **kwargs)
         self._posture = self._capture_robot_posture(backend)
         return result
 

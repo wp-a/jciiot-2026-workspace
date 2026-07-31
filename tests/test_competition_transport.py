@@ -113,6 +113,21 @@ class PhysicalTransportGeometryTests(unittest.TestCase):
 
         self.assertAlmostEqual(module.planar_grasp_drift(start, rotated), 0.0)
 
+    def test_planar_reseat_moves_both_grippers_inward_symmetrically(self):
+        module = load_module()
+
+        deltas = module.symmetric_planar_reseat_deltas(
+            {
+                "right": np.array([7.4, 4.7, 1.3]),
+                "left": np.array([7.4, 4.5, 1.3]),
+            },
+            inward_delta=0.001,
+        )
+
+        np.testing.assert_allclose(deltas["right"], [0.0, -0.001])
+        np.testing.assert_allclose(deltas["left"], [0.0, 0.001])
+        np.testing.assert_allclose(deltas["right"], -deltas["left"])
+
     def test_vertical_hold_delta_adds_feedforward_and_corrects_height_error(self):
         module = load_module()
 
@@ -247,6 +262,23 @@ class PostureLockedPhysicalCarryDriverTests(unittest.TestCase):
         self.assertFalse(result)
         self.assertIs(driver._posture, refreshed)
 
+    def test_planar_reseat_refreshes_locked_posture(self):
+        module = load_module()
+
+        class Delegate:
+            def step(self, _backend, **_kwargs):
+                return {"collision": False}
+
+        driver = module.PostureLockedPhysicalCarryDriver(Delegate())
+        refreshed = {"qpos": np.array([2.0])}
+        driver._posture = {"qpos": np.array([1.0])}
+        driver._capture_robot_posture = lambda _backend: refreshed
+
+        result = driver.recover_planar(object(), base_command=np.zeros(3))
+
+        self.assertFalse(result["collision"])
+        self.assertIs(driver._posture, refreshed)
+
     def test_single_arm_under_support_target_descends_and_moves_toward_midpoint(self):
         module = load_module()
         current = {
@@ -310,6 +342,7 @@ class FakePhysicalTransportDriver:
         recover_success=True,
         recovered_height_result=None,
         planar_slip_per_step=0.0,
+        gripper_xy_offsets=None,
     ):
         self.base_xy = np.zeros(2, dtype=float)
         self.object_xy = np.array([0.5, 0.0], dtype=float)
@@ -321,8 +354,16 @@ class FakePhysicalTransportDriver:
         self.recover_success = bool(recover_success)
         self.recovered_height_result = recovered_height_result
         self.planar_slip_per_step = float(planar_slip_per_step)
+        self.gripper_xy_offsets = {
+            arm: np.asarray(offset, dtype=float).copy()
+            for arm, offset in (
+                gripper_xy_offsets
+                or {"right": np.zeros(2), "left": np.zeros(2)}
+            ).items()
+        }
         self.recovered_height = None
         self.recover_calls = []
+        self.planar_recoveries = []
         self.gripper_z = {"right": 1.01, "left": 1.01}
         self.steps = []
         self.events = []
@@ -350,8 +391,9 @@ class FakePhysicalTransportDriver:
                 arm: np.array(
                     [
                         self.object_xy[0]
+                        + self.gripper_xy_offsets[arm][0]
                         + len(self.steps) * self.planar_slip_per_step,
-                        self.object_xy[1],
+                        self.object_xy[1] + self.gripper_xy_offsets[arm][1],
                         self.gripper_z[arm],
                     ],
                     dtype=float,
@@ -421,6 +463,10 @@ class FakePhysicalTransportDriver:
         elif self.recover_success:
             self.recovered_height = 1.0
         return self.recover_success
+
+    def recover_planar(self, backend, **kwargs):
+        self.planar_recoveries.append(kwargs)
+        return self.step(backend, **kwargs)
 
 
 class FakeHeadingAlignedTransportDriver(FakePhysicalTransportDriver):
@@ -628,6 +674,34 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
         self.assertEqual(result["failure_stage"], "planar_grasp_drift")
         self.assertGreater(result["max_planar_grasp_drift_m"], 0.02)
         self.assertEqual(result["contacts"], {"right": True, "left": True})
+
+    def test_planar_drift_triggers_bounded_physical_reseat(self):
+        driver = FakePhysicalTransportDriver(
+            planar_slip_per_step=0.015,
+            gripper_xy_offsets={
+                "right": np.array([0.0, -0.2]),
+                "left": np.array([0.0, 0.2]),
+            },
+        )
+        config = self.module.PhysicalCarryConfig(
+            waypoint_tolerance=0.02,
+            max_steps=30,
+            k_linear=1.0,
+            max_linear=0.05,
+            max_linear_delta=0.05,
+            max_planar_grasp_drift=0.50,
+            planar_recovery_trigger=0.02,
+            planar_recovery_steps=1,
+            planar_recovery_inward_delta=0.001,
+        )
+
+        result = self.run_transport(driver, config=config)
+
+        self.assertTrue(result["success"])
+        self.assertGreaterEqual(len(driver.planar_recoveries), 1)
+        recovery = driver.planar_recoveries[0]["arm_world_deltas"]
+        np.testing.assert_allclose(recovery["right"], -recovery["left"])
+        self.assertAlmostEqual(np.linalg.norm(recovery["right"][:2]), 0.001)
 
     def test_transport_result_records_start_and_final_physical_poses(self):
         driver = FakePhysicalTransportDriver()
