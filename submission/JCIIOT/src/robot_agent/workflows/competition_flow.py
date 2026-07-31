@@ -442,7 +442,7 @@ class OfficialCompetitionDriver:
             align_heading_to_path=True,
             heading_translation_tolerance=0.05,
             max_planar_grasp_drift=0.12,
-            height_recovery_trigger=0.004,
+            height_recovery_trigger=0.01,
             planar_recovery_trigger=0.015,
             planar_recovery_steps=4,
             planar_recovery_inward_delta=0.002,
