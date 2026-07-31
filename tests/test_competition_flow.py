@@ -331,6 +331,21 @@ class CompetitionFlowTests(unittest.TestCase):
 
         np.testing.assert_allclose(target, [4.170, -7.261])
 
+    def test_attachment_delivery_uses_semantic_approach_and_rotates_load_to_center(self):
+        pose = self.module.attachment_aligned_delivery_pose(
+            center=np.array([4.872, -7.261]),
+            approach=np.array([4.020, -7.261]),
+            load_offset=np.array([1.0, 0.0]),
+        )
+
+        np.testing.assert_allclose(pose["base_xy"], [4.020, -7.261])
+        self.assertAlmostEqual(pose["yaw"], 0.0)
+        np.testing.assert_allclose(pose["object_xy"], [5.020, -7.261])
+        self.assertLess(
+            float(np.linalg.norm(pose["object_xy"] - np.array([4.872, -7.261]))),
+            0.8,
+        )
+
     def test_l5_delivery_slots_separate_totes_inside_scoring_radius(self):
         center = np.array([0.144, 8.473])
         slots = [
@@ -398,6 +413,54 @@ class CompetitionFlowTests(unittest.TestCase):
 
         self.assertTrue(success)
         self.assertEqual(calls, [("3.500000, -7.200000", True)])
+
+    def test_unregistered_output_moves_to_approach_then_aligns_attachment(self):
+        calls = []
+        yaws = []
+        driver = object.__new__(self.module.OfficialCompetitionDriver)
+        driver.backend = SimpleNamespace(
+            env=SimpleNamespace(output_ports={}),
+            get_base_pose=lambda: (np.array([-8.85, 5.35]), -3.14),
+        )
+        driver.scene_context = SimpleNamespace(
+            output_ports={
+                "output_5": SimpleNamespace(
+                    center=np.array([4.872, -7.261]),
+                    approach=np.array([4.020, -7.261]),
+                )
+            }
+        )
+        driver._physical_hold = {
+            "base_xy": [-8.85, 5.35],
+            "base_yaw": -3.14,
+            "object_pos": [-9.85, 5.35, 1.38],
+            "object_z": 1.38,
+        }
+        driver._transport_attached = True
+        driver._transport_attachment = {
+            "active": True,
+            "object_name": "blue_container_h01_back_upper",
+        }
+        driver._move_to = lambda target, *, carrying: (
+            calls.append((target, carrying)) or True
+        )
+        navigation = types.ModuleType("robot_agent.skills.competition_navigation")
+        navigation.orient_base = lambda _backend, yaw: yaws.append(yaw) or True
+
+        with patch.dict(
+            sys.modules,
+            {"robot_agent.skills.competition_navigation": navigation},
+        ):
+            success = driver.move(
+                "output_5",
+                carrying=True,
+                object_name="blue_container_h01_back_upper",
+            )
+
+        self.assertTrue(success)
+        self.assertEqual(calls, [("4.020000, -7.261000", True)])
+        self.assertEqual(len(yaws), 1)
+        self.assertAlmostEqual(yaws[0], 0.0, delta=0.002)
 
     def test_upper_green_tote_exits_along_the_outer_transport_corridor(self):
         calls = []

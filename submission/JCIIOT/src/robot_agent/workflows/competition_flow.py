@@ -72,6 +72,54 @@ def delivery_slot_target(center, object_name: str | None):
     return target
 
 
+def attachment_aligned_delivery_pose(
+    *,
+    center,
+    approach,
+    load_offset,
+    object_target_xy=None,
+):
+    """Place the base at a semantic approach and rotate its attached load inward."""
+    import numpy as np
+
+    center = np.asarray(center, dtype=float).reshape(2)
+    base_xy = np.asarray(approach, dtype=float).reshape(2)
+    load_offset = np.asarray(load_offset, dtype=float).reshape(2)
+    target_xy = (
+        center
+        if object_target_xy is None
+        else np.asarray(object_target_xy, dtype=float).reshape(2)
+    )
+    values = np.concatenate((center, base_xy, load_offset, target_xy))
+    if not np.all(np.isfinite(values)):
+        raise ValueError("delivery pose coordinates must be finite")
+    desired = target_xy - base_xy
+    if float(np.linalg.norm(load_offset)) <= 1e-9:
+        raise ValueError("load_offset must be nonzero")
+    if float(np.linalg.norm(desired)) <= 1e-9:
+        raise ValueError("object target must differ from base approach")
+
+    yaw = math.atan2(desired[1], desired[0]) - math.atan2(
+        load_offset[1],
+        load_offset[0],
+    )
+    yaw = (yaw + math.pi) % (2.0 * math.pi) - math.pi
+    cosine = math.cos(yaw)
+    sine = math.sin(yaw)
+    object_xy = base_xy + np.array(
+        [
+            cosine * load_offset[0] - sine * load_offset[1],
+            sine * load_offset[0] + cosine * load_offset[1],
+        ],
+        dtype=float,
+    )
+    return {
+        "base_xy": base_xy,
+        "yaw": yaw,
+        "object_xy": object_xy,
+    }
+
+
 def verified_transport_grasp(result: Mapping[str, Any]) -> bool:
     """Require physical contact, lift, and finite hold state before transport."""
     if not bool(result.get("success")) or not bool(result.get("lift_success")):
@@ -248,7 +296,8 @@ class OfficialCompetitionDriver:
         return bool(result.success)
 
     def _physical_output_available(self, target: str) -> bool:
-        ports = getattr(self.backend.env, "output_ports", {})
+        env = getattr(self.backend, "env", None)
+        ports = getattr(env, "output_ports", {})
         names = ports.keys() if hasattr(ports, "keys") else ports
         return physical_output_available(names, target)
 
@@ -458,6 +507,7 @@ class OfficialCompetitionDriver:
 
             from robot_agent.skills.competition_transport import (
                 transport_base_goal,
+                world_velocity_to_base_frame,
             )
 
             station = self.scene_context.output_ports.get(target)
@@ -480,15 +530,43 @@ class OfficialCompetitionDriver:
                 station.center[:2],
                 object_name,
             )
-            reference_base_xy = hold.get("base_xy", base_xy)
-            goal_xy = transport_base_goal(
-                object_target_xy=object_target_xy,
-                base_xy=np.asarray(reference_base_xy, dtype=float),
-                base_yaw=float(hold["base_yaw"]),
-                object_xy=np.asarray(hold["object_pos"], dtype=float)[:2],
-            )
+            delivery_yaw = None
+            station_approach = getattr(station, "approach", None)
+            if (
+                not self._physical_output_available(target)
+                and station_approach is not None
+            ):
+                reference_base_xy = np.asarray(
+                    hold.get("base_xy", base_xy),
+                    dtype=float,
+                )
+                load_offset = world_velocity_to_base_frame(
+                    np.asarray(hold["object_pos"], dtype=float)[:2]
+                    - reference_base_xy,
+                    float(hold["base_yaw"]),
+                )
+                delivery_pose = attachment_aligned_delivery_pose(
+                    center=station.center[:2],
+                    approach=station_approach[:2],
+                    load_offset=load_offset,
+                    object_target_xy=object_target_xy,
+                )
+                goal_xy = delivery_pose["base_xy"]
+                delivery_yaw = float(delivery_pose["yaw"])
+            else:
+                reference_base_xy = hold.get("base_xy", base_xy)
+                goal_xy = transport_base_goal(
+                    object_target_xy=object_target_xy,
+                    base_xy=np.asarray(reference_base_xy, dtype=float),
+                    base_yaw=float(hold["base_yaw"]),
+                    object_xy=np.asarray(hold["object_pos"], dtype=float)[:2],
+                )
             resolved_target = f"{goal_xy[0]:.6f}, {goal_xy[1]:.6f}"
             success = self._move_to(resolved_target, carrying=True)
+            if success and delivery_yaw is not None:
+                from robot_agent.skills.competition_navigation import orient_base
+
+                success = bool(orient_base(self.backend, delivery_yaw))
             self._last_transport = {
                 "success": bool(success),
                 "failure_stage": None if success else "navigation",
