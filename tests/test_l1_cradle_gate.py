@@ -2264,6 +2264,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.floor_push_oriented_retract_lateral_m, 0.08)
         self.assertIsNone(args.floor_push_lateral_offset_m)
         self.assertAlmostEqual(args.floor_push_torso_drop_m, 0.24)
+        self.assertFalse(args.floor_push_base_pusher)
         self.assertAlmostEqual(args.floor_push_maximum_lateral_offset_m, 0.25)
         self.assertAlmostEqual(args.floor_push_face_offset_m, 0.24)
         self.assertAlmostEqual(args.floor_push_hand_separation_m, 0.28)
@@ -2408,6 +2409,7 @@ class JointSeedParserTests(unittest.TestCase):
                 "-0.15",
                 "--floor-push-torso-drop-m",
                 "0.22",
+                "--floor-push-base-pusher",
                 "--floor-push-maximum-lateral-offset-m",
                 "0.22",
                 "--floor-push-face-offset-m",
@@ -2546,6 +2548,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.floor_push_oriented_retract_lateral_m, 0.07)
         self.assertAlmostEqual(args.floor_push_lateral_offset_m, -0.15)
         self.assertAlmostEqual(args.floor_push_torso_drop_m, 0.22)
+        self.assertTrue(args.floor_push_base_pusher)
         self.assertAlmostEqual(args.floor_push_maximum_lateral_offset_m, 0.22)
         self.assertAlmostEqual(args.floor_push_face_offset_m, 0.21)
         self.assertAlmostEqual(args.floor_push_hand_separation_m, 0.26)

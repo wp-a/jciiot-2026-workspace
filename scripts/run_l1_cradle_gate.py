@@ -2027,6 +2027,26 @@ def object_robot_contacts(raw_env, object_name: str) -> dict[str, tuple[str, ...
     return {arm: tuple(sorted(names)) for arm, names in result.items()}
 
 
+def object_all_robot_contacts(raw_env, object_name: str) -> tuple[str, ...]:
+    """Return every robot geometry physically touching the named object."""
+    model = raw_env.sim.model
+    object_bodies = _object_body_ids(raw_env, object_name)
+    result = set()
+    for contact in raw_env.sim.data.contact[: raw_env.sim.data.ncon]:
+        geom_ids = (int(contact.geom1), int(contact.geom2))
+        object_sides = [
+            int(model.geom_bodyid[geom_id]) in object_bodies
+            for geom_id in geom_ids
+        ]
+        if object_sides[0] == object_sides[1]:
+            continue
+        robot_geom_id = geom_ids[1] if object_sides[0] else geom_ids[0]
+        name = model.geom_id2name(robot_geom_id)
+        if name and name.lower().startswith(("robot0_", "gripper0_")):
+            result.add(name)
+    return tuple(sorted(result))
+
+
 def geometry_snapshot(raw_env, object_name: str) -> dict[str, Any]:
     """Capture world geometry needed to design a physical support transition."""
     model = raw_env.sim.model
@@ -2830,6 +2850,7 @@ def _floor_corridor_push_probe(
     orientation_clearance_m: float,
     lateral_offset_m: float | None,
     torso_drop_m: float,
+    base_pusher: bool,
     oriented_retract_forward_m: float,
     oriented_retract_lateral_m: float,
     oriented_retract_target_z: float,
@@ -2969,21 +2990,24 @@ def _floor_corridor_push_probe(
         torso_minimum=0.10,
         torso_steps=160,
     )
-    torso_lowered = bool(
-        stage_reached
-        and position_driver.lower_torso_for_reach(backend, position_config)
-    )
-    precontact_reached = bool(
-        torso_lowered
-        and position_driver._move_to_targets(
-            backend,
-            targets["precontact"],
-            position_config,
-            max_steps=480,
-            gripper_value=-1.0,
-            tolerance=position_config.position_tolerance,
+    torso_lowered = False
+    precontact_reached = False
+    if not base_pusher:
+        torso_lowered = bool(
+            stage_reached
+            and position_driver.lower_torso_for_reach(backend, position_config)
         )
-    )
+        precontact_reached = bool(
+            torso_lowered
+            and position_driver._move_to_targets(
+                backend,
+                targets["precontact"],
+                position_config,
+                max_steps=480,
+                gripper_value=-1.0,
+                tolerance=position_config.position_tolerance,
+            )
+        )
     carry_driver = OfficialPhysicalCarryDriver()
     observations = []
     stable_contact_steps = 0
@@ -2995,7 +3019,7 @@ def _floor_corridor_push_probe(
     contact_acquire_steps = 0
     collision = bool(getattr(raw_env, "has_judge_collision", False))
     contact_reached = False
-    if precontact_reached and not collision:
+    if precontact_reached and not collision and not base_pusher:
         acquire_hold_targets = carry_driver.capture_hold_targets(backend)
         acquire_delta = np.r_[direction * 0.003, -0.003]
         for step in range(240):
@@ -3072,11 +3096,11 @@ def _floor_corridor_push_probe(
         failure_stage = "oriented_retract"
     elif not stage_reached:
         failure_stage = "stage_base"
-    elif not torso_lowered:
+    elif not base_pusher and not torso_lowered:
         failure_stage = "lower_torso"
-    elif not precontact_reached:
+    elif not base_pusher and not precontact_reached:
         failure_stage = "precontact"
-    elif not contact_reached:
+    elif not base_pusher and not contact_reached:
         failure_stage = "contact_acquire"
     elif collision:
         failure_stage = "collision"
@@ -3093,6 +3117,14 @@ def _floor_corridor_push_probe(
                 direction * requested_speed,
                 base_yaw,
             )
+            arm_world_deltas = None
+            gripper_value = -1.0
+            if not base_pusher:
+                arm_world_deltas = {
+                    "right": np.r_[arm_step, 0.0],
+                    "left": np.r_[arm_step, 0.0],
+                }
+                gripper_value = 1.0
             step_info = carry_driver.step(
                 backend,
                 object_name=object_name,
@@ -3101,19 +3133,23 @@ def _floor_corridor_push_probe(
                     dtype=float,
                 ),
                 hold_targets=hold_targets,
-                arm_world_deltas={
-                    "right": np.r_[arm_step, 0.0],
-                    "left": np.r_[arm_step, 0.0],
-                },
-                gripper_value=1.0,
+                arm_world_deltas=arm_world_deltas,
+                gripper_value=gripper_value,
                 base_control_dt=base_control_dt,
             )
             steps = step + 1
             collision = bool(step_info.get("collision", False))
-            contacts = object_robot_contacts(raw_env, object_name)
-            has_contact = any(contacts[arm] for arm in ("right", "left"))
+            if base_pusher:
+                base_contacts = object_all_robot_contacts(raw_env, object_name)
+                contacts = {"base": base_contacts}
+                has_contact = bool(base_contacts)
+            else:
+                contacts = object_robot_contacts(raw_env, object_name)
+                has_contact = any(contacts[arm] for arm in ("right", "left"))
             stable_contact_steps = stable_contact_steps + 1 if has_contact else 0
             maximum_contact_steps = max(maximum_contact_steps, stable_contact_steps)
+            if stable_contact_steps >= 5:
+                contact_reached = True
             no_contact_steps = 0 if has_contact else no_contact_steps + 1
             object_position = np.asarray(
                 raw_env.sim.data.body_xpos[body_id], dtype=float
@@ -3174,6 +3210,7 @@ def _floor_corridor_push_probe(
     return {
         "success": success,
         "failure_stage": failure_stage,
+        "pusher": "base" if base_pusher else "dual_arm",
         "escape_stage_reached": escape_stage_reached,
         "orientation_stage_reached": orientation_stage_reached,
         "stage_reached": stage_reached,
@@ -3447,6 +3484,7 @@ def _end_grasp_floor_push_probe(
     push_oriented_retract_lateral_m: float = 0.08,
     push_lateral_offset_m: float | None = None,
     push_torso_drop_m: float = 0.24,
+    push_base_pusher: bool = False,
     push_maximum_lateral_offset_m: float = 0.25,
     push_face_offset_m: float = 0.24,
     push_hand_separation_m: float = 0.28,
@@ -3520,6 +3558,7 @@ def _end_grasp_floor_push_probe(
                 orientation_clearance_m=push_orientation_clearance_m,
                 lateral_offset_m=push_lateral_offset_m,
                 torso_drop_m=push_torso_drop_m,
+                base_pusher=push_base_pusher,
                 oriented_retract_forward_m=push_oriented_retract_forward_m,
                 oriented_retract_lateral_m=push_oriented_retract_lateral_m,
                 oriented_retract_target_z=floor_retract_target_z,
@@ -7713,6 +7752,7 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                                     args.floor_push_lateral_offset_m
                                 ),
                                 push_torso_drop_m=args.floor_push_torso_drop_m,
+                                push_base_pusher=args.floor_push_base_pusher,
                                 push_maximum_lateral_offset_m=(
                                     args.floor_push_maximum_lateral_offset_m
                                 ),
@@ -8207,6 +8247,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--floor-push-lateral-offset-m", type=float)
     parser.add_argument("--floor-push-torso-drop-m", type=float, default=0.24)
+    parser.add_argument("--floor-push-base-pusher", action="store_true")
     parser.add_argument(
         "--floor-push-maximum-lateral-offset-m", type=float, default=0.25
     )
