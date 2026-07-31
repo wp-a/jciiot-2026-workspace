@@ -418,6 +418,7 @@ class InchwormCarryConfig:
         reset_max_gripper_drift: float = 0.06,
         reseat_steps: int = 4,
         reseat_inward_delta: float = 0.002,
+        downstream_stroke_scale: float = 0.5,
         max_lateral_drift: float = 0.03,
         minimum_macro_progress: float = 0.02,
         max_cycles: int = 64,
@@ -435,6 +436,7 @@ class InchwormCarryConfig:
         self.reset_max_gripper_drift = float(reset_max_gripper_drift)
         self.reseat_steps = int(reseat_steps)
         self.reseat_inward_delta = float(reseat_inward_delta)
+        self.downstream_stroke_scale = float(downstream_stroke_scale)
         self.max_lateral_drift = float(max_lateral_drift)
         self.minimum_macro_progress = float(minimum_macro_progress)
         self.max_cycles = int(max_cycles)
@@ -1255,6 +1257,37 @@ def _inchworm_planar_motion(delta, direction) -> tuple[float, float]:
     return progress, lateral
 
 
+def directional_stroke_scales(
+    gripper_positions,
+    *,
+    travel_direction,
+    downstream_scale: float,
+) -> dict[str, float]:
+    """Keep the leading gripper as a constraint while the trailing arm pushes."""
+    scale = float(downstream_scale)
+    if not np.isfinite(scale) or scale < 0.0 or scale > 1.0:
+        raise ValueError("downstream_stroke_scale must be in [0, 1]")
+    direction = np.asarray(travel_direction, dtype=float).reshape(2)
+    norm = float(np.linalg.norm(direction))
+    if norm <= 1e-12 or not np.all(np.isfinite(direction)):
+        raise ValueError("travel_direction must be finite and non-zero")
+    direction /= norm
+    projections = {
+        arm: float(
+            np.dot(
+                np.asarray(gripper_positions[arm], dtype=float)[:2],
+                direction,
+            )
+        )
+        for arm in ("right", "left")
+    }
+    scales = {"right": 1.0, "left": 1.0}
+    if abs(projections["right"] - projections["left"]) > 1e-9:
+        downstream_arm = max(projections, key=projections.get)
+        scales[downstream_arm] = scale
+    return scales
+
+
 def run_inchworm_transport(
     backend,
     *,
@@ -1293,6 +1326,12 @@ def run_inchworm_transport(
         raise ValueError("inchworm step and cycle budgets must be positive")
     if config.reseat_steps < 0 or config.reseat_inward_delta < 0.0:
         raise ValueError("inchworm reseat controls must be non-negative")
+    if (
+        not np.isfinite(config.downstream_stroke_scale)
+        or config.downstream_stroke_scale < 0.0
+        or config.downstream_stroke_scale > 1.0
+    ):
+        raise ValueError("downstream_stroke_scale must be in [0, 1]")
 
     hold_targets = driver.capture_hold_targets(backend)
     start = driver.observe(backend, object_name)
@@ -1332,12 +1371,17 @@ def run_inchworm_transport(
                 config.max_vertical_adjustment,
             )
         )
+        stroke_scales = directional_stroke_scales(
+            cycle_start_grippers,
+            travel_direction=direction,
+            downstream_scale=config.downstream_stroke_scale,
+        )
         arm_targets = {
             arm: cycle_start_grippers[arm]
             + np.array(
                 [
-                    direction[0] * config.stroke_distance,
-                    direction[1] * config.stroke_distance,
+                    direction[0] * config.stroke_distance * stroke_scales[arm],
+                    direction[1] * config.stroke_distance * stroke_scales[arm],
                     vertical_adjustment,
                 ],
                 dtype=float,
@@ -1416,6 +1460,7 @@ def run_inchworm_transport(
                     "arm_steps": arm_steps,
                     "reset_steps": 0,
                     "vertical_adjustment_m": vertical_adjustment,
+                    "stroke_scales": dict(stroke_scales),
                     "arm_progress_m": arm_progress,
                     "macro_progress_m": arm_progress,
                     "total_progress_m": total_arm_progress,
@@ -1577,6 +1622,7 @@ def run_inchworm_transport(
                 "reset_steps": reset_steps,
                 "reseat_steps": reseat_steps,
                 "vertical_adjustment_m": vertical_adjustment,
+                "stroke_scales": dict(stroke_scales),
                 "arm_progress_m": arm_progress,
                 "macro_progress_m": macro_progress,
                 "total_progress_m": total_progress,
@@ -1621,6 +1667,13 @@ def run_inchworm_transport(
         cycle_count=len(cycles),
         contacts={
             arm: bool(final["contacts"].get(arm, False))
+            for arm in ("right", "left")
+        },
+        final_object_pos=np.asarray(final["object_pos"], dtype=float).tolist(),
+        final_gripper_positions={
+            arm: np.asarray(
+                final["gripper_positions"][arm], dtype=float
+            ).tolist()
             for arm in ("right", "left")
         },
     )

@@ -591,6 +591,7 @@ class FakeInchwormDriver:
             "left": np.array([0.5, 0.2, 1.01], dtype=float),
         }
         self.steps = []
+        self.events = []
 
     def capture_hold_targets(self, _backend):
         return {}
@@ -634,6 +635,7 @@ class FakeInchwormDriver:
         return {"collision": False}
 
     def record_event(self, _backend, event, **payload):
+        self.events.append((event, payload))
         return event, payload
 
 
@@ -1104,6 +1106,28 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
 
 
 class InchwormTransportRunnerTests(unittest.TestCase):
+    def test_directional_stroke_reduces_only_downstream_gripper(self):
+        module = load_module()
+
+        scales = module.directional_stroke_scales(
+            {
+                "right": np.array([7.4, 4.74, 1.3]),
+                "left": np.array([7.4, 4.50, 1.3]),
+            },
+            travel_direction=np.array([0.0, -1.0]),
+            downstream_scale=0.5,
+        )
+
+        self.assertEqual(scales, {"right": 1.0, "left": 0.5})
+
+    def test_inchworm_defaults_keep_downstream_gripper_as_planar_constraint(self):
+        module = load_module()
+
+        self.assertAlmostEqual(
+            module.InchwormCarryConfig().downstream_stroke_scale,
+            0.5,
+        )
+
     def test_default_reset_stays_below_observed_contact_loss_distance(self):
         module = load_module()
 
@@ -1183,6 +1207,29 @@ class InchwormTransportRunnerTests(unittest.TestCase):
         self.assertGreaterEqual(result["cycles"][1]["total_progress_m"], 0.12)
         self.assertAlmostEqual(result["base_translation_m"], 0.08, places=6)
         self.assertEqual(result["cycles"][1]["reset_steps"], 0)
+
+    def test_end_event_records_terminal_inchworm_geometry(self):
+        module = load_module()
+        driver = FakeInchwormDriver()
+
+        module.run_inchworm_transport(
+            object(),
+            object_name="box",
+            travel_direction=np.array([1.0, 0.0]),
+            travel_distance=0.05,
+            minimum_object_z=0.90,
+            config=module.InchwormCarryConfig(
+                stroke_vertical_feedforward=0.0,
+            ),
+            driver=driver,
+        )
+
+        event, payload = driver.events[-1]
+        self.assertEqual(event, "inchworm_transport_end")
+        self.assertEqual(len(payload["final_object_pos"]), 3)
+        self.assertEqual(
+            sorted(payload["final_gripper_positions"]), ["left", "right"]
+        )
 
 
 class CradleTransferTests(unittest.TestCase):
