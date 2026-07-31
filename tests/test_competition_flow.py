@@ -795,6 +795,37 @@ class CompetitionFlowTests(unittest.TestCase):
         self.assertIsNotNone(driver._physical_hold)
         self.assertTrue(driver._transport_attached)
 
+    def test_unregistered_l4_output_accepts_verified_scoring_pose_hold(self):
+        object_name = "blue_container_h01_back_upper"
+        backend = SimpleNamespace(
+            env=SimpleNamespace(
+                output_ports={},
+                obj_body_id={object_name: 7},
+                sim=SimpleNamespace(
+                    data=SimpleNamespace(
+                        body_xpos={7: np.array([4.80, -8.00, 1.38])}
+                    )
+                ),
+            )
+        )
+        driver = object.__new__(self.module.OfficialCompetitionDriver)
+        driver.backend = backend
+        driver.scene_context = SimpleNamespace(
+            output_ports={
+                "output_5": SimpleNamespace(center=np.array([4.872, -7.261]))
+            }
+        )
+        driver._physical_hold = {"object_z": 1.38}
+        driver._transport_attached = True
+        driver._transport_attachment = {"active": True, "object_name": object_name}
+
+        self.assertTrue(driver.place("output_5", object_name))
+        self.assertEqual(
+            driver._last_place["method"],
+            "verified_attachment_scoring_pose_hold",
+        )
+        self.assertTrue(driver._transport_attached)
+
 
 if __name__ == "__main__":
     unittest.main()
