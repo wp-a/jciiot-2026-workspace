@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run and validate the L1 physical cradle-transfer research gate."""
+"""Run and validate a physical competition-task research gate."""
 
 from __future__ import annotations
 
@@ -8237,6 +8237,20 @@ def _center_regrasp_probe(
     }
 
 
+def task_for_index(tasks: object, task_index: object) -> dict[str, Any]:
+    """Return a copied task entry for a validated zero-based index."""
+    if isinstance(task_index, bool) or not isinstance(task_index, int):
+        raise TypeError("task_index must be an integer")
+    if not isinstance(tasks, list):
+        raise TypeError("tasks must be a list")
+    if task_index < 0 or task_index >= len(tasks):
+        raise IndexError("task_index is outside the configured task list")
+    task = tasks[task_index]
+    if not isinstance(task, Mapping):
+        raise TypeError("selected task must be a mapping")
+    return dict(task)
+
+
 def run_probe(args: argparse.Namespace) -> dict[str, Any]:
     candidate_root = args.candidate_root.resolve()
     app_dir = _configure_candidate(candidate_root)
@@ -8249,7 +8263,7 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
     tasks = json.loads(
         (app_dir / "knowledge" / "task_config.json").read_text(encoding="utf-8")
     )["tasks"]
-    task = dict(tasks[0])
+    task = task_for_index(tasks, args.task_index)
     backend = None
     started = time.perf_counter()
     record: dict[str, Any] = {
@@ -8263,6 +8277,8 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
         "dropped": True,
         "infrastructure_error": None,
         "seed": int(args.seed),
+        "task_index": int(args.task_index),
+        "task_level": str(task.get("level") or f"L{int(args.task_index) + 1}"),
         "official_commit": official_commit,
         "mode": "post_lift_hold_probe",
     }
@@ -8955,6 +8971,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--trajectory", type=Path, required=True)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--task-index", type=int, choices=range(5), default=0)
     parser.add_argument("--hold-steps", type=int, default=20)
     parser.add_argument("--inward-probe-m", type=float, default=0.0)
     parser.add_argument("--inward-steps", type=int, default=40)

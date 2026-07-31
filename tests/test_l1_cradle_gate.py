@@ -45,6 +45,7 @@ from scripts.run_l1_cradle_gate import (
     opposed_wall_squeeze_targets,
     orientation_alignment_failures,
     parse_args,
+    task_for_index,
     push_gate_accepted,
     push_gate_failures,
     hybrid_exit_gate_accepted,
@@ -2280,6 +2281,36 @@ class BaseAdvanceMathTests(unittest.TestCase):
 
 
 class JointSeedParserTests(unittest.TestCase):
+    def test_task_index_defaults_to_l1_and_can_select_another_level(self):
+        common = [
+            "--candidate-root",
+            "/tmp/candidate",
+            "--expected-official-commit",
+            "official-commit",
+            "--output",
+            "/tmp/result.json",
+            "--trajectory",
+            "/tmp/trajectory.json",
+        ]
+
+        self.assertEqual(parse_args(common).task_index, 0)
+        self.assertEqual(
+            parse_args([*common, "--task-index", "3"]).task_index,
+            3,
+        )
+
+    def test_task_for_index_returns_a_copy_and_rejects_invalid_indices(self):
+        tasks = [{"level": "L1"}, {"level": "L2"}]
+
+        selected = task_for_index(tasks, 1)
+
+        self.assertEqual(selected, {"level": "L2"})
+        self.assertIsNot(selected, tasks[1])
+        for invalid in (-1, 2, True, 0.5):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises((TypeError, ValueError, IndexError)):
+                    task_for_index(tasks, invalid)
+
     def test_joint_seed_parser_defaults_are_strict_and_opt_in(self):
         args = parse_args(
             [
