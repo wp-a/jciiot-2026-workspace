@@ -35,6 +35,7 @@ class BatchJob:
     task_index: int
     seed: int
     output_dir: Path
+    perturbation_tier: str = "nominal"
 
     @property
     def level(self) -> str:
@@ -42,7 +43,9 @@ class BatchJob:
 
     @property
     def label(self) -> str:
-        return f"{self.level.lower()}-seed-{self.seed}"
+        tier = str(self.perturbation_tier).strip().lower()
+        tier_label = "" if tier == "nominal" else f"-{tier}"
+        return f"{self.level.lower()}{tier_label}-seed-{self.seed}"
 
     @property
     def manifest_path(self) -> Path:
@@ -58,7 +61,11 @@ class BatchJob:
 
 
 def build_jobs(
-    *, task_indices: Iterable[int], seeds: Iterable[int], output_dir: Path
+    *,
+    task_indices: Iterable[int],
+    seeds: Iterable[int],
+    output_dir: Path,
+    perturbation_tier: str = "nominal",
 ) -> list[BatchJob]:
     jobs = []
     for task_index in task_indices:
@@ -70,6 +77,7 @@ def build_jobs(
                     task_index=int(task_index),
                     seed=int(seed),
                     output_dir=output_dir,
+                    perturbation_tier=str(perturbation_tier),
                 )
             )
     return jobs
@@ -205,6 +213,8 @@ def _experiment_command(job: BatchJob, args: argparse.Namespace) -> list[str]:
         str(job.manifest_path),
         "--required-score",
         str(TASK_MAX_SCORES[job.task_index]),
+        "--perturbation-tier",
+        job.perturbation_tier,
     ]
 
 
@@ -259,6 +269,7 @@ def _write_summary(
             "workspace_commit": args.workspace_commit,
             "task_indices": list(args.task_indices),
             "seeds": list(args.seeds),
+            "perturbation_tier": args.perturbation_tier,
             "max_workers": args.max_workers,
             "updated_at": _utc_now(),
         }
@@ -272,6 +283,7 @@ def run_batch(args: argparse.Namespace) -> dict[str, Any]:
         task_indices=args.task_indices,
         seeds=args.seeds,
         output_dir=args.output_dir,
+        perturbation_tier=args.perturbation_tier,
     )
     manifests = [
         manifest
@@ -326,6 +338,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-workers", type=int, default=1)
     parser.add_argument("--egl-devices", type=lambda value: value.split(","), default=["0"])
     parser.add_argument("--max-attempts", type=int, default=1)
+    parser.add_argument(
+        "--perturbation-tier",
+        choices=("nominal", "small", "medium", "stress"),
+        default="nominal",
+    )
     parser.add_argument("--python", type=Path, default=Path(sys.executable))
     parser.add_argument(
         "--runner",

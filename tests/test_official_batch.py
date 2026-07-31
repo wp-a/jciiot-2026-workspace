@@ -4,9 +4,12 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 from scripts.run_official_batch import (
     BatchJob,
+    _experiment_command,
+    _write_summary,
     build_jobs,
     is_terminal_manifest,
     summarize_manifests,
@@ -31,6 +34,33 @@ def _manifest(*, level: str, score: int, max_score: int, collision_frames: int =
 
 
 class OfficialBatchTests(unittest.TestCase):
+    def test_experiment_command_propagates_non_nominal_perturbation_tier(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            job = BatchJob(
+                task_index=0,
+                seed=2026073111,
+                output_dir=root / "results",
+                perturbation_tier="small",
+            )
+            args = SimpleNamespace(
+                python=Path("python3"),
+                runner=Path("scripts/run_official_experiment.py"),
+                candidate_root=root / "candidate",
+                expected_official_commit="official-commit",
+                workspace_commit="workspace-commit",
+                max_attempts=1,
+            )
+
+            command = _experiment_command(job, args)
+
+            self.assertEqual(job.label, "l1-small-seed-2026073111")
+            self.assertIn("--perturbation-tier", command)
+            self.assertEqual(
+                command[command.index("--perturbation-tier") + 1],
+                "small",
+            )
+
     def test_script_can_be_invoked_directly(self):
         repository_root = Path(__file__).resolve().parents[1]
         result = subprocess.run(
@@ -43,6 +73,41 @@ class OfficialBatchTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("--candidate-root", result.stdout)
+        self.assertIn("--perturbation-tier", result.stdout)
+
+    def test_build_jobs_propagates_perturbation_tier(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            jobs = build_jobs(
+                task_indices=[0],
+                seeds=[2026073111, 2026073112],
+                output_dir=Path(temp_dir),
+                perturbation_tier="small",
+            )
+
+        self.assertEqual(
+            [job.perturbation_tier for job in jobs],
+            ["small", "small"],
+        )
+        self.assertEqual(
+            [job.label for job in jobs],
+            ["l1-small-seed-2026073111", "l1-small-seed-2026073112"],
+        )
+
+    def test_summary_records_perturbation_tier(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            args = SimpleNamespace(
+                output_dir=Path(temp_dir),
+                expected_official_commit="official-commit",
+                workspace_commit="workspace-commit",
+                task_indices=[0],
+                seeds=[2026073111],
+                perturbation_tier="small",
+                max_workers=1,
+            )
+
+            summary = _write_summary(jobs=[], manifests=[], args=args)
+
+        self.assertEqual(summary["perturbation_tier"], "small")
 
     def test_build_jobs_assigns_unique_paths_for_each_task_and_seed(self):
         with tempfile.TemporaryDirectory() as temp_dir:
