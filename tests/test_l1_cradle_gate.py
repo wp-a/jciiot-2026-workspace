@@ -20,6 +20,7 @@ from scripts.run_l1_cradle_gate import (
     eef_site_pose,
     floor_base_reposition_targets,
     floor_base_target_route,
+    floor_base_tracking_velocity,
     floor_regrasp_safe_base_xy,
     floor_push_staging_targets,
     geometry_snapshot,
@@ -288,6 +289,17 @@ class EndGraspSetdownGateTests(unittest.TestCase):
         np.testing.assert_allclose(targets["corner_base_xy"], [8.65, -7.50])
         np.testing.assert_allclose(targets["stage_base_xy"], [8.65, -8.40])
         self.assertAlmostEqual(targets["target_yaw"], np.pi)
+
+    def test_floor_base_tracking_velocity_corrects_lateral_drift(self):
+        velocity = floor_base_tracking_velocity(
+            push_direction_xy=[0.0, -1.0],
+            lateral_error_m=0.10,
+            forward_speed_m_s=0.04,
+            lateral_gain=0.50,
+            maximum_lateral_speed_m_s=0.02,
+        )
+
+        np.testing.assert_allclose(velocity, [-0.02, -0.04])
 
     def test_hybrid_exit_gate_requires_strict_official_exit_and_physics(self):
         self.assertEqual(hybrid_exit_gate_failures(VALID_HYBRID_EXIT_RECORD), [])
@@ -2316,6 +2328,8 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.floor_base_route_corridor_y, -8.40)
         self.assertAlmostEqual(args.floor_base_route_arrival_margin_m, 0.05)
         self.assertAlmostEqual(args.floor_base_route_reposition_clearance_m, 0.90)
+        self.assertAlmostEqual(args.floor_base_tracking_gain, 0.50)
+        self.assertAlmostEqual(args.floor_base_max_lateral_speed_m_s, 0.02)
         self.assertAlmostEqual(args.center_carry_distance_m, 0.0)
         self.assertFalse(args.center_carry_away_from_object)
         self.assertAlmostEqual(args.center_carry_max_linear, 0.04)
@@ -2475,6 +2489,10 @@ class JointSeedParserTests(unittest.TestCase):
                 "0.06",
                 "--floor-base-route-reposition-clearance-m",
                 "0.95",
+                "--floor-base-tracking-gain",
+                "0.60",
+                "--floor-base-max-lateral-speed-m-s",
+                "0.03",
                 "--center-carry-away-from-object",
                 "--center-carry-corner-seat-m",
                 "0.08",
@@ -2611,6 +2629,8 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.floor_base_route_corridor_y, -8.55)
         self.assertAlmostEqual(args.floor_base_route_arrival_margin_m, 0.06)
         self.assertAlmostEqual(args.floor_base_route_reposition_clearance_m, 0.95)
+        self.assertAlmostEqual(args.floor_base_tracking_gain, 0.60)
+        self.assertAlmostEqual(args.floor_base_max_lateral_speed_m_s, 0.03)
         self.assertTrue(args.center_carry_away_from_object)
         self.assertAlmostEqual(args.center_carry_corner_seat_m, 0.08)
         self.assertAlmostEqual(args.center_carry_arm_stroke_m, 0.07)

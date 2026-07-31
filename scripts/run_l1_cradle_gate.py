@@ -345,6 +345,50 @@ def floor_base_reposition_targets(
     }
 
 
+def floor_base_tracking_velocity(
+    *,
+    push_direction_xy: object,
+    lateral_error_m: float,
+    forward_speed_m_s: float,
+    lateral_gain: float,
+    maximum_lateral_speed_m_s: float,
+) -> np.ndarray:
+    """Return world velocity with bounded feedback toward the push centerline."""
+    direction = np.asarray(push_direction_xy, dtype=float)
+    values = np.asarray(
+        [
+            lateral_error_m,
+            forward_speed_m_s,
+            lateral_gain,
+            maximum_lateral_speed_m_s,
+        ],
+        dtype=float,
+    )
+    if direction.shape != (2,) or not np.all(np.isfinite(direction)):
+        raise ValueError("tracking direction must be a finite planar vector")
+    direction_norm = float(np.linalg.norm(direction))
+    if direction_norm <= 1e-12:
+        raise ValueError("tracking direction must be non-zero")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("tracking parameters must be finite")
+    speed = float(forward_speed_m_s)
+    gain = float(lateral_gain)
+    maximum_lateral_speed = float(maximum_lateral_speed_m_s)
+    if speed <= 0.0 or gain < 0.0 or maximum_lateral_speed <= 0.0:
+        raise ValueError("tracking speed limits must be positive and gain nonnegative")
+
+    direction /= direction_norm
+    left_axis = np.array([-direction[1], direction[0]], dtype=float)
+    correction = float(
+        np.clip(
+            -gain * float(lateral_error_m),
+            -maximum_lateral_speed,
+            maximum_lateral_speed,
+        )
+    )
+    return direction * speed + left_axis * correction
+
+
 @contextmanager
 def transport_attachment_audit(raw_env: object, transport_module: object):
     """Count transport attachment and direct object-pose operations in a scope."""
@@ -3060,6 +3104,8 @@ def _physical_base_push_segment(
     direction_xy: object,
     distance_m: float,
     base_speed_m_s: float,
+    tracking_gain: float,
+    maximum_lateral_speed_m_s: float,
     max_steps: int,
 ) -> dict[str, Any]:
     """Push one floor segment using only actuated base-object contact."""
@@ -3109,6 +3155,7 @@ def _physical_base_push_segment(
     no_contact_steps = 0
     object_progress = 0.0
     lateral_drift = 0.0
+    signed_lateral_error = 0.0
     base_progress = 0.0
     collision = bool(getattr(raw_env, "has_judge_collision", False))
     failure_stage = "collision" if collision else None
@@ -3117,8 +3164,15 @@ def _physical_base_push_segment(
     if failure_stage is None:
         for step in range(requested_steps):
             _, base_yaw = backend.get_base_pose()
+            world_velocity = floor_base_tracking_velocity(
+                push_direction_xy=direction,
+                lateral_error_m=signed_lateral_error,
+                forward_speed_m_s=requested_speed,
+                lateral_gain=tracking_gain,
+                maximum_lateral_speed_m_s=maximum_lateral_speed_m_s,
+            )
             base_velocity = world_velocity_to_base_frame(
-                direction * requested_speed,
+                world_velocity,
                 base_yaw,
             )
             step_info = carry_driver.step(
@@ -3144,7 +3198,8 @@ def _physical_base_push_segment(
             ).copy()
             object_delta = object_position[:2] - start_object[:2]
             object_progress = float(np.dot(object_delta, direction))
-            lateral_drift = abs(float(np.dot(object_delta, left_axis)))
+            signed_lateral_error = float(np.dot(object_delta, left_axis))
+            lateral_drift = abs(signed_lateral_error)
             base_delta = (
                 np.asarray(backend.get_base_pose()[0], dtype=float) - start_base_xy
             )
@@ -3239,6 +3294,8 @@ def _floor_corridor_push_probe(
     route_arrival_radius_m: float = 0.80,
     route_arrival_margin_m: float = 0.05,
     route_reposition_clearance_m: float = 0.90,
+    tracking_gain: float = 0.50,
+    maximum_lateral_speed_m_s: float = 0.02,
 ) -> dict[str, Any]:
     """Push a floor object through its current lane using two actuated arms."""
     from robot_agent.skills.competition_grasp import (
@@ -3418,6 +3475,7 @@ def _floor_corridor_push_probe(
     no_contact_steps = 0
     object_progress = 0.0
     lateral_drift = 0.0
+    signed_lateral_error = 0.0
     base_progress = 0.0
     contact_acquire_steps = 0
     collision = bool(getattr(raw_env, "has_judge_collision", False))
@@ -3516,8 +3574,15 @@ def _floor_corridor_push_probe(
         arm_step = direction * requested_speed * base_control_dt
         for step in range(requested_steps):
             _, base_yaw = backend.get_base_pose()
+            world_velocity = floor_base_tracking_velocity(
+                push_direction_xy=direction,
+                lateral_error_m=signed_lateral_error,
+                forward_speed_m_s=requested_speed,
+                lateral_gain=tracking_gain,
+                maximum_lateral_speed_m_s=maximum_lateral_speed_m_s,
+            )
             base_velocity = world_velocity_to_base_frame(
-                direction * requested_speed,
+                world_velocity,
                 base_yaw,
             )
             arm_world_deltas = None
@@ -3559,9 +3624,10 @@ def _floor_corridor_push_probe(
             ).copy()
             object_delta = object_position[:2] - interaction_start_object[:2]
             object_progress = float(np.dot(object_delta, direction))
-            lateral_drift = abs(
-                float(np.dot(object_delta, np.asarray(targets["left_axis"])))
+            signed_lateral_error = float(
+                np.dot(object_delta, np.asarray(targets["left_axis"]))
             )
+            lateral_drift = abs(signed_lateral_error)
             base_delta = (
                 np.asarray(backend.get_base_pose()[0], dtype=float)
                 - push_start_base_xy
@@ -3677,6 +3743,8 @@ def _floor_corridor_push_probe(
                 direction_xy=segment_direction,
                 distance_m=remaining_distance,
                 base_speed_m_s=requested_speed,
+                tracking_gain=tracking_gain,
+                maximum_lateral_speed_m_s=maximum_lateral_speed_m_s,
                 max_steps=requested_steps,
             )
             segment["index"] = route_index
@@ -4014,6 +4082,8 @@ def _end_grasp_floor_push_probe(
     floor_base_route_corridor_y: float = -8.40,
     floor_base_route_arrival_margin_m: float = 0.05,
     floor_base_route_reposition_clearance_m: float = 0.90,
+    floor_base_tracking_gain: float = 0.50,
+    floor_base_max_lateral_speed_m_s: float = 0.02,
     _extraction_probe=None,
     _navigation_retract=None,
     _floor_push=None,
@@ -4099,6 +4169,10 @@ def _end_grasp_floor_push_probe(
                 route_arrival_margin_m=floor_base_route_arrival_margin_m,
                 route_reposition_clearance_m=(
                     floor_base_route_reposition_clearance_m
+                ),
+                tracking_gain=floor_base_tracking_gain,
+                maximum_lateral_speed_m_s=(
+                    floor_base_max_lateral_speed_m_s
                 ),
             )
             if not bool(floor_push.get("success", False)):
@@ -8340,6 +8414,12 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                                 floor_base_route_reposition_clearance_m=(
                                     args.floor_base_route_reposition_clearance_m
                                 ),
+                                floor_base_tracking_gain=(
+                                    args.floor_base_tracking_gain
+                                ),
+                                floor_base_max_lateral_speed_m_s=(
+                                    args.floor_base_max_lateral_speed_m_s
+                                ),
                                 **inchworm_kwargs,
                             )
                             record["extraction_success"] = bool(
@@ -8855,6 +8935,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--floor-base-route-reposition-clearance-m", type=float, default=0.90
+    )
+    parser.add_argument("--floor-base-tracking-gain", type=float, default=0.50)
+    parser.add_argument(
+        "--floor-base-max-lateral-speed-m-s", type=float, default=0.02
     )
     parser.add_argument("--center-carry-distance-m", type=float, default=0.0)
     parser.add_argument("--center-carry-max-linear", type=float, default=0.04)
