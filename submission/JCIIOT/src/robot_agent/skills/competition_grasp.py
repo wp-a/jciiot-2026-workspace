@@ -389,6 +389,7 @@ def apply_object_grasp_profile(
         config.close_follow_max_distance = 0.10
         if str(object_name).lower().endswith("_upper"):
             config.pregrasp_wrist_adjustment = True
+            config.hold_close_pose = False
     elif uses_station_side_tote_grasp(object_name):
         config.mirrored_ik_height_offset = 0.06
         config.station_side_reach_offset = 0.04
