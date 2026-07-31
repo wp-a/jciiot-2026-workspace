@@ -425,7 +425,7 @@ class OfficialCompetitionDriver:
                 "failure_stage": "path",
             }
             return False
-        max_linear = 0.04
+        max_linear = 0.01
         control_dt = 0.05
         config = PhysicalCarryConfig(
             max_steps=physical_carry_step_budget(
@@ -436,7 +436,7 @@ class OfficialCompetitionDriver:
             ),
             max_linear=max_linear,
             max_angular=0.04,
-            max_linear_delta=0.005,
+            max_linear_delta=0.00125,
             max_angular_delta=0.01,
             base_control_dt=control_dt,
             align_heading_to_path=False,
