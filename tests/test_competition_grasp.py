@@ -664,6 +664,38 @@ class CompetitionGraspTests(unittest.TestCase):
         )
         self.assertEqual(config.approach_tolerance, 0.08)
 
+    def test_high_clearance_translation_uses_approach_tolerance(self):
+        driver = self.module.OfficialScriptedGraspDriver()
+        config = self.module.ScriptedGraspConfig(
+            position_tolerance=0.012,
+            approach_tolerance=0.025,
+        )
+        targets = {
+            "right": np.array([12.03, 2.98, 1.68]),
+            "left": np.array([11.70, 2.98, 1.68]),
+        }
+        captured = {}
+        driver._seed_station_side_clearance = lambda *_args: True
+        driver._grasp_targets = lambda *_args, **_kwargs: targets
+
+        def move_to_targets(_backend, actual_targets, _config, **kwargs):
+            captured["targets"] = actual_targets
+            captured.update(kwargs)
+            return True
+
+        driver._move_to_targets = move_to_targets
+
+        reached = driver.move_above_grasp_sites(
+            object(),
+            "green_tote_b01_lower",
+            config,
+        )
+
+        self.assertTrue(reached)
+        self.assertIs(captured["targets"], targets)
+        self.assertEqual(captured["tolerance"], config.approach_tolerance)
+        self.assertEqual(captured["max_steps"], config.clearance_translate_steps)
+
     def test_vertical_clearance_targets_only_raise_grippers(self):
         current = {
             "right": np.array([12.48, 4.87, 1.16]),

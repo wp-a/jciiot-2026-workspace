@@ -901,6 +901,7 @@ class OfficialScriptedGraspDriver:
             config,
             max_steps=config.clearance_translate_steps,
             gripper_value=-1.0,
+            tolerance=config.approach_tolerance,
         )
 
     def move_to_pregrasp(self, backend, object_name, config) -> bool:
