@@ -9,6 +9,7 @@ import numpy as np
 
 REFERENCE_BASE_TO_GRASP_CENTER = 0.651001
 BLUE_TOTE_STATION_AXIS_STANDOFF = 0.78
+BLUE_CONTAINER_TRANSPORT_LATERAL_BIAS = 0.20
 SAFE_GRASP_YAW_CORRECTION = 0.15
 PRECISE_GRASP_BASE_TOLERANCE = 0.04
 PRECISE_GRASP_BASE_MAX_STEPS = 120
@@ -291,6 +292,42 @@ def station_axis_grasp_pose(
             raise ValueError("facing_xy must be finite and differ from base_xy")
         result["yaw"] = math.atan2(direction[1], direction[0])
         result["orientation_target_xy"] = facing.tolist()
+    return result
+
+
+def transport_biased_grasp_pose(
+    pose,
+    *,
+    object_name: str,
+    object_xy,
+    station_center,
+    station_approach,
+):
+    """Offset long-container grasps laterally so the carried load clears output."""
+    result = dict(pose)
+    if "blue_container_h01" not in str(object_name).lower():
+        return result
+
+    object_xy = np.asarray(object_xy, dtype=float).reshape(2)
+    station_center = np.asarray(station_center, dtype=float).reshape(2)
+    station_approach = np.asarray(station_approach, dtype=float).reshape(2)
+    axis = station_approach - station_center
+    axis_norm = float(np.linalg.norm(axis))
+    if axis_norm <= 1e-9:
+        raise ValueError("station approach must differ from station center")
+    axis /= axis_norm
+    station_offset = object_xy - station_center
+    lateral = station_offset - float(np.dot(station_offset, axis)) * axis
+    lateral_norm = float(np.linalg.norm(lateral))
+    if lateral_norm <= 1e-9:
+        return result
+
+    base_xy = np.asarray(result["base_xy"], dtype=float).reshape(2)
+    base_xy -= lateral / lateral_norm * BLUE_CONTAINER_TRANSPORT_LATERAL_BIAS
+    facing = object_xy - base_xy
+    result["base_xy"] = base_xy.tolist()
+    result["yaw"] = math.atan2(facing[1], facing[0])
+    result["orientation_target_xy"] = object_xy.tolist()
     return result
 
 

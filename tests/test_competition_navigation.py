@@ -105,6 +105,50 @@ class CompetitionNavigationTests(unittest.TestCase):
             [-0.215201, 8.473143],
         )
 
+    def test_l4_blue_container_biases_grasp_for_safe_delivery_offset(self):
+        pose = self.module.transport_biased_grasp_pose(
+            {
+                "base_xy": [-8.979311, 5.343394],
+                "staging_xy": [-8.979311, 5.010000],
+                "yaw": math.pi,
+            },
+            object_name="blue_container_h01_back_upper",
+            object_xy=[-9.848312, 5.343394],
+            station_center=[-9.761, 5.010],
+            station_approach=[-8.300, 5.010],
+        )
+
+        np.testing.assert_allclose(
+            pose["base_xy"],
+            [-8.979311, 5.143394],
+        )
+        np.testing.assert_allclose(
+            pose["staging_xy"],
+            [-8.979311, 5.010000],
+        )
+        np.testing.assert_allclose(
+            pose["orientation_target_xy"],
+            [-9.848312, 5.343394],
+        )
+        self.assertAlmostEqual(pose["yaw"], 2.9153, places=3)
+
+    def test_transport_grasp_bias_does_not_change_other_object_families(self):
+        original = {
+            "base_xy": [1.0, 2.0],
+            "staging_xy": [1.5, 2.0],
+            "yaw": 0.5,
+        }
+
+        pose = self.module.transport_biased_grasp_pose(
+            original,
+            object_name="green_tote_b01_upper",
+            object_xy=[0.0, 2.0],
+            station_center=[0.0, 0.0],
+            station_approach=[1.0, 0.0],
+        )
+
+        self.assertEqual(pose, original)
+
     def test_nearly_cardinal_station_axis_snaps_to_its_dominant_axis(self):
         snapped = self.module.dominant_cardinal_axis(
             np.array([-0.034, -0.923]),

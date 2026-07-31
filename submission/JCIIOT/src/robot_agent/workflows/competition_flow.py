@@ -334,6 +334,7 @@ class OfficialCompetitionDriver:
             station_axis_standoff_for_object,
             station_axis_grasp_pose,
             station_side_grasp_pose,
+            transport_biased_grasp_pose,
         )
 
         station = self.scene_context.input_ports[source]
@@ -380,6 +381,13 @@ class OfficialCompetitionDriver:
                 station_center=station.center,
                 station_approach=station_approach,
             )
+        pose = transport_biased_grasp_pose(
+            pose,
+            object_name=object_name,
+            object_xy=object_xy,
+            station_center=station.center,
+            station_approach=station_approach,
+        )
         return pose
 
     def rank_objects(self, source: str, object_names: Iterable[str]) -> list[str]:
