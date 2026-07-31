@@ -294,20 +294,39 @@ class EndGraspSetdownGateTests(unittest.TestCase):
         velocity = floor_base_tracking_velocity(
             push_direction_xy=[0.0, -1.0],
             lateral_error_m=0.10,
+            base_object_lateral_offset_m=0.0,
             forward_speed_m_s=0.04,
             lateral_gain=0.50,
+            alignment_gain=0.50,
             lateral_deadband_m=0.05,
+            maximum_base_object_offset_m=0.08,
             maximum_lateral_speed_m_s=0.02,
         )
 
-        np.testing.assert_allclose(velocity, [-0.02, -0.04])
+        np.testing.assert_allclose(velocity, [-0.0125, -0.04])
+
+        recenter_velocity = floor_base_tracking_velocity(
+            push_direction_xy=[0.0, -1.0],
+            lateral_error_m=0.10,
+            base_object_lateral_offset_m=-0.20,
+            forward_speed_m_s=0.04,
+            lateral_gain=0.50,
+            alignment_gain=0.50,
+            lateral_deadband_m=0.05,
+            maximum_base_object_offset_m=0.08,
+            maximum_lateral_speed_m_s=0.02,
+        )
+        np.testing.assert_allclose(recenter_velocity, [0.02, -0.04])
 
         deadband_velocity = floor_base_tracking_velocity(
             push_direction_xy=[0.0, -1.0],
             lateral_error_m=-0.04,
+            base_object_lateral_offset_m=0.0,
             forward_speed_m_s=0.04,
             lateral_gain=0.50,
+            alignment_gain=0.50,
             lateral_deadband_m=0.05,
+            maximum_base_object_offset_m=0.08,
             maximum_lateral_speed_m_s=0.02,
         )
         np.testing.assert_allclose(deadband_velocity, [0.0, -0.04])
@@ -2340,7 +2359,9 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.floor_base_route_arrival_margin_m, 0.05)
         self.assertAlmostEqual(args.floor_base_route_reposition_clearance_m, 0.90)
         self.assertAlmostEqual(args.floor_base_tracking_gain, 0.50)
+        self.assertAlmostEqual(args.floor_base_alignment_gain, 0.50)
         self.assertAlmostEqual(args.floor_base_tracking_deadband_m, 0.05)
+        self.assertAlmostEqual(args.floor_base_maximum_contact_offset_m, 0.08)
         self.assertAlmostEqual(args.floor_base_max_lateral_speed_m_s, 0.02)
         self.assertAlmostEqual(args.center_carry_distance_m, 0.0)
         self.assertFalse(args.center_carry_away_from_object)
@@ -2503,8 +2524,12 @@ class JointSeedParserTests(unittest.TestCase):
                 "0.95",
                 "--floor-base-tracking-gain",
                 "0.60",
+                "--floor-base-alignment-gain",
+                "0.70",
                 "--floor-base-tracking-deadband-m",
                 "0.07",
+                "--floor-base-maximum-contact-offset-m",
+                "0.09",
                 "--floor-base-max-lateral-speed-m-s",
                 "0.03",
                 "--center-carry-away-from-object",
@@ -2644,7 +2669,9 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.floor_base_route_arrival_margin_m, 0.06)
         self.assertAlmostEqual(args.floor_base_route_reposition_clearance_m, 0.95)
         self.assertAlmostEqual(args.floor_base_tracking_gain, 0.60)
+        self.assertAlmostEqual(args.floor_base_alignment_gain, 0.70)
         self.assertAlmostEqual(args.floor_base_tracking_deadband_m, 0.07)
+        self.assertAlmostEqual(args.floor_base_maximum_contact_offset_m, 0.09)
         self.assertAlmostEqual(args.floor_base_max_lateral_speed_m_s, 0.03)
         self.assertTrue(args.center_carry_away_from_object)
         self.assertAlmostEqual(args.center_carry_corner_seat_m, 0.08)
