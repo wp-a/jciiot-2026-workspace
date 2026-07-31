@@ -433,6 +433,9 @@ class CompetitionFlowTests(unittest.TestCase):
         self.assertFalse(
             captured["transport"]["config"].height_recovery_enabled
         )
+        self.assertFalse(
+            captured["transport"]["config"].pivot_compensation_enabled
+        )
         self.assertAlmostEqual(
             captured["transport"]["config"].height_settle_allowance,
             0.012,

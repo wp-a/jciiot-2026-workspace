@@ -849,6 +849,41 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
         self.assertEqual(first_translation, 0)
         self.assertGreater(abs(driver.steps[0]["base_command"][2]), 0.01)
 
+    def test_heading_aligned_mode_can_rotate_without_base_translation(self):
+        driver = FakeHeadingAlignedTransportDriver()
+        config = self.module.PhysicalCarryConfig(
+            waypoint_tolerance=0.01,
+            max_steps=500,
+            max_linear=0.10,
+            max_angular=0.50,
+            max_linear_delta=0.10,
+            max_angular_delta=0.50,
+            base_control_dt=0.05,
+            align_heading_to_path=True,
+            pivot_compensation_enabled=False,
+            heading_translation_tolerance=0.05,
+        )
+
+        result = self.run_transport(
+            driver,
+            path=[np.array([0.0, 0.10])],
+            config=config,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertTrue(
+            any(abs(step["base_command"][2]) > 0.01 for step in driver.steps)
+        )
+        first_rotating = next(
+            step
+            for step in driver.steps
+            if abs(step["base_command"][2]) > 0.01
+        )
+        self.assertLessEqual(
+            np.linalg.norm(first_rotating["base_command"][:2]),
+            1e-12,
+        )
+
     def test_object_slip_triggers_a_physical_height_recovery(self):
         driver = FakePhysicalTransportDriver(
             object_heights=[1.0, 0.985, 0.985, 0.985]

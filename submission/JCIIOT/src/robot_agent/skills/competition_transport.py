@@ -293,6 +293,7 @@ class PhysicalCarryConfig:
         base_control_dt: float = 0.05,
         yaw_tolerance: float = 0.04,
         align_heading_to_path: bool = False,
+        pivot_compensation_enabled: bool = True,
         heading_translation_tolerance: float = 0.05,
         object_drop_tolerance: float = 0.025,
         vertical_hold_feedforward: float = 0.0,
@@ -331,6 +332,7 @@ class PhysicalCarryConfig:
         self.base_control_dt = float(base_control_dt)
         self.yaw_tolerance = float(yaw_tolerance)
         self.align_heading_to_path = bool(align_heading_to_path)
+        self.pivot_compensation_enabled = bool(pivot_compensation_enabled)
         self.heading_translation_tolerance = float(
             heading_translation_tolerance
         )
@@ -1096,7 +1098,7 @@ def run_physical_transport(
                 dtype=float,
             ),
         )
-        if not heading_aligned:
+        if not heading_aligned and config.pivot_compensation_enabled:
             command[:2] = pivot_compensated_base_velocity(
                 base_xy=observation["base_xy"],
                 base_yaw=float(observation["base_yaw"]),
