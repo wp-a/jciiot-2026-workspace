@@ -236,6 +236,115 @@ def floor_push_staging_targets(
     }
 
 
+def floor_base_target_route(
+    *,
+    start_object_xy: object,
+    target_xy: object,
+    corridor_y: float,
+    arrival_radius_m: float,
+    arrival_margin_m: float,
+) -> dict[str, Any]:
+    """Plan three axis-aligned floor pushes through a lower cross aisle."""
+    start = np.asarray(start_object_xy, dtype=float)
+    target = np.asarray(target_xy, dtype=float)
+    values = np.asarray(
+        [corridor_y, arrival_radius_m, arrival_margin_m], dtype=float
+    )
+    if start.shape != (2,) or target.shape != (2,):
+        raise ValueError("floor route positions must be planar vectors")
+    if not np.all(np.isfinite(start)) or not np.all(np.isfinite(target)):
+        raise ValueError("floor route positions must be finite")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("floor route parameters must be finite")
+    radius = float(arrival_radius_m)
+    margin = float(arrival_margin_m)
+    if radius <= 0.0 or margin <= 0.0 or margin >= radius:
+        raise ValueError("arrival margin must be positive and smaller than radius")
+
+    final_y = float(target[1]) - (radius - margin)
+    aisle_y = float(corridor_y)
+    if aisle_y >= min(float(start[1]), final_y):
+        raise ValueError("floor route corridor must lie below start and arrival")
+
+    waypoints = (
+        start,
+        np.array([start[0], aisle_y], dtype=float),
+        np.array([target[0], aisle_y], dtype=float),
+        np.array([target[0], final_y], dtype=float),
+    )
+    segments = []
+    for segment_start, segment_end in zip(waypoints, waypoints[1:]):
+        delta = segment_end - segment_start
+        distance = float(np.linalg.norm(delta))
+        if distance <= 1e-12:
+            continue
+        segments.append(
+            {
+                "start_object_xy": segment_start.tolist(),
+                "end_object_xy": segment_end.tolist(),
+                "direction": (delta / distance).tolist(),
+                "distance_m": distance,
+            }
+        )
+    final_object = waypoints[-1]
+    return {
+        "segments": segments,
+        "corridor_y": aisle_y,
+        "target_xy": target.tolist(),
+        "final_object_xy": final_object.tolist(),
+        "final_target_distance_m": float(np.linalg.norm(final_object - target)),
+    }
+
+
+def floor_base_reposition_targets(
+    *,
+    object_xy: object,
+    current_base_xy: object,
+    next_push_direction_xy: object,
+    retreat_clearance_m: float,
+    base_standoff_m: float,
+) -> dict[str, Any]:
+    """Build an orthogonal, object-avoiding base path for a push direction change."""
+    object_position = np.asarray(object_xy, dtype=float)
+    base_position = np.asarray(current_base_xy, dtype=float)
+    direction = np.asarray(next_push_direction_xy, dtype=float)
+    if any(value.shape != (2,) for value in (object_position, base_position, direction)):
+        raise ValueError("floor reposition positions and direction must be planar vectors")
+    if not all(
+        np.all(np.isfinite(value))
+        for value in (object_position, base_position, direction)
+    ):
+        raise ValueError("floor reposition positions and direction must be finite")
+    direction_norm = float(np.linalg.norm(direction))
+    if direction_norm <= 1e-12:
+        raise ValueError("next floor push direction must be non-zero")
+    direction /= direction_norm
+    retreat_clearance = float(retreat_clearance_m)
+    standoff = float(base_standoff_m)
+    if (
+        not np.isfinite(retreat_clearance)
+        or not np.isfinite(standoff)
+        or retreat_clearance <= standoff
+        or standoff <= 0.0
+    ):
+        raise ValueError("retreat clearance must be finite and exceed standoff")
+
+    outward = base_position - object_position
+    outward_norm = float(np.linalg.norm(outward))
+    if outward_norm <= 1e-12:
+        raise ValueError("floor reposition base must not coincide with the object")
+    retreat = object_position + outward / outward_norm * retreat_clearance
+    stage = object_position - direction * standoff
+    corner = retreat + (stage - object_position)
+    return {
+        "direction": direction,
+        "retreat_base_xy": retreat,
+        "corner_base_xy": corner,
+        "stage_base_xy": stage,
+        "target_yaw": float(np.arctan2(direction[1], direction[0])),
+    }
+
+
 @contextmanager
 def transport_attachment_audit(raw_env: object, transport_module: object):
     """Count transport attachment and direct object-pose operations in a scope."""
@@ -599,7 +708,8 @@ _HYBRID_EXIT_REQUIRED_FIELDS = (
     "navigation_retract_success",
     "floor_push_success",
     "physical_contact_steps",
-    "maximum_axis_displacement_m",
+    "official_source_maximum_axis_displacement_m",
+    "official_target_distance_m",
     "attachment_calls",
     "object_pose_writes",
     "collision_frames",
@@ -633,9 +743,12 @@ def hybrid_exit_gate_failures(record: Mapping[str, object]) -> list[str]:
     contact_steps = numeric("physical_contact_steps")
     if contact_steps is None or contact_steps < 20.0:
         failures.append("physical_contact_steps")
-    displacement = numeric("maximum_axis_displacement_m")
+    displacement = numeric("official_source_maximum_axis_displacement_m")
     if displacement is None or displacement <= 1.0:
-        failures.append("maximum_axis_displacement_m")
+        failures.append("official_source_maximum_axis_displacement_m")
+    target_distance = numeric("official_target_distance_m")
+    if target_distance is None or target_distance >= 0.80:
+        failures.append("official_target_distance_m")
     for key in ("attachment_calls", "object_pose_writes", "collision_frames"):
         value = numeric(key)
         if value is None or value != 0.0:
@@ -2839,6 +2952,266 @@ def _floor_regrasp_move_probe(
     }
 
 
+def _reposition_base_for_floor_push(
+    backend,
+    object_name: str,
+    *,
+    direction_xy: object,
+    retreat_clearance_m: float,
+    base_standoff_m: float,
+    retract_forward_m: float,
+    retract_lateral_m: float,
+    retract_target_z: float,
+) -> dict[str, Any]:
+    """Move around a settled object and face the next physical push direction."""
+    from robot_agent.skills.competition_navigation import orient_base
+
+    raw_env = backend.env
+    body_id = raw_env.obj_body_id[object_name]
+    object_position = np.asarray(
+        raw_env.sim.data.body_xpos[body_id], dtype=float
+    ).copy()
+    current_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
+    targets = floor_base_reposition_targets(
+        object_xy=object_position[:2],
+        current_base_xy=current_base_xy,
+        next_push_direction_xy=direction_xy,
+        retreat_clearance_m=retreat_clearance_m,
+        base_standoff_m=base_standoff_m,
+    )
+    marker = getattr(backend, "_mark_trajectory_event", None)
+    if callable(marker):
+        marker(
+            "floor_base_reposition_start",
+            object_name=object_name,
+            direction=targets["direction"].tolist(),
+            retreat_base_xy=targets["retreat_base_xy"].tolist(),
+            corner_base_xy=targets["corner_base_xy"].tolist(),
+            stage_base_xy=targets["stage_base_xy"].tolist(),
+        )
+
+    retreat_reached = bool(
+        backend.follow_path(
+            [targets["retreat_base_xy"], targets["corner_base_xy"]],
+            max_steps=1800,
+            waypoint_tolerance=0.03,
+        )
+    )
+    oriented = bool(
+        retreat_reached and orient_base(backend, targets["target_yaw"])
+    )
+    retract = (
+        _navigation_retract_probe(
+            backend,
+            forward_m=retract_forward_m,
+            lateral_m=retract_lateral_m,
+            target_z=retract_target_z,
+        )
+        if oriented
+        else None
+    )
+    refined_object = np.asarray(
+        raw_env.sim.data.body_xpos[body_id], dtype=float
+    ).copy()
+    refined_targets = floor_base_reposition_targets(
+        object_xy=refined_object[:2],
+        current_base_xy=np.asarray(backend.get_base_pose()[0], dtype=float),
+        next_push_direction_xy=direction_xy,
+        retreat_clearance_m=retreat_clearance_m,
+        base_standoff_m=base_standoff_m,
+    )
+    stage_reached = bool(
+        isinstance(retract, Mapping)
+        and retract.get("success", False)
+        and backend.follow_path(
+            [refined_targets["stage_base_xy"]],
+            max_steps=1200,
+            waypoint_tolerance=0.03,
+        )
+    )
+    collision = bool(getattr(raw_env, "has_judge_collision", False))
+    success = bool(stage_reached and not collision)
+    if callable(marker):
+        marker(
+            "floor_base_reposition_end",
+            object_name=object_name,
+            success=success,
+            collision=collision,
+            final_stage_base_xy=refined_targets["stage_base_xy"].tolist(),
+        )
+    return {
+        "success": success,
+        "collision": collision,
+        "retreat_reached": retreat_reached,
+        "oriented": oriented,
+        "retract": retract,
+        "stage_reached": stage_reached,
+        "targets": {
+            key: value.tolist() if isinstance(value, np.ndarray) else value
+            for key, value in refined_targets.items()
+        },
+    }
+
+
+def _physical_base_push_segment(
+    backend,
+    object_name: str,
+    *,
+    direction_xy: object,
+    distance_m: float,
+    base_speed_m_s: float,
+    max_steps: int,
+) -> dict[str, Any]:
+    """Push one floor segment using only actuated base-object contact."""
+    from robot_agent.skills.competition_transport import (
+        OfficialPhysicalCarryDriver,
+        world_velocity_to_base_frame,
+    )
+
+    direction = np.asarray(direction_xy, dtype=float)
+    if direction.shape != (2,) or not np.all(np.isfinite(direction)):
+        raise ValueError("base push direction must be a finite planar vector")
+    direction_norm = float(np.linalg.norm(direction))
+    if direction_norm <= 1e-12:
+        raise ValueError("base push direction must be non-zero")
+    direction /= direction_norm
+    requested_distance = float(distance_m)
+    requested_speed = float(base_speed_m_s)
+    requested_steps = int(max_steps)
+    if not np.isfinite(requested_distance) or requested_distance <= 0.0:
+        raise ValueError("base push distance must be finite and positive")
+    if not np.isfinite(requested_speed) or requested_speed <= 0.0:
+        raise ValueError("base push speed must be finite and positive")
+    if isinstance(max_steps, bool) or requested_steps != max_steps or requested_steps < 1:
+        raise ValueError("base push max_steps must be a positive integer")
+
+    raw_env = backend.env
+    body_id = raw_env.obj_body_id[object_name]
+    start_object = np.asarray(
+        raw_env.sim.data.body_xpos[body_id], dtype=float
+    ).copy()
+    start_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
+    left_axis = np.array([-direction[1], direction[0]], dtype=float)
+    carry_driver = OfficialPhysicalCarryDriver()
+    hold_targets = carry_driver.capture_hold_targets(backend)
+    marker = getattr(backend, "_mark_trajectory_event", None)
+    if callable(marker):
+        marker(
+            "floor_base_push_segment_start",
+            object_name=object_name,
+            direction=direction.tolist(),
+            requested_distance_m=requested_distance,
+        )
+
+    observations = []
+    stable_contact_steps = 0
+    maximum_contact_steps = 0
+    no_contact_steps = 0
+    object_progress = 0.0
+    lateral_drift = 0.0
+    base_progress = 0.0
+    collision = bool(getattr(raw_env, "has_judge_collision", False))
+    failure_stage = "collision" if collision else None
+    steps = 0
+    base_control_dt = 0.05
+    if failure_stage is None:
+        for step in range(requested_steps):
+            _, base_yaw = backend.get_base_pose()
+            base_velocity = world_velocity_to_base_frame(
+                direction * requested_speed,
+                base_yaw,
+            )
+            step_info = carry_driver.step(
+                backend,
+                object_name=object_name,
+                base_command=np.array(
+                    [base_velocity[0], base_velocity[1], 0.0], dtype=float
+                ),
+                hold_targets=hold_targets,
+                arm_world_deltas=None,
+                gripper_value=-1.0,
+                base_control_dt=base_control_dt,
+            )
+            steps = step + 1
+            collision = bool(step_info.get("collision", False))
+            contacts = object_all_robot_contacts(raw_env, object_name)
+            has_contact = bool(contacts)
+            stable_contact_steps = stable_contact_steps + 1 if has_contact else 0
+            maximum_contact_steps = max(maximum_contact_steps, stable_contact_steps)
+            no_contact_steps = 0 if has_contact else no_contact_steps + 1
+            object_position = np.asarray(
+                raw_env.sim.data.body_xpos[body_id], dtype=float
+            ).copy()
+            object_delta = object_position[:2] - start_object[:2]
+            object_progress = float(np.dot(object_delta, direction))
+            lateral_drift = abs(float(np.dot(object_delta, left_axis)))
+            base_delta = (
+                np.asarray(backend.get_base_pose()[0], dtype=float) - start_base_xy
+            )
+            base_progress = float(np.dot(base_delta, direction))
+            if step % 25 == 0 or collision or object_progress >= requested_distance:
+                observations.append(
+                    {
+                        "step": steps,
+                        "object_position": object_position.tolist(),
+                        "object_progress_m": object_progress,
+                        "lateral_drift_m": lateral_drift,
+                        "base_progress_m": base_progress,
+                        "contacts": list(contacts),
+                        "stable_contact_steps": stable_contact_steps,
+                        "judge_collision": collision,
+                    }
+                )
+            if collision:
+                failure_stage = "collision"
+                break
+            if lateral_drift > 0.30:
+                failure_stage = "lateral_drift"
+                break
+            if object_progress >= requested_distance and maximum_contact_steps >= 20:
+                failure_stage = None
+                break
+            if maximum_contact_steps >= 20 and no_contact_steps >= 80:
+                failure_stage = "contact_lost"
+                break
+        else:
+            failure_stage = "timeout"
+
+    success = bool(
+        failure_stage is None
+        and object_progress >= requested_distance
+        and maximum_contact_steps >= 20
+        and not collision
+    )
+    final_object = np.asarray(
+        raw_env.sim.data.body_xpos[body_id], dtype=float
+    ).copy()
+    if callable(marker):
+        marker(
+            "floor_base_push_segment_end",
+            object_name=object_name,
+            success=success,
+            failure_stage=failure_stage,
+            object_progress_m=object_progress,
+            physical_contact_steps=maximum_contact_steps,
+        )
+    return {
+        "success": success,
+        "failure_stage": failure_stage,
+        "collision": collision,
+        "steps": steps,
+        "physical_contact_steps": maximum_contact_steps,
+        "object_progress_m": object_progress,
+        "lateral_drift_m": lateral_drift,
+        "base_progress_m": base_progress,
+        "start_object_position": start_object.tolist(),
+        "end_object_position": final_object.tolist(),
+        "direction": direction.tolist(),
+        "requested_distance_m": requested_distance,
+        "observations": observations,
+    }
+
+
 def _floor_corridor_push_probe(
     backend,
     object_name: str,
@@ -2861,6 +3234,11 @@ def _floor_corridor_push_probe(
     precontact_clearance_m: float,
     base_speed_m_s: float,
     max_steps: int,
+    route_target_xy: object | None = None,
+    route_corridor_y: float = -8.40,
+    route_arrival_radius_m: float = 0.80,
+    route_arrival_margin_m: float = 0.05,
+    route_reposition_clearance_m: float = 0.90,
 ) -> dict[str, Any]:
     """Push a floor object through its current lane using two actuated arms."""
     from robot_agent.skills.competition_grasp import (
@@ -2950,6 +3328,31 @@ def _floor_corridor_push_probe(
     interaction_start_object = np.asarray(
         raw_env.sim.data.body_xpos[body_id], dtype=float
     ).copy()
+    route_plan = None
+    if route_target_xy is not None:
+        if not base_pusher:
+            raise ValueError("floor target route requires the physical base pusher")
+        route_plan = floor_base_target_route(
+            start_object_xy=interaction_start_object[:2],
+            target_xy=route_target_xy,
+            corridor_y=route_corridor_y,
+            arrival_radius_m=route_arrival_radius_m,
+            arrival_margin_m=route_arrival_margin_m,
+        )
+        first_route_segment = route_plan["segments"][0]
+        if not np.allclose(first_route_segment["direction"], direction, atol=1e-9):
+            raise ValueError(
+                "initial floor push direction must match the first target-route segment"
+            )
+        requested_distance = float(first_route_segment["distance_m"])
+        if callable(marker):
+            marker(
+                "floor_base_target_route",
+                target_xy=route_plan["target_xy"],
+                corridor_y=route_plan["corridor_y"],
+                final_object_xy=route_plan["final_object_xy"],
+                segment_count=len(route_plan["segments"]),
+            )
     if isinstance(oriented_retract, Mapping) and oriented_retract.get(
         "success", False
     ):
@@ -3197,7 +3600,116 @@ def _floor_corridor_push_probe(
         and maximum_contact_steps >= 20
         and not collision
     )
+    total_steps = steps
+    total_physical_contact_steps = maximum_contact_steps
+    maximum_route_lateral_drift = lateral_drift
+    route_segments = [
+        {
+            "index": 1,
+            "direction": direction.tolist(),
+            "requested_distance_m": requested_distance,
+            "success": success,
+            "failure_stage": failure_stage,
+            "steps": steps,
+            "physical_contact_steps": maximum_contact_steps,
+            "object_progress_m": object_progress,
+            "lateral_drift_m": lateral_drift,
+        }
+    ]
+    if success and route_plan is not None:
+        for route_index, planned_segment in enumerate(
+            route_plan["segments"][1:], start=2
+        ):
+            segment_direction = np.asarray(
+                planned_segment["direction"], dtype=float
+            )
+            current_object = np.asarray(
+                raw_env.sim.data.body_xpos[body_id], dtype=float
+            ).copy()
+            desired_end_xy = np.asarray(
+                planned_segment["end_object_xy"], dtype=float
+            )
+            remaining_distance = float(
+                np.dot(desired_end_xy - current_object[:2], segment_direction)
+            )
+            if remaining_distance <= 0.01:
+                route_segments.append(
+                    {
+                        "index": route_index,
+                        "direction": segment_direction.tolist(),
+                        "requested_distance_m": remaining_distance,
+                        "success": True,
+                        "failure_stage": None,
+                        "skipped": True,
+                    }
+                )
+                continue
+
+            reposition = _reposition_base_for_floor_push(
+                backend,
+                object_name,
+                direction_xy=segment_direction,
+                retreat_clearance_m=route_reposition_clearance_m,
+                base_standoff_m=base_standoff_m,
+                retract_forward_m=oriented_retract_forward_m,
+                retract_lateral_m=oriented_retract_lateral_m,
+                retract_target_z=oriented_retract_target_z,
+            )
+            if not reposition["success"]:
+                success = False
+                collision = bool(reposition["collision"])
+                failure_stage = f"route_{route_index}:reposition"
+                route_segments.append(
+                    {
+                        "index": route_index,
+                        "direction": segment_direction.tolist(),
+                        "requested_distance_m": remaining_distance,
+                        "success": False,
+                        "failure_stage": failure_stage,
+                        "reposition": reposition,
+                    }
+                )
+                break
+
+            segment = _physical_base_push_segment(
+                backend,
+                object_name,
+                direction_xy=segment_direction,
+                distance_m=remaining_distance,
+                base_speed_m_s=requested_speed,
+                max_steps=requested_steps,
+            )
+            segment["index"] = route_index
+            segment["reposition"] = reposition
+            route_segments.append(segment)
+            total_steps += int(segment["steps"])
+            total_physical_contact_steps += int(
+                segment["physical_contact_steps"]
+            )
+            maximum_route_lateral_drift = max(
+                maximum_route_lateral_drift,
+                float(segment["lateral_drift_m"]),
+            )
+            collision = bool(segment["collision"])
+            if not segment["success"]:
+                success = False
+                failure_stage = (
+                    f"route_{route_index}:"
+                    f"{segment.get('failure_stage') or 'unknown'}"
+                )
+                break
+
     final_object = np.asarray(raw_env.sim.data.body_xpos[body_id], dtype=float).copy()
+    final_target_distance = None
+    if route_plan is not None:
+        final_target_distance = float(
+            np.linalg.norm(
+                final_object[:2] - np.asarray(route_plan["target_xy"], dtype=float)
+            )
+        )
+        if success and final_target_distance >= float(route_arrival_radius_m):
+            success = False
+            failure_stage = "target_distance"
     if callable(marker):
         marker(
             "floor_corridor_push_end",
@@ -3205,7 +3717,8 @@ def _floor_corridor_push_probe(
             success=success,
             failure_stage=failure_stage,
             object_progress_m=object_progress,
-            physical_contact_steps=maximum_contact_steps,
+            physical_contact_steps=total_physical_contact_steps,
+            final_target_distance_m=final_target_distance,
         )
     return {
         "success": success,
@@ -3222,14 +3735,17 @@ def _floor_corridor_push_probe(
         "contact_acquire_steps": contact_acquire_steps,
         "collision": collision,
         "collision_pairs": collision_pairs,
-        "steps": steps,
-        "physical_contact_steps": maximum_contact_steps,
+        "steps": total_steps,
+        "physical_contact_steps": total_physical_contact_steps,
         "object_progress_m": object_progress,
-        "lateral_drift_m": lateral_drift,
+        "lateral_drift_m": maximum_route_lateral_drift,
         "base_progress_m": base_progress,
         "start_object_position": start_object.tolist(),
         "interaction_start_object_position": interaction_start_object.tolist(),
         "end_object_position": final_object.tolist(),
+        "route_plan": route_plan,
+        "route_segments": route_segments,
+        "final_target_distance_m": final_target_distance,
         "targets": {
             "escape_base_xy": navigation_targets["escape_base_xy"].tolist(),
             "orientation_base_xy": navigation_targets[
@@ -3492,6 +4008,12 @@ def _end_grasp_floor_push_probe(
     push_precontact_clearance_m: float = 0.08,
     push_base_speed_m_s: float = 0.025,
     push_max_steps: int = 1200,
+    source_center_xy: object | None = None,
+    target_center_xy: object | None = None,
+    floor_base_route_to_target: bool = False,
+    floor_base_route_corridor_y: float = -8.40,
+    floor_base_route_arrival_margin_m: float = 0.05,
+    floor_base_route_reposition_clearance_m: float = 0.90,
     _extraction_probe=None,
     _navigation_retract=None,
     _floor_push=None,
@@ -3569,12 +4091,40 @@ def _end_grasp_floor_push_probe(
                 precontact_clearance_m=push_precontact_clearance_m,
                 base_speed_m_s=push_base_speed_m_s,
                 max_steps=push_max_steps,
+                route_target_xy=(
+                    target_center_xy if floor_base_route_to_target else None
+                ),
+                route_corridor_y=floor_base_route_corridor_y,
+                route_arrival_radius_m=0.80,
+                route_arrival_margin_m=floor_base_route_arrival_margin_m,
+                route_reposition_clearance_m=(
+                    floor_base_route_reposition_clearance_m
+                ),
             )
             if not bool(floor_push.get("success", False)):
                 failure_stage = f"floor_push:{floor_push.get('failure_stage') or 'unknown'}"
 
     end_object = np.asarray(raw_env.sim.data.body_xpos[body_id], dtype=float).copy()
     displacement = end_object[:2] - start_object[:2]
+    official_source_center = np.asarray(
+        start_object[:2] if source_center_xy is None else source_center_xy,
+        dtype=float,
+    )
+    if official_source_center.shape != (2,) or not np.all(
+        np.isfinite(official_source_center)
+    ):
+        raise ValueError("official source center must be a finite planar vector")
+    official_source_displacement = end_object[:2] - official_source_center
+    official_target_distance = float("inf")
+    if target_center_xy is not None:
+        official_target_center = np.asarray(target_center_xy, dtype=float)
+        if official_target_center.shape != (2,) or not np.all(
+            np.isfinite(official_target_center)
+        ):
+            raise ValueError("official target center must be a finite planar vector")
+        official_target_distance = float(
+            np.linalg.norm(end_object[:2] - official_target_center)
+        )
     success = bool(failure_stage is None)
     return {
         "success": success,
@@ -3594,6 +4144,10 @@ def _end_grasp_floor_push_probe(
             else 0
         ),
         "maximum_axis_displacement_m": float(np.max(np.abs(displacement))),
+        "official_source_maximum_axis_displacement_m": float(
+            np.max(np.abs(official_source_displacement))
+        ),
+        "official_target_distance_m": official_target_distance,
         "start_object_position": start_object.tolist(),
         "after_extraction_object_position": after_extraction.tolist(),
         "end_object_position": end_object.tolist(),
@@ -7768,6 +8322,24 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                                     args.floor_push_base_speed_m_s
                                 ),
                                 push_max_steps=args.floor_push_max_steps,
+                                source_center_xy=scene_context.input_port(
+                                    str(task["source"])
+                                ).center,
+                                target_center_xy=scene_context.output_port(
+                                    str(task["target"])
+                                ).center,
+                                floor_base_route_to_target=(
+                                    args.floor_base_route_to_target
+                                ),
+                                floor_base_route_corridor_y=(
+                                    args.floor_base_route_corridor_y
+                                ),
+                                floor_base_route_arrival_margin_m=(
+                                    args.floor_base_route_arrival_margin_m
+                                ),
+                                floor_base_route_reposition_clearance_m=(
+                                    args.floor_base_route_reposition_clearance_m
+                                ),
                                 **inchworm_kwargs,
                             )
                             record["extraction_success"] = bool(
@@ -7787,6 +8359,17 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                             )
                             record["maximum_axis_displacement_m"] = float(
                                 probe.get("maximum_axis_displacement_m", 0.0)
+                            )
+                            record[
+                                "official_source_maximum_axis_displacement_m"
+                            ] = float(
+                                probe.get(
+                                    "official_source_maximum_axis_displacement_m",
+                                    0.0,
+                                )
+                            )
+                            record["official_target_distance_m"] = float(
+                                probe.get("official_target_distance_m", float("inf"))
                             )
                         elif args.end_grasp_regrasp_macros > 1:
                             probe = _end_grasp_regrasp_probe(
@@ -8263,6 +8846,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--floor-push-base-speed-m-s", type=float, default=0.025
     )
     parser.add_argument("--floor-push-max-steps", type=int, default=1200)
+    parser.add_argument("--floor-base-route-to-target", action="store_true")
+    parser.add_argument(
+        "--floor-base-route-corridor-y", type=float, default=-8.40
+    )
+    parser.add_argument(
+        "--floor-base-route-arrival-margin-m", type=float, default=0.05
+    )
+    parser.add_argument(
+        "--floor-base-route-reposition-clearance-m", type=float, default=0.90
+    )
     parser.add_argument("--center-carry-distance-m", type=float, default=0.0)
     parser.add_argument("--center-carry-max-linear", type=float, default=0.04)
     parser.add_argument("--center-carry-away-from-object", action="store_true")

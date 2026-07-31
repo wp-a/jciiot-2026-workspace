@@ -18,6 +18,8 @@ from scripts.run_l1_cradle_gate import (
     cradle_gate_accepted,
     cradle_gate_failures,
     eef_site_pose,
+    floor_base_reposition_targets,
+    floor_base_target_route,
     floor_regrasp_safe_base_xy,
     floor_push_staging_targets,
     geometry_snapshot,
@@ -87,7 +89,8 @@ VALID_HYBRID_EXIT_RECORD = {
     "navigation_retract_success": True,
     "floor_push_success": True,
     "physical_contact_steps": 20,
-    "maximum_axis_displacement_m": 1.000001,
+    "official_source_maximum_axis_displacement_m": 1.000001,
+    "official_target_distance_m": 0.799999,
     "attachment_calls": 0,
     "object_pose_writes": 0,
     "collision_frames": 0,
@@ -250,6 +253,42 @@ class EndGraspSetdownGateTests(unittest.TestCase):
         np.testing.assert_allclose(targets["stage_base_xy"], [7.634, 5.332])
         self.assertAlmostEqual(targets["lateral_offset_m"], -0.15)
 
+    def test_floor_base_target_route_uses_safe_bottom_corridor(self):
+        route = floor_base_target_route(
+            start_object_xy=[7.979, 4.560],
+            target_xy=[-0.166, -7.290],
+            corridor_y=-8.40,
+            arrival_radius_m=0.80,
+            arrival_margin_m=0.05,
+        )
+
+        self.assertEqual(len(route["segments"]), 3)
+        np.testing.assert_allclose(
+            [segment["direction"] for segment in route["segments"]],
+            [[0.0, -1.0], [-1.0, 0.0], [0.0, 1.0]],
+        )
+        np.testing.assert_allclose(
+            [segment["distance_m"] for segment in route["segments"]],
+            [12.960, 8.145, 0.360],
+            atol=1e-9,
+        )
+        np.testing.assert_allclose(route["final_object_xy"], [-0.166, -8.040])
+        self.assertAlmostEqual(route["final_target_distance_m"], 0.75)
+
+    def test_floor_base_reposition_targets_go_around_object(self):
+        targets = floor_base_reposition_targets(
+            object_xy=[8.0, -8.4],
+            current_base_xy=[8.0, -7.95],
+            next_push_direction_xy=[-1.0, 0.0],
+            retreat_clearance_m=0.90,
+            base_standoff_m=0.65,
+        )
+
+        np.testing.assert_allclose(targets["retreat_base_xy"], [8.0, -7.50])
+        np.testing.assert_allclose(targets["corner_base_xy"], [8.65, -7.50])
+        np.testing.assert_allclose(targets["stage_base_xy"], [8.65, -8.40])
+        self.assertAlmostEqual(targets["target_yaw"], np.pi)
+
     def test_hybrid_exit_gate_requires_strict_official_exit_and_physics(self):
         self.assertEqual(hybrid_exit_gate_failures(VALID_HYBRID_EXIT_RECORD), [])
         self.assertTrue(hybrid_exit_gate_accepted(VALID_HYBRID_EXIT_RECORD))
@@ -261,7 +300,8 @@ class EndGraspSetdownGateTests(unittest.TestCase):
             "navigation_retract_success": False,
             "floor_push_success": False,
             "physical_contact_steps": 19,
-            "maximum_axis_displacement_m": 1.0,
+            "official_source_maximum_axis_displacement_m": 1.0,
+            "official_target_distance_m": 0.8,
             "attachment_calls": 1,
             "object_pose_writes": 1,
             "collision_frames": 1,
@@ -2272,6 +2312,10 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.floor_push_precontact_clearance_m, 0.08)
         self.assertAlmostEqual(args.floor_push_base_speed_m_s, 0.025)
         self.assertEqual(args.floor_push_max_steps, 1200)
+        self.assertFalse(args.floor_base_route_to_target)
+        self.assertAlmostEqual(args.floor_base_route_corridor_y, -8.40)
+        self.assertAlmostEqual(args.floor_base_route_arrival_margin_m, 0.05)
+        self.assertAlmostEqual(args.floor_base_route_reposition_clearance_m, 0.90)
         self.assertAlmostEqual(args.center_carry_distance_m, 0.0)
         self.assertFalse(args.center_carry_away_from_object)
         self.assertAlmostEqual(args.center_carry_max_linear, 0.04)
@@ -2424,6 +2468,13 @@ class JointSeedParserTests(unittest.TestCase):
                 "0.02",
                 "--floor-push-max-steps",
                 "900",
+                "--floor-base-route-to-target",
+                "--floor-base-route-corridor-y",
+                "-8.55",
+                "--floor-base-route-arrival-margin-m",
+                "0.06",
+                "--floor-base-route-reposition-clearance-m",
+                "0.95",
                 "--center-carry-away-from-object",
                 "--center-carry-corner-seat-m",
                 "0.08",
@@ -2556,6 +2607,10 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.floor_push_precontact_clearance_m, 0.07)
         self.assertAlmostEqual(args.floor_push_base_speed_m_s, 0.02)
         self.assertEqual(args.floor_push_max_steps, 900)
+        self.assertTrue(args.floor_base_route_to_target)
+        self.assertAlmostEqual(args.floor_base_route_corridor_y, -8.55)
+        self.assertAlmostEqual(args.floor_base_route_arrival_margin_m, 0.06)
+        self.assertAlmostEqual(args.floor_base_route_reposition_clearance_m, 0.95)
         self.assertTrue(args.center_carry_away_from_object)
         self.assertAlmostEqual(args.center_carry_corner_seat_m, 0.08)
         self.assertAlmostEqual(args.center_carry_arm_stroke_m, 0.07)
