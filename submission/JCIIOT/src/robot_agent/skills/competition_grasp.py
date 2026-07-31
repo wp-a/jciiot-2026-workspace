@@ -75,6 +75,7 @@ class ScriptedGraspConfig:
         face_insertion: float = 0.0,
         close_follow_max_distance: float = 0.0,
         close_follow_arms: tuple[str, ...] = ARMS,
+        close_follow_requires_contact_arm: str | None = None,
         close_increment_interval: int = 20,
         max_action: float = 0.65,
         lift_height: float = 0.04,
@@ -121,6 +122,18 @@ class ScriptedGraspConfig:
         self.close_follow_arms = tuple(str(arm) for arm in close_follow_arms)
         if any(arm not in ARMS for arm in self.close_follow_arms):
             raise ValueError("close_follow_arms must contain only configured arms")
+        self.close_follow_requires_contact_arm = (
+            None
+            if close_follow_requires_contact_arm is None
+            else str(close_follow_requires_contact_arm)
+        )
+        if (
+            self.close_follow_requires_contact_arm is not None
+            and self.close_follow_requires_contact_arm not in ARMS
+        ):
+            raise ValueError(
+                "close_follow_requires_contact_arm must name a configured arm"
+            )
         self.close_increment_interval = int(close_increment_interval)
         self.max_action = float(max_action)
         self.lift_height = float(lift_height)
@@ -403,6 +416,7 @@ def apply_object_grasp_profile(
     elif "blue_tote_b01" in str(object_name).lower():
         config.close_follow_max_distance = 0.10
         config.close_follow_arms = ("left",)
+        config.close_follow_requires_contact_arm = "right"
     elif uses_station_side_tote_grasp(object_name):
         config.mirrored_ik_height_offset = 0.06
         config.station_side_reach_offset = 0.04
@@ -599,9 +613,10 @@ def configured_close_follow_offset(
     arm: str,
     follow_arms: tuple[str, ...],
     has_contact: bool,
+    enabled: bool = True,
 ) -> np.ndarray:
     """Follow object motion only with the configured non-contacting arms."""
-    if str(arm) not in tuple(follow_arms):
+    if not bool(enabled) or str(arm) not in tuple(follow_arms):
         return np.zeros(2, dtype=float)
     return contact_aware_follow_offset(offset, has_contact=has_contact)
 
@@ -1236,6 +1251,11 @@ class OfficialScriptedGraspDriver:
                 object_xy - start_object_xy,
                 max_distance=config.close_follow_max_distance,
             )
+            required_contact_arm = config.close_follow_requires_contact_arm
+            follow_enabled = (
+                required_contact_arm is None
+                or bool(contacts.get(required_contact_arm, False))
+            )
             arm_actions = {}
             for arm in ARMS:
                 current = helpers["gripper_position"](raw_env, robot, arm)
@@ -1245,6 +1265,7 @@ class OfficialScriptedGraspDriver:
                     arm=arm,
                     follow_arms=config.close_follow_arms,
                     has_contact=bool(contacts.get(arm, False)),
+                    enabled=follow_enabled,
                 )
                 world_delta = active_target - current
                 controller_delta = helpers["world_delta"](robot, arm, world_delta)
