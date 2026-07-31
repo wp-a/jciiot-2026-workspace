@@ -481,6 +481,7 @@ class CompetitionGraspTests(unittest.TestCase):
 
         self.assertAlmostEqual(profiled.approach_tolerance, 0.08)
         self.assertAlmostEqual(profiled.face_insertion, 0.03)
+        self.assertAlmostEqual(profiled.close_follow_max_distance, 0.10)
 
     def test_l5_followup_totes_use_a_full_upper_body_clearance_seed(self):
         self.assertIsNone(
