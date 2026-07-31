@@ -420,7 +420,7 @@ class InchwormCarryConfig:
         reseat_steps: int = 4,
         reseat_inward_delta: float = 0.002,
         max_lateral_drift: float = 0.03,
-        minimum_macro_progress: float = 0.02,
+        minimum_macro_progress: float = 0.015,
         max_cycles: int = 64,
     ) -> None:
         self.stroke_distance = float(stroke_distance)

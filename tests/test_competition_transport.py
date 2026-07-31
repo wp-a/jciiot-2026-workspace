@@ -1126,6 +1126,14 @@ class InchwormTransportRunnerTests(unittest.TestCase):
             4.0,
         )
 
+    def test_inchworm_progress_gate_accepts_measured_small_stable_macros(self):
+        module = load_module()
+
+        self.assertAlmostEqual(
+            module.InchwormCarryConfig().minimum_macro_progress,
+            0.015,
+        )
+
     def test_default_reset_stays_below_observed_contact_loss_distance(self):
         module = load_module()
 
