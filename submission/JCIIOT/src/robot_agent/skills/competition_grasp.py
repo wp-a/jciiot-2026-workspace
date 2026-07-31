@@ -544,6 +544,16 @@ def bounded_planar_follow_offset(delta: np.ndarray, *, max_distance: float) -> n
     return delta / distance * limit
 
 
+def contact_aware_follow_offset(
+    offset: np.ndarray,
+    *,
+    has_contact: bool,
+) -> np.ndarray:
+    """Keep a contacting arm fixed while the other arm follows the object."""
+    offset = np.asarray(offset, dtype=float).reshape(2)
+    return np.zeros(2, dtype=float) if bool(has_contact) else offset.copy()
+
+
 def gripper_close_command(step: int, *, interval: int) -> float:
     """Pulse the binary Robotiq close command to reduce contact impulse."""
     interval = int(interval)
@@ -1160,6 +1170,7 @@ class OfficialScriptedGraspDriver:
         )
         hold_targets = helpers["capture_hold_targets"](robot)
         stable_steps = 0
+        contacts = helpers["grasp_status"](raw_env, robot, object_name)
 
         for step in range(config.close_steps):
             robot.composite_controller.update_state()
@@ -1172,7 +1183,10 @@ class OfficialScriptedGraspDriver:
             for arm in ARMS:
                 current = helpers["gripper_position"](raw_env, robot, arm)
                 active_target = np.asarray(grasp_targets[arm], dtype=float).copy()
-                active_target[:2] += follow_offset
+                active_target[:2] += contact_aware_follow_offset(
+                    follow_offset,
+                    has_contact=bool(contacts.get(arm, False)),
+                )
                 world_delta = active_target - current
                 controller_delta = helpers["world_delta"](robot, arm, world_delta)
                 arm_actions[arm] = helpers["arm_action"](

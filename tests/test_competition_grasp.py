@@ -645,6 +645,24 @@ class CompetitionGraspTests(unittest.TestCase):
 
         np.testing.assert_allclose(offset, [0.018, 0.024])
 
+    def test_close_follow_moves_only_an_arm_without_contact(self):
+        offset = np.array([-0.07, 0.06])
+
+        np.testing.assert_allclose(
+            self.module.contact_aware_follow_offset(
+                offset,
+                has_contact=False,
+            ),
+            offset,
+        )
+        np.testing.assert_allclose(
+            self.module.contact_aware_follow_offset(
+                offset,
+                has_contact=True,
+            ),
+            [0.0, 0.0],
+        )
+
     def test_gripper_close_uses_spaced_positive_pulses(self):
         commands = [
             self.module.gripper_close_command(step, interval=20)
