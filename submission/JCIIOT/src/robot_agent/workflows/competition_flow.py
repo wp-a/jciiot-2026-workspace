@@ -725,6 +725,32 @@ class OfficialCompetitionDriver:
             or not self._attachment_is_active(object_name)
         ):
             return False
+        if not self._physical_output_available(target):
+            from robot_agent.skills.competition_transport import (
+                run_scored_physical_release,
+            )
+            from robosuite.environments.factory_sorting.transport_attachment import (
+                clear_transport_attachment,
+            )
+
+            release = run_scored_physical_release(
+                self.backend,
+                object_name=object_name,
+                target_xy=station.center[:2],
+                before_release_fn=lambda: clear_transport_attachment(
+                    self.backend.env
+                ),
+            )
+            success = bool(release.get("success", False))
+            self._last_place = {
+                **release,
+                "success": success,
+                "method": "scored_physical_release",
+            }
+            if success:
+                self._physical_hold = None
+                self._reset_transport_attachment()
+            return success
         place_object_physics = getattr(self.backend, "place_object_physics", None)
         body_ids = getattr(self.backend.env, "obj_body_id", {})
         body_id = body_ids.get(object_name) if hasattr(body_ids, "get") else None

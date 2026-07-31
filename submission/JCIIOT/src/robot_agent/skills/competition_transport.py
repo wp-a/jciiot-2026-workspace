@@ -2212,3 +2212,103 @@ def run_physical_place(
         final_distance=final_distance,
         steps=steps,
     )
+
+
+def run_scored_physical_release(
+    backend,
+    *,
+    object_name: str,
+    target_xy,
+    release_steps: int = 40,
+    settle_steps: int = 40,
+    max_target_distance: float = 0.8,
+    driver=None,
+    before_release_fn=None,
+) -> dict:
+    """Open both grippers only after an attached object enters scoring range."""
+    if int(release_steps) < 1 or int(settle_steps) < 0:
+        raise ValueError("release_steps must be positive and settle_steps non-negative")
+    target_xy = np.asarray(target_xy, dtype=float).reshape(2)
+    driver = driver or OfficialPhysicalCarryDriver()
+    observation = driver.observe(backend, object_name)
+    initial_distance = float(
+        np.linalg.norm(
+            np.asarray(observation["object_pos"], dtype=float)[:2] - target_xy
+        )
+    )
+    if initial_distance >= float(max_target_distance):
+        return {
+            "success": False,
+            "failure_stage": "target_distance",
+            "initial_distance": initial_distance,
+            "final_distance": initial_distance,
+            "steps": 0,
+            "contacts": dict(observation["contacts"]),
+            "release_started": False,
+        }
+
+    driver.record_event(
+        backend,
+        "scored_attachment_release_start",
+        object_name=object_name,
+        initial_distance=initial_distance,
+    )
+    hold_targets = driver.capture_hold_targets(backend)
+    if before_release_fn is not None:
+        before_release_fn()
+
+    zero_arms = {
+        arm: np.zeros(3, dtype=float)
+        for arm in ("right", "left")
+    }
+    failure_stage = None
+    steps = 0
+    for _ in range(int(release_steps) + int(settle_steps)):
+        step_info = driver.step(
+            backend,
+            object_name=object_name,
+            base_command=np.zeros(3, dtype=float),
+            hold_targets=hold_targets,
+            arm_world_deltas=zero_arms,
+            gripper_value=-1.0,
+        )
+        steps += 1
+        observation = driver.observe(backend, object_name)
+        if bool((step_info or {}).get("collision", False)):
+            failure_stage = "collision"
+            break
+
+    final_distance = float(
+        np.linalg.norm(
+            np.asarray(observation["object_pos"], dtype=float)[:2] - target_xy
+        )
+    )
+    contacts = {
+        arm: bool(observation["contacts"].get(arm, False))
+        for arm in ("right", "left")
+    }
+    if failure_stage is None and final_distance >= float(max_target_distance):
+        failure_stage = "target_distance"
+    if failure_stage is None and all(contacts.values()):
+        failure_stage = "release"
+    success = failure_stage is None
+    driver.record_event(
+        backend,
+        "scored_attachment_release_end",
+        object_name=object_name,
+        success=success,
+        failure_stage=failure_stage,
+        final_distance=final_distance,
+    )
+    return {
+        "success": success,
+        "failure_stage": failure_stage,
+        "initial_distance": initial_distance,
+        "final_distance": final_distance,
+        "final_object_pos": np.asarray(
+            observation["object_pos"], dtype=float
+        ).tolist(),
+        "steps": steps,
+        "contacts": contacts,
+        "release_started": True,
+    }

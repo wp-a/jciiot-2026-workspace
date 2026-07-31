@@ -632,7 +632,10 @@ class CompetitionFlowTests(unittest.TestCase):
         calls = []
         driver = object.__new__(self.module.OfficialCompetitionDriver)
         backend = SimpleNamespace(
-            env=SimpleNamespace(obj_body_id={"blue_tote": 9}),
+            env=SimpleNamespace(
+                obj_body_id={"blue_tote": 9},
+                output_ports={"output_5_table": object()},
+            ),
             _held_crate_name=None,
             _held_crate_body_id=None,
         )
@@ -684,6 +687,75 @@ class CompetitionFlowTests(unittest.TestCase):
         success = driver.place("output_5", "blue_tote")
 
         self.assertFalse(success)
+
+    def test_unregistered_output_releases_scored_object_and_continues(self):
+        calls = []
+        cleared = []
+        transport = types.ModuleType("robot_agent.skills.competition_transport")
+        def run_release(*args, **kwargs):
+            calls.append((args, kwargs))
+            kwargs["before_release_fn"]()
+            return {
+                "success": True,
+                "failure_stage": None,
+                "final_distance": 0.27,
+            }
+        transport.run_scored_physical_release = run_release
+        attachment = types.ModuleType(
+            "robosuite.environments.factory_sorting.transport_attachment"
+        )
+        attachment.clear_transport_attachment = lambda env: cleared.append(env)
+        backend = SimpleNamespace(
+            env=SimpleNamespace(output_ports={}),
+            _held_crate_name=None,
+            _held_crate_body_id=None,
+        )
+        driver = object.__new__(self.module.OfficialCompetitionDriver)
+        driver.backend = backend
+        driver.scene_context = SimpleNamespace(
+            output_ports={
+                "aux_output_1": SimpleNamespace(
+                    center=np.array([0.144, 8.473])
+                )
+            }
+        )
+        driver._physical_hold = {"object_z": 1.29}
+        driver._transport_attached = True
+        driver._transport_attachment = {
+            "active": True,
+            "object_name": "white_tote_b01_left_center",
+        }
+
+        with patch.dict(
+            sys.modules,
+            {
+                "robot_agent.skills.competition_transport": transport,
+                "robosuite": types.ModuleType("robosuite"),
+                "robosuite.environments": types.ModuleType(
+                    "robosuite.environments"
+                ),
+                "robosuite.environments.factory_sorting": types.ModuleType(
+                    "robosuite.environments.factory_sorting"
+                ),
+                "robosuite.environments.factory_sorting.transport_attachment": (
+                    attachment
+                ),
+            },
+        ):
+            success = driver.place(
+                "aux_output_1",
+                "white_tote_b01_left_center",
+            )
+
+        self.assertTrue(success)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(cleared, [backend.env])
+        np.testing.assert_allclose(
+            calls[0][1]["target_xy"],
+            [0.144, 8.473],
+        )
+        self.assertIsNone(driver._physical_hold)
+        self.assertFalse(driver._transport_attached)
 
 
 if __name__ == "__main__":

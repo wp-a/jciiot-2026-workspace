@@ -1638,5 +1638,38 @@ class PhysicalPlacementRunnerTests(unittest.TestCase):
         self.assertAlmostEqual(result["final_distance"], 1.0)
 
 
+class ScoredPhysicalReleaseTests(unittest.TestCase):
+    def setUp(self):
+        self.module = load_module()
+
+    def test_clears_official_attachment_and_opens_both_grippers_inside_target(self):
+        driver = FakePhysicalPlacementDriver(
+            object_heights=[1.29, 1.00, 0.40, 0.20, 0.20],
+            object_xy=(0.42, 8.44),
+        )
+        cleared = []
+        backend = SimpleNamespace(env=object())
+
+        result = self.module.run_scored_physical_release(
+            backend,
+            object_name="white_tote_b01_left_center",
+            target_xy=np.array([0.144, 8.473]),
+            release_steps=2,
+            settle_steps=2,
+            driver=driver,
+            before_release_fn=lambda: cleared.append(backend.env),
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(cleared, [backend.env])
+        self.assertEqual(len(driver.steps), 4)
+        self.assertTrue(
+            all(step["gripper_value"] == -1.0 for step in driver.steps)
+        )
+        self.assertLess(result["final_distance"], 0.8)
+        self.assertFalse(result["contacts"]["right"])
+        self.assertFalse(result["contacts"]["left"])
+
+
 if __name__ == "__main__":
     unittest.main()
