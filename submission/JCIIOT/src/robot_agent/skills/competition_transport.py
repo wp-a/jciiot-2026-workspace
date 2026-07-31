@@ -548,27 +548,31 @@ def planar_grasp_drift(start_observation, observation) -> float:
     return max(drifts)
 
 
-def symmetric_planar_reseat_deltas(
+def unilateral_planar_reseat_deltas(
     gripper_positions,
     *,
+    object_position,
     inward_delta: float,
 ) -> dict[str, np.ndarray]:
-    """Move both grippers inward along their measured planar separation."""
+    """Move only the farther gripper toward the measured object center."""
     requested = float(inward_delta)
     if requested < 0.0 or not np.isfinite(requested):
         raise ValueError("inward reseat delta must be finite and non-negative")
-    right = np.asarray(gripper_positions["right"], dtype=float)[:2]
-    left = np.asarray(gripper_positions["left"], dtype=float)[:2]
-    separation = right - left
-    distance = float(np.linalg.norm(separation))
-    if distance <= 1e-12 or requested == 0.0:
-        zero = np.zeros(2, dtype=float)
-        return {"right": zero.copy(), "left": zero.copy()}
-    axis = separation / distance
-    return {
-        "right": -axis * requested,
-        "left": axis * requested,
+    object_xy = np.asarray(object_position, dtype=float)[:2]
+    positions = {
+        arm: np.asarray(gripper_positions[arm], dtype=float)[:2]
+        for arm in ("right", "left")
     }
+    deltas = {arm: np.zeros(2, dtype=float) for arm in ("right", "left")}
+    moving_arm = max(
+        ("right", "left"),
+        key=lambda arm: float(np.linalg.norm(positions[arm] - object_xy)),
+    )
+    toward_object = object_xy - positions[moving_arm]
+    distance = float(np.linalg.norm(toward_object))
+    if distance > 1e-12 and requested > 0.0:
+        deltas[moving_arm] = toward_object / distance * requested
+    return deltas
 
 
 def physical_action_parts(
@@ -773,8 +777,9 @@ def run_physical_transport(
             recovery_steps = 0
             for _ in range(max(0, int(config.planar_recovery_steps))):
                 observation = driver.observe(backend, object_name)
-                reseat_deltas = symmetric_planar_reseat_deltas(
+                reseat_deltas = unilateral_planar_reseat_deltas(
                     observation["gripper_positions"],
+                    object_position=observation["object_pos"],
                     inward_delta=float(config.planar_recovery_inward_delta),
                 )
                 step_info = driver.recover_planar(

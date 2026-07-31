@@ -424,15 +424,15 @@ class CompetitionFlowTests(unittest.TestCase):
         )
         self.assertAlmostEqual(
             captured["transport"]["config"].planar_recovery_trigger,
-            0.02,
+            0.015,
         )
         self.assertEqual(
             captured["transport"]["config"].planar_recovery_steps,
-            2,
+            4,
         )
         self.assertAlmostEqual(
             captured["transport"]["config"].planar_recovery_inward_delta,
-            0.001,
+            0.002,
         )
         self.assertFalse(captured["transport"]["config"].align_heading_to_path)
 

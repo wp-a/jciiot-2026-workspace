@@ -113,20 +113,20 @@ class PhysicalTransportGeometryTests(unittest.TestCase):
 
         self.assertAlmostEqual(module.planar_grasp_drift(start, rotated), 0.0)
 
-    def test_planar_reseat_moves_both_grippers_inward_symmetrically(self):
+    def test_planar_reseat_moves_only_farther_gripper_toward_object(self):
         module = load_module()
 
-        deltas = module.symmetric_planar_reseat_deltas(
+        deltas = module.unilateral_planar_reseat_deltas(
             {
-                "right": np.array([7.4, 4.7, 1.3]),
-                "left": np.array([7.4, 4.5, 1.3]),
+                "right": np.array([7.4, 4.62, 1.3]),
+                "left": np.array([7.4, 4.40, 1.3]),
             },
-            inward_delta=0.001,
+            object_position=np.array([7.4, 4.58, 1.3]),
+            inward_delta=0.002,
         )
 
-        np.testing.assert_allclose(deltas["right"], [0.0, -0.001])
-        np.testing.assert_allclose(deltas["left"], [0.0, 0.001])
-        np.testing.assert_allclose(deltas["right"], -deltas["left"])
+        np.testing.assert_allclose(deltas["right"], np.zeros(2))
+        np.testing.assert_allclose(deltas["left"], [0.0, 0.002])
 
     def test_vertical_hold_delta_adds_feedforward_and_corrects_height_error(self):
         module = load_module()
@@ -679,8 +679,8 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
         driver = FakePhysicalTransportDriver(
             planar_slip_per_step=0.015,
             gripper_xy_offsets={
-                "right": np.array([0.0, -0.2]),
-                "left": np.array([0.0, 0.2]),
+                "right": np.array([0.0, 0.05]),
+                "left": np.array([0.0, -0.2]),
             },
         )
         config = self.module.PhysicalCarryConfig(
@@ -690,9 +690,9 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
             max_linear=0.05,
             max_linear_delta=0.05,
             max_planar_grasp_drift=0.50,
-            planar_recovery_trigger=0.02,
+            planar_recovery_trigger=0.015,
             planar_recovery_steps=1,
-            planar_recovery_inward_delta=0.001,
+            planar_recovery_inward_delta=0.002,
         )
 
         result = self.run_transport(driver, config=config)
@@ -700,8 +700,8 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertGreaterEqual(len(driver.planar_recoveries), 1)
         recovery = driver.planar_recoveries[0]["arm_world_deltas"]
-        np.testing.assert_allclose(recovery["right"], -recovery["left"])
-        self.assertAlmostEqual(np.linalg.norm(recovery["right"][:2]), 0.001)
+        np.testing.assert_allclose(recovery["right"], np.zeros(3))
+        self.assertAlmostEqual(np.linalg.norm(recovery["left"][:2]), 0.002)
 
     def test_transport_result_records_start_and_final_physical_poses(self):
         driver = FakePhysicalTransportDriver()
