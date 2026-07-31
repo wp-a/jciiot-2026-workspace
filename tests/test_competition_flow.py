@@ -765,6 +765,36 @@ class CompetitionFlowTests(unittest.TestCase):
         self.assertIsNone(driver._physical_hold)
         self.assertFalse(driver._transport_attached)
 
+    def test_unregistered_non_l5_output_does_not_use_sequential_release(self):
+        backend = SimpleNamespace(
+            env=SimpleNamespace(
+                output_ports={},
+                obj_body_id={"blue_tote_b01_far_right": 7},
+            ),
+            _held_crate_name=None,
+            _held_crate_body_id=None,
+            place_object_physics=lambda _target: False,
+        )
+        driver = object.__new__(self.module.OfficialCompetitionDriver)
+        driver.backend = backend
+        driver.scene_context = SimpleNamespace(
+            output_ports={
+                "output_5": SimpleNamespace(center=np.array([4.872, -7.261]))
+            }
+        )
+        driver._physical_hold = {"object_z": 1.29}
+        driver._transport_attached = True
+        driver._transport_attachment = {
+            "active": True,
+            "object_name": "blue_tote_b01_far_right",
+        }
+
+        success = driver.place("output_5", "blue_tote_b01_far_right")
+
+        self.assertFalse(success)
+        self.assertIsNotNone(driver._physical_hold)
+        self.assertTrue(driver._transport_attached)
+
 
 if __name__ == "__main__":
     unittest.main()

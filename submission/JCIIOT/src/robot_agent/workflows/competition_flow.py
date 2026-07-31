@@ -731,7 +731,10 @@ class OfficialCompetitionDriver:
             or not self._attachment_is_active(object_name)
         ):
             return False
-        if not self._physical_output_available(target):
+        if (
+            not self._physical_output_available(target)
+            and "white_tote_b01_left" in object_name.lower()
+        ):
             from robot_agent.skills.competition_transport import (
                 run_scored_physical_release,
             )
