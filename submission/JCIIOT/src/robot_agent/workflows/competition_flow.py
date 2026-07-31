@@ -17,6 +17,19 @@ def auxiliary_source_detour(*, target: str, carrying: bool) -> list[float] | Non
     return None
 
 
+def carrying_egress_waypoints(
+    object_name: str | None,
+    base_xy,
+) -> list[list[float]]:
+    """Route the L2 tote outside line 6 before entering the lower corridor."""
+    if str(object_name or "").lower() != "green_tote_b01_upper":
+        return []
+    return [
+        [13.5, float(base_xy[1])],
+        [13.5, -9.0],
+    ]
+
+
 def physical_output_available(output_names: Iterable[str], target: str) -> bool:
     """Return whether the physics backend registered the semantic output."""
     target = str(target)
@@ -443,13 +456,25 @@ class OfficialCompetitionDriver:
                 return False
             base_xy, _ = self.backend.get_base_pose()
             hold = self._physical_hold
+            for waypoint in carrying_egress_waypoints(object_name, base_xy):
+                if not self._move_to(
+                    f"{waypoint[0]:.6f}, {waypoint[1]:.6f}",
+                    carrying=True,
+                ):
+                    self._last_transport = {
+                        "success": False,
+                        "failure_stage": "navigation_egress",
+                        "method": "official_transport_attachment",
+                    }
+                    return False
             object_target_xy = delivery_slot_target(
                 station.center[:2],
                 object_name,
             )
+            reference_base_xy = hold.get("base_xy", base_xy)
             goal_xy = transport_base_goal(
                 object_target_xy=object_target_xy,
-                base_xy=np.asarray(base_xy, dtype=float),
+                base_xy=np.asarray(reference_base_xy, dtype=float),
                 base_yaw=float(hold["base_yaw"]),
                 object_xy=np.asarray(hold["object_pos"], dtype=float)[:2],
             )

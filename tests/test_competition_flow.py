@@ -399,6 +399,48 @@ class CompetitionFlowTests(unittest.TestCase):
         self.assertTrue(success)
         self.assertEqual(calls, [("3.500000, -7.200000", True)])
 
+    def test_upper_green_tote_exits_along_the_outer_transport_corridor(self):
+        calls = []
+        driver = object.__new__(self.module.OfficialCompetitionDriver)
+        driver.backend = SimpleNamespace(
+            get_base_pose=lambda: (np.array([12.55, 4.41]), -3.14),
+        )
+        driver.scene_context = SimpleNamespace(
+            output_ports={
+                "output_4": SimpleNamespace(center=np.array([-0.17, -7.29]))
+            }
+        )
+        driver._physical_hold = {
+            "base_xy": [12.55, 4.41],
+            "base_yaw": -3.14,
+            "object_pos": [11.87, 4.63, 1.2],
+            "object_z": 1.2,
+        }
+        driver._transport_attached = True
+        driver._transport_attachment = {
+            "active": True,
+            "object_name": "green_tote_b01_upper",
+        }
+        driver._move_to = lambda target, *, carrying: (
+            calls.append((target, carrying)) or True
+        )
+
+        success = driver.move(
+            "output_4",
+            carrying=True,
+            object_name="green_tote_b01_upper",
+        )
+
+        self.assertTrue(success)
+        self.assertEqual(
+            calls[:2],
+            [
+                ("13.500000, 4.410000", True),
+                ("13.500000, -9.000000", True),
+            ],
+        )
+        self.assertEqual(calls[-1][1], True)
+
     def test_carrying_move_stops_without_verified_attachment(self):
         driver = object.__new__(self.module.OfficialCompetitionDriver)
         driver._physical_hold = {"object_z": 1.1}
