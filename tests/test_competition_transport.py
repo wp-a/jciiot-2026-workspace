@@ -128,6 +128,31 @@ class PhysicalTransportGeometryTests(unittest.TestCase):
         np.testing.assert_allclose(deltas["right"], np.zeros(2))
         np.testing.assert_allclose(deltas["left"], [0.0, 0.002])
 
+    def test_bilateral_reseat_moves_both_grippers_toward_object(self):
+        module = load_module()
+
+        deltas = module.bilateral_planar_reseat_deltas(
+            {
+                "right": np.array([7.4, 4.74, 1.3]),
+                "left": np.array([7.4, 4.50, 1.3]),
+            },
+            object_position=np.array([7.1, 4.62, 1.3]),
+            inward_delta=0.002,
+        )
+
+        for arm in ("right", "left"):
+            self.assertAlmostEqual(np.linalg.norm(deltas[arm]), 0.002)
+            self.assertGreater(
+                np.dot(
+                    deltas[arm],
+                    np.array([7.1, 4.62])
+                    - np.array(
+                        [7.4, 4.74 if arm == "right" else 4.50]
+                    ),
+                ),
+                0.0,
+            )
+
     def test_vertical_hold_delta_adds_feedforward_and_corrects_height_error(self):
         module = load_module()
 
@@ -1091,6 +1116,13 @@ class InchwormTransportRunnerTests(unittest.TestCase):
             module.InchwormCarryConfig().reset_max_gripper_drift,
             0.06,
         )
+
+    def test_inchworm_defaults_reseat_after_each_base_reset(self):
+        module = load_module()
+        config = module.InchwormCarryConfig()
+
+        self.assertEqual(config.reseat_steps, 4)
+        self.assertAlmostEqual(config.reseat_inward_delta, 0.002)
 
     def test_stops_after_arm_stroke_when_measured_object_progress_reaches_target(self):
         module = load_module()

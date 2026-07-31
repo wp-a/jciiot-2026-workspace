@@ -416,6 +416,8 @@ class InchwormCarryConfig:
         reset_control_dt: float = 0.05,
         reset_position_tolerance: float = 1e-4,
         reset_max_gripper_drift: float = 0.06,
+        reseat_steps: int = 4,
+        reseat_inward_delta: float = 0.002,
         max_lateral_drift: float = 0.03,
         minimum_macro_progress: float = 0.02,
         max_cycles: int = 64,
@@ -431,6 +433,8 @@ class InchwormCarryConfig:
         self.reset_control_dt = float(reset_control_dt)
         self.reset_position_tolerance = float(reset_position_tolerance)
         self.reset_max_gripper_drift = float(reset_max_gripper_drift)
+        self.reseat_steps = int(reseat_steps)
+        self.reseat_inward_delta = float(reseat_inward_delta)
         self.max_lateral_drift = float(max_lateral_drift)
         self.minimum_macro_progress = float(minimum_macro_progress)
         self.max_cycles = int(max_cycles)
@@ -630,6 +634,30 @@ def unilateral_planar_reseat_deltas(
     distance = float(np.linalg.norm(toward_object))
     if distance > 1e-12 and requested > 0.0:
         deltas[moving_arm] = toward_object / distance * requested
+    return deltas
+
+
+def bilateral_planar_reseat_deltas(
+    gripper_positions,
+    *,
+    object_position,
+    inward_delta: float,
+) -> dict[str, np.ndarray]:
+    """Move both gripper centers a bounded planar step toward the object."""
+    requested = float(inward_delta)
+    if requested < 0.0 or not np.isfinite(requested):
+        raise ValueError("inward reseat delta must be finite and non-negative")
+    object_xy = np.asarray(object_position, dtype=float)[:2]
+    deltas = {}
+    for arm in ("right", "left"):
+        position = np.asarray(gripper_positions[arm], dtype=float)[:2]
+        toward_object = object_xy - position
+        distance = float(np.linalg.norm(toward_object))
+        deltas[arm] = (
+            np.zeros(2, dtype=float)
+            if distance <= 1e-12 or requested == 0.0
+            else toward_object / distance * requested
+        )
     return deltas
 
 
@@ -1263,6 +1291,8 @@ def run_inchworm_transport(
         raise ValueError("inchworm distances, limits, and tolerances must be positive")
     if config.arm_max_steps < 1 or config.max_cycles < 1:
         raise ValueError("inchworm step and cycle budgets must be positive")
+    if config.reseat_steps < 0 or config.reseat_inward_delta < 0.0:
+        raise ValueError("inchworm reseat controls must be non-negative")
 
     hold_targets = driver.capture_hold_targets(backend)
     start = driver.observe(backend, object_name)
@@ -1480,6 +1510,49 @@ def run_inchworm_transport(
                 cycle_failure = "reset_gripper_drift"
                 break
 
+        reseat_steps = 0
+        if cycle_failure is None:
+            for _ in range(config.reseat_steps):
+                observation = driver.observe(backend, object_name)
+                reseat_xy = bilateral_planar_reseat_deltas(
+                    observation["gripper_positions"],
+                    object_position=observation["object_pos"],
+                    inward_delta=config.reseat_inward_delta,
+                )
+                step_info = driver.step(
+                    backend,
+                    object_name=object_name,
+                    base_command=np.zeros(3, dtype=float),
+                    hold_targets=hold_targets,
+                    arm_world_deltas={
+                        arm: np.array(
+                            [reseat_xy[arm][0], reseat_xy[arm][1], 0.0],
+                            dtype=float,
+                        )
+                        for arm in ("right", "left")
+                    },
+                    gripper_value=1.0,
+                    base_control_dt=config.reset_control_dt,
+                )
+                steps += 1
+                reseat_steps += 1
+                observation = driver.observe(backend, object_name)
+                minimum_observed_z = min(
+                    minimum_observed_z,
+                    float(observation["object_pos"][2]),
+                )
+                if bool(step_info.get("collision", False)):
+                    cycle_failure = "collision"
+                    break
+                if next_contact_stability(observation["contacts"], 0) == 0:
+                    cycle_failure = "contact"
+                    break
+                if float(observation["object_pos"][2]) < float(
+                    minimum_object_z
+                ):
+                    cycle_failure = "object_drop"
+                    break
+
         cycle_end = driver.observe(backend, object_name)
         reset_translation = float(
             np.dot(
@@ -1502,6 +1575,7 @@ def run_inchworm_transport(
                 "cycle": cycle_index + 1,
                 "arm_steps": arm_steps,
                 "reset_steps": reset_steps,
+                "reseat_steps": reseat_steps,
                 "vertical_adjustment_m": vertical_adjustment,
                 "arm_progress_m": arm_progress,
                 "macro_progress_m": macro_progress,
@@ -1545,6 +1619,10 @@ def run_inchworm_transport(
         failure_stage=failure_stage,
         object_progress_m=object_progress,
         cycle_count=len(cycles),
+        contacts={
+            arm: bool(final["contacts"].get(arm, False))
+            for arm in ("right", "left")
+        },
     )
     return {
         "success": bool(success),
