@@ -516,6 +516,7 @@ class CompetitionGraspTests(unittest.TestCase):
         )
 
         self.assertAlmostEqual(config.close_follow_max_distance, 0.10)
+        self.assertEqual(config.close_follow_arms, ("left",))
 
     def test_l5_followup_totes_use_a_full_upper_body_clearance_seed(self):
         self.assertIsNone(
@@ -695,6 +696,28 @@ class CompetitionGraspTests(unittest.TestCase):
                 has_contact=True,
             ),
             [0.0, 0.0],
+        )
+
+    def test_configured_close_follow_keeps_unlisted_arm_fixed(self):
+        offset = np.array([-0.07, 0.06])
+
+        np.testing.assert_allclose(
+            self.module.configured_close_follow_offset(
+                offset,
+                arm="right",
+                follow_arms=("left",),
+                has_contact=False,
+            ),
+            [0.0, 0.0],
+        )
+        np.testing.assert_allclose(
+            self.module.configured_close_follow_offset(
+                offset,
+                arm="left",
+                follow_arms=("left",),
+                has_contact=False,
+            ),
+            offset,
         )
 
     def test_gripper_close_uses_spaced_positive_pulses(self):

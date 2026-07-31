@@ -74,6 +74,7 @@ class ScriptedGraspConfig:
         hold_close_pose: bool = True,
         face_insertion: float = 0.0,
         close_follow_max_distance: float = 0.0,
+        close_follow_arms: tuple[str, ...] = ARMS,
         close_increment_interval: int = 20,
         max_action: float = 0.65,
         lift_height: float = 0.04,
@@ -117,6 +118,9 @@ class ScriptedGraspConfig:
         self.hold_close_pose = bool(hold_close_pose)
         self.face_insertion = float(face_insertion)
         self.close_follow_max_distance = float(close_follow_max_distance)
+        self.close_follow_arms = tuple(str(arm) for arm in close_follow_arms)
+        if any(arm not in ARMS for arm in self.close_follow_arms):
+            raise ValueError("close_follow_arms must contain only configured arms")
         self.close_increment_interval = int(close_increment_interval)
         self.max_action = float(max_action)
         self.lift_height = float(lift_height)
@@ -398,6 +402,7 @@ def apply_object_grasp_profile(
             config.site_below_offset = 0.03
     elif "blue_tote_b01" in str(object_name).lower():
         config.close_follow_max_distance = 0.10
+        config.close_follow_arms = ("left",)
     elif uses_station_side_tote_grasp(object_name):
         config.mirrored_ik_height_offset = 0.06
         config.station_side_reach_offset = 0.04
@@ -586,6 +591,19 @@ def contact_aware_follow_offset(
     """Keep a contacting arm fixed while the other arm follows the object."""
     offset = np.asarray(offset, dtype=float).reshape(2)
     return np.zeros(2, dtype=float) if bool(has_contact) else offset.copy()
+
+
+def configured_close_follow_offset(
+    offset: np.ndarray,
+    *,
+    arm: str,
+    follow_arms: tuple[str, ...],
+    has_contact: bool,
+) -> np.ndarray:
+    """Follow object motion only with the configured non-contacting arms."""
+    if str(arm) not in tuple(follow_arms):
+        return np.zeros(2, dtype=float)
+    return contact_aware_follow_offset(offset, has_contact=has_contact)
 
 
 def gripper_close_command(step: int, *, interval: int) -> float:
@@ -1222,8 +1240,10 @@ class OfficialScriptedGraspDriver:
             for arm in ARMS:
                 current = helpers["gripper_position"](raw_env, robot, arm)
                 active_target = np.asarray(grasp_targets[arm], dtype=float).copy()
-                active_target[:2] += contact_aware_follow_offset(
+                active_target[:2] += configured_close_follow_offset(
                     follow_offset,
+                    arm=arm,
+                    follow_arms=config.close_follow_arms,
                     has_contact=bool(contacts.get(arm, False)),
                 )
                 world_delta = active_target - current

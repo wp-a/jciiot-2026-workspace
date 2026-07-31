@@ -232,6 +232,7 @@ def station_axis_grasp_pose(
     station_center,
     station_approach,
     base_standoff: float = REFERENCE_BASE_TO_GRASP_CENTER,
+    facing_xy=None,
 ) -> dict:
     """Approach a tote along the free station axis instead of its proxy."""
     center = np.asarray(grasp_center_xy, dtype=float).reshape(2)
@@ -254,7 +255,7 @@ def station_axis_grasp_pose(
         right_site_xy=right_site_xy,
         left_site_xy=left_site_xy,
     )
-    return {
+    result = {
         "base_xy": base_xy.tolist(),
         "staging_xy": staging_xy.tolist(),
         "grasp_center_xy": center.tolist(),
@@ -264,6 +265,14 @@ def station_axis_grasp_pose(
         "swap_arm_targets": orientation["swap_arm_targets"],
         "precise_alignment": True,
     }
+    if facing_xy is not None:
+        facing = np.asarray(facing_xy, dtype=float).reshape(2)
+        direction = facing - base_xy
+        if not np.all(np.isfinite(facing)) or float(np.linalg.norm(direction)) <= 1e-9:
+            raise ValueError("facing_xy must be finite and differ from base_xy")
+        result["yaw"] = math.atan2(direction[1], direction[0])
+        result["orientation_target_xy"] = facing.tolist()
+    return result
 
 
 def select_grasp_candidate(candidates, *, station_approach) -> str:

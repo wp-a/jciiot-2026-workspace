@@ -89,6 +89,7 @@ class CompetitionNavigationTests(unittest.TestCase):
             station_center=[0.144, 8.473],
             station_approach=[0.11, 7.55],
             base_standoff=standoff,
+            facing_xy=[-0.215201, 8.473143],
         )
 
         self.assertAlmostEqual(standoff, 0.78)
@@ -98,6 +99,11 @@ class CompetitionNavigationTests(unittest.TestCase):
             atol=1e-4,
         )
         self.assertTrue(pose["precise_alignment"])
+        self.assertAlmostEqual(pose["yaw"], 1.805388, places=5)
+        np.testing.assert_allclose(
+            pose["orientation_target_xy"],
+            [-0.215201, 8.473143],
+        )
 
     def test_other_objects_keep_their_existing_grasp_pose_family(self):
         self.assertIsNone(

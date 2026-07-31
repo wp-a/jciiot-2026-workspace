@@ -358,6 +358,11 @@ class OfficialCompetitionDriver:
         )
         station_axis_standoff = station_axis_standoff_for_object(object_name)
         if station_axis_standoff is not None:
+            orientation_target_xy = (
+                object_xy
+                if "blue_tote_b01" in str(object_name).lower()
+                else None
+            )
             pose = station_axis_grasp_pose(
                 grasp_center_xy=pose["grasp_center_xy"],
                 right_site_xy=pose["right_site_xy"],
@@ -365,6 +370,7 @@ class OfficialCompetitionDriver:
                 station_center=station.center,
                 station_approach=station_approach,
                 base_standoff=station_axis_standoff,
+                facing_xy=orientation_target_xy,
             )
         if str(source) == "input_1" and "white_tote_b01_left" in object_name.lower():
             pose = station_side_grasp_pose(
@@ -556,6 +562,14 @@ class OfficialCompetitionDriver:
                 right_site_xy=active_grasp_pose["right_site_xy"],
                 left_site_xy=active_grasp_pose["left_site_xy"],
             )
+            orientation_target_xy = active_grasp_pose.get(
+                "orientation_target_xy"
+            )
+            if orientation_target_xy is not None:
+                orientation["yaw"] = math.atan2(
+                    float(orientation_target_xy[1]) - float(reached_xy[1]),
+                    float(orientation_target_xy[0]) - float(reached_xy[0]),
+                )
             self._grasp_yaw = bounded_yaw_step(
                 current_yaw=reached_yaw,
                 target_yaw=float(orientation["yaw"]),
