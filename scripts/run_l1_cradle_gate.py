@@ -2943,18 +2943,69 @@ def _floor_corridor_push_probe(
             tolerance=position_config.position_tolerance,
         )
     )
-    contact_reached = bool(
-        precontact_reached
-        and position_driver._move_to_targets(
-            backend,
-            targets["contact"],
-            position_config,
-            max_steps=360,
-            gripper_value=1.0,
-            tolerance=0.04,
-        )
-    )
+    carry_driver = OfficialPhysicalCarryDriver()
+    observations = []
+    stable_contact_steps = 0
+    maximum_contact_steps = 0
+    no_contact_steps = 0
+    object_progress = 0.0
+    lateral_drift = 0.0
+    base_progress = 0.0
+    contact_acquire_steps = 0
     collision = bool(getattr(raw_env, "has_judge_collision", False))
+    contact_reached = False
+    if precontact_reached and not collision:
+        acquire_hold_targets = carry_driver.capture_hold_targets(backend)
+        acquire_delta = np.r_[direction * 0.003, -0.003]
+        for step in range(240):
+            step_info = carry_driver.step(
+                backend,
+                object_name=object_name,
+                base_command=np.zeros(3, dtype=float),
+                hold_targets=acquire_hold_targets,
+                arm_world_deltas={
+                    "right": acquire_delta,
+                    "left": acquire_delta,
+                },
+                gripper_value=1.0,
+            )
+            contact_acquire_steps = step + 1
+            collision = bool(step_info.get("collision", False))
+            contacts = object_robot_contacts(raw_env, object_name)
+            has_contact = any(contacts[arm] for arm in ("right", "left"))
+            stable_contact_steps = stable_contact_steps + 1 if has_contact else 0
+            maximum_contact_steps = max(
+                maximum_contact_steps,
+                stable_contact_steps,
+            )
+            object_position = np.asarray(
+                raw_env.sim.data.body_xpos[body_id], dtype=float
+            ).copy()
+            object_delta = object_position[:2] - start_object[:2]
+            object_progress = float(np.dot(object_delta, direction))
+            lateral_drift = abs(
+                float(np.dot(object_delta, np.asarray(targets["left_axis"])))
+            )
+            if step % 10 == 0 or collision or stable_contact_steps >= 5:
+                observations.append(
+                    {
+                        "stage": "contact_acquire",
+                        "step": contact_acquire_steps,
+                        "object_position": object_position.tolist(),
+                        "object_progress_m": object_progress,
+                        "lateral_drift_m": lateral_drift,
+                        "contacts": {
+                            arm: list(contacts[arm]) for arm in contacts
+                        },
+                        "stable_contact_steps": stable_contact_steps,
+                        "judge_collision": collision,
+                    }
+                )
+            if collision:
+                break
+            if stable_contact_steps >= 5:
+                contact_reached = True
+                break
     collision_pairs = []
     if collision:
         from robot_agent.environments.robosuite_backend import _navigation_collisions
@@ -2983,20 +3034,12 @@ def _floor_corridor_push_probe(
     elif not precontact_reached:
         failure_stage = "precontact"
     elif not contact_reached:
-        failure_stage = "contact_pose"
+        failure_stage = "contact_acquire"
     elif collision:
         failure_stage = "collision"
 
-    observations = []
-    stable_contact_steps = 0
-    maximum_contact_steps = 0
-    no_contact_steps = 0
-    object_progress = 0.0
-    lateral_drift = 0.0
-    base_progress = 0.0
     steps = 0
     if failure_stage is None:
-        carry_driver = OfficialPhysicalCarryDriver()
         hold_targets = carry_driver.capture_hold_targets(backend)
         base_control_dt = 0.05
         arm_step = direction * requested_speed * base_control_dt
@@ -3091,6 +3134,7 @@ def _floor_corridor_push_probe(
         "oriented_retract": oriented_retract,
         "precontact_reached": precontact_reached,
         "contact_reached": contact_reached,
+        "contact_acquire_steps": contact_acquire_steps,
         "collision": collision,
         "collision_pairs": collision_pairs,
         "steps": steps,
