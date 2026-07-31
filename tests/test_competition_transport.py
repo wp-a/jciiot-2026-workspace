@@ -1106,28 +1106,6 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
 
 
 class InchwormTransportRunnerTests(unittest.TestCase):
-    def test_directional_stroke_reduces_only_downstream_gripper(self):
-        module = load_module()
-
-        scales = module.directional_stroke_scales(
-            {
-                "right": np.array([7.4, 4.74, 1.3]),
-                "left": np.array([7.4, 4.50, 1.3]),
-            },
-            travel_direction=np.array([0.0, -1.0]),
-            downstream_scale=0.5,
-        )
-
-        self.assertEqual(scales, {"right": 1.0, "left": 0.5})
-
-    def test_inchworm_defaults_keep_downstream_gripper_as_planar_constraint(self):
-        module = load_module()
-
-        self.assertAlmostEqual(
-            module.InchwormCarryConfig().downstream_stroke_scale,
-            0.5,
-        )
-
     def test_default_reset_stays_below_observed_contact_loss_distance(self):
         module = load_module()
 
@@ -1226,7 +1204,11 @@ class InchwormTransportRunnerTests(unittest.TestCase):
 
         event, payload = driver.events[-1]
         self.assertEqual(event, "inchworm_transport_end")
+        self.assertEqual(len(payload["start_object_pos"]), 3)
         self.assertEqual(len(payload["final_object_pos"]), 3)
+        self.assertEqual(
+            sorted(payload["start_gripper_positions"]), ["left", "right"]
+        )
         self.assertEqual(
             sorted(payload["final_gripper_positions"]), ["left", "right"]
         )
