@@ -76,7 +76,6 @@ class ScriptedGraspConfig:
         close_follow_max_distance: float = 0.0,
         close_follow_arms: tuple[str, ...] = ARMS,
         close_follow_requires_contact_arm: str | None = None,
-        close_follow_uses_requested_target: bool = False,
         close_increment_interval: int = 20,
         max_action: float = 0.65,
         lift_height: float = 0.04,
@@ -135,9 +134,6 @@ class ScriptedGraspConfig:
             raise ValueError(
                 "close_follow_requires_contact_arm must name a configured arm"
             )
-        self.close_follow_uses_requested_target = bool(
-            close_follow_uses_requested_target
-        )
         self.close_increment_interval = int(close_increment_interval)
         self.max_action = float(max_action)
         self.lift_height = float(lift_height)
@@ -421,7 +417,6 @@ def apply_object_grasp_profile(
         config.close_follow_max_distance = 0.10
         config.close_follow_arms = ("left",)
         config.close_follow_requires_contact_arm = "right"
-        config.close_follow_uses_requested_target = True
     elif uses_station_side_tote_grasp(object_name):
         config.mirrored_ik_height_offset = 0.06
         config.station_side_reach_offset = 0.04
@@ -590,25 +585,6 @@ def close_grasp_targets(
         inserted,
         hold_current=hold_current,
     )
-
-
-def staged_close_target(
-    held_targets: Mapping[str, np.ndarray],
-    requested_targets: Mapping[str, np.ndarray],
-    *,
-    arm: str,
-    follow_arms: tuple[str, ...],
-    follow_enabled: bool,
-    use_requested_target: bool,
-) -> np.ndarray:
-    """Release a held close pose only after its contact gate opens."""
-    use_requested = bool(
-        use_requested_target
-        and follow_enabled
-        and str(arm) in tuple(follow_arms)
-    )
-    targets = requested_targets if use_requested else held_targets
-    return np.asarray(targets[str(arm)], dtype=float).copy()
 
 
 def bounded_planar_follow_offset(delta: np.ndarray, *, max_distance: float) -> np.ndarray:
@@ -1252,13 +1228,6 @@ class OfficialScriptedGraspDriver:
             for arm in ARMS
         }
         body_id = raw_env.obj_body_id[object_name]
-        requested_close_targets = close_grasp_targets(
-            current_positions,
-            grasp_targets,
-            object_xy=raw_env.sim.data.body_xpos[body_id][:2],
-            insertion=config.face_insertion,
-            hold_current=False,
-        )
         grasp_targets = close_grasp_targets(
             current_positions,
             grasp_targets,
@@ -1290,16 +1259,7 @@ class OfficialScriptedGraspDriver:
             arm_actions = {}
             for arm in ARMS:
                 current = helpers["gripper_position"](raw_env, robot, arm)
-                active_target = staged_close_target(
-                    grasp_targets,
-                    requested_close_targets,
-                    arm=arm,
-                    follow_arms=config.close_follow_arms,
-                    follow_enabled=follow_enabled,
-                    use_requested_target=(
-                        config.close_follow_uses_requested_target
-                    ),
-                )
+                active_target = np.asarray(grasp_targets[arm], dtype=float).copy()
                 active_target[:2] += configured_close_follow_offset(
                     follow_offset,
                     arm=arm,
