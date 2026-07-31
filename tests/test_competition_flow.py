@@ -420,7 +420,7 @@ class CompetitionFlowTests(unittest.TestCase):
         )
         self.assertAlmostEqual(
             captured["transport"]["config"].height_recovery_trigger,
-            0.01,
+            0.006,
         )
         self.assertAlmostEqual(
             captured["transport"]["config"].planar_recovery_trigger,
