@@ -416,6 +416,7 @@ class InchwormCarryConfig:
         reset_control_dt: float = 0.05,
         reset_position_tolerance: float = 1e-4,
         reset_max_gripper_drift: float = 0.06,
+        reset_arm_compensation_gain: float = 4.0,
         reseat_steps: int = 4,
         reseat_inward_delta: float = 0.002,
         max_lateral_drift: float = 0.03,
@@ -433,6 +434,7 @@ class InchwormCarryConfig:
         self.reset_control_dt = float(reset_control_dt)
         self.reset_position_tolerance = float(reset_position_tolerance)
         self.reset_max_gripper_drift = float(reset_max_gripper_drift)
+        self.reset_arm_compensation_gain = float(reset_arm_compensation_gain)
         self.reseat_steps = int(reseat_steps)
         self.reseat_inward_delta = float(reseat_inward_delta)
         self.max_lateral_drift = float(max_lateral_drift)
@@ -1255,6 +1257,25 @@ def _inchworm_planar_motion(delta, direction) -> tuple[float, float]:
     return progress, lateral
 
 
+def compensated_reset_arm_delta(
+    *,
+    reset_start_gripper,
+    current_gripper,
+    world_step,
+    planar_gain: float,
+) -> np.ndarray:
+    """Compensate direct base motion without amplifying vertical corrections."""
+    gain = float(planar_gain)
+    if not np.isfinite(gain) or gain <= 0.0:
+        raise ValueError("planar reset compensation gain must be positive")
+    start = np.asarray(reset_start_gripper, dtype=float).reshape(3)
+    current = np.asarray(current_gripper, dtype=float).reshape(3)
+    step = np.asarray(world_step, dtype=float).reshape(2)
+    delta = start - current - np.array([step[0], step[1], 0.0], dtype=float)
+    delta[:2] *= gain
+    return delta
+
+
 def run_inchworm_transport(
     backend,
     *,
@@ -1284,6 +1305,7 @@ def run_inchworm_transport(
         "reset_control_dt": config.reset_control_dt,
         "reset_position_tolerance": config.reset_position_tolerance,
         "reset_max_gripper_drift": config.reset_max_gripper_drift,
+        "reset_arm_compensation_gain": config.reset_arm_compensation_gain,
         "max_lateral_drift": config.max_lateral_drift,
         "minimum_macro_progress": config.minimum_macro_progress,
     }
@@ -1427,6 +1449,10 @@ def run_inchworm_transport(
                     "total_progress_m": total_arm_progress,
                     "macro_lateral_drift_m": arm_lateral,
                     "max_gripper_reset_drift_m": 0.0,
+                    "max_gripper_reset_drift_by_arm_m": {
+                        "right": 0.0,
+                        "left": 0.0,
+                    },
                     "base_reset_translation_m": 0.0,
                 }
             )
@@ -1442,6 +1468,7 @@ def run_inchworm_transport(
         }
         reset_steps = 0
         max_gripper_drift = 0.0
+        max_gripper_drift_by_arm = {"right": 0.0, "left": 0.0}
         reset_translation = 0.0
         reset_budget = int(
             math.ceil(
@@ -1467,10 +1494,11 @@ def run_inchworm_transport(
             )
             world_step = direction * speed * config.reset_control_dt
             arm_deltas = {
-                arm: (
-                    reset_start_grippers[arm]
-                    - np.asarray(observation["gripper_positions"][arm], dtype=float)
-                    - np.array([world_step[0], world_step[1], 0.0], dtype=float)
+                arm: compensated_reset_arm_delta(
+                    reset_start_gripper=reset_start_grippers[arm],
+                    current_gripper=observation["gripper_positions"][arm],
+                    world_step=world_step,
+                    planar_gain=config.reset_arm_compensation_gain,
                 )
                 for arm in ("right", "left")
             }
@@ -1491,18 +1519,17 @@ def run_inchworm_transport(
             minimum_observed_z = min(
                 minimum_observed_z, float(observation["object_pos"][2])
             )
-            max_gripper_drift = max(
-                max_gripper_drift,
-                max(
+            for arm in ("right", "left"):
+                max_gripper_drift_by_arm[arm] = max(
+                    max_gripper_drift_by_arm[arm],
                     float(
                         np.linalg.norm(
                             np.asarray(observation["gripper_positions"][arm])[:2]
                             - reset_start_grippers[arm][:2]
                         )
                     )
-                    for arm in ("right", "left")
-                ),
-            )
+                )
+            max_gripper_drift = max(max_gripper_drift_by_arm.values())
             if bool(step_info.get("collision", False)):
                 cycle_failure = "collision"
                 break
@@ -1588,6 +1615,9 @@ def run_inchworm_transport(
                 "total_progress_m": total_progress,
                 "macro_lateral_drift_m": macro_lateral,
                 "max_gripper_reset_drift_m": max_gripper_drift,
+                "max_gripper_reset_drift_by_arm_m": dict(
+                    max_gripper_drift_by_arm
+                ),
                 "base_reset_translation_m": reset_translation,
             }
         )

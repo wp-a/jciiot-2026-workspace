@@ -1106,6 +1106,26 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
 
 
 class InchwormTransportRunnerTests(unittest.TestCase):
+    def test_reset_compensation_amplifies_planar_error_only(self):
+        module = load_module()
+
+        delta = module.compensated_reset_arm_delta(
+            reset_start_gripper=np.array([0.0, 0.0, 1.0]),
+            current_gripper=np.array([-0.01, 0.02, 0.98]),
+            world_step=np.array([-0.002, 0.0]),
+            planar_gain=4.0,
+        )
+
+        np.testing.assert_allclose(delta, [0.048, -0.08, 0.02])
+
+    def test_inchworm_defaults_strengthen_reset_arm_compensation(self):
+        module = load_module()
+
+        self.assertAlmostEqual(
+            module.InchwormCarryConfig().reset_arm_compensation_gain,
+            4.0,
+        )
+
     def test_default_reset_stays_below_observed_contact_loss_distance(self):
         module = load_module()
 
@@ -1166,6 +1186,7 @@ class InchwormTransportRunnerTests(unittest.TestCase):
             stroke_vertical_feedforward=0.0,
             reset_distance=0.08,
             reset_max_linear=0.04,
+            reset_arm_compensation_gain=1.0,
             max_cycles=3,
         )
 
