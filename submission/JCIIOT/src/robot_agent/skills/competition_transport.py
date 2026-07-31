@@ -1593,8 +1593,7 @@ class PostureLockedPhysicalCarryDriver:
 
     def recover_height(self, backend, **kwargs):
         result = self._delegate.recover_height(backend, **kwargs)
-        if result:
-            self._posture = self._capture_robot_posture(backend)
+        self._posture = self._capture_robot_posture(backend)
         return result
 
 

@@ -230,6 +230,23 @@ class PostureLockedPhysicalCarryDriverTests(unittest.TestCase):
         np.testing.assert_allclose(backend.env.sim.data.qvel, [5, 6, 7, 28])
         self.assertEqual(forward_calls, [True])
 
+    def test_partial_height_recovery_refreshes_locked_posture(self):
+        module = load_module()
+
+        class Delegate:
+            def recover_height(self, _backend, **_kwargs):
+                return False
+
+        driver = module.PostureLockedPhysicalCarryDriver(Delegate())
+        refreshed = {"qpos": np.array([2.0])}
+        driver._posture = {"qpos": np.array([1.0])}
+        driver._capture_robot_posture = lambda _backend: refreshed
+
+        result = driver.recover_height(object())
+
+        self.assertFalse(result)
+        self.assertIs(driver._posture, refreshed)
+
     def test_single_arm_under_support_target_descends_and_moves_toward_midpoint(self):
         module = load_module()
         current = {
