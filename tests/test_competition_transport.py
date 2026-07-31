@@ -517,14 +517,21 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
             object_drop_tolerance=0.02,
         )
 
-    def run_transport(self, driver, *, path=None, config=None):
+    def run_transport(
+        self,
+        driver,
+        *,
+        path=None,
+        config=None,
+        minimum_object_z=0.98,
+    ):
         self.assertTrue(hasattr(self.module, "run_physical_transport"))
         return self.module.run_physical_transport(
             object(),
             path=path or [np.array([0.18, 0.0])],
             object_name="box",
             hold_yaw=0.0,
-            minimum_object_z=0.98,
+            minimum_object_z=minimum_object_z,
             config=config or self.config,
             driver=driver,
         )
@@ -735,6 +742,17 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
                 for step in driver.steps
             )
         )
+
+    def test_height_recovery_tracks_initial_hold_above_safety_floor(self):
+        driver = FakePhysicalTransportDriver(
+            object_heights=[1.0, 0.985, 0.985, 0.985]
+        )
+
+        result = self.run_transport(driver, minimum_object_z=0.90)
+
+        self.assertTrue(result["success"])
+        self.assertEqual(len(driver.recover_calls), 1)
+        self.assertAlmostEqual(driver.recover_calls[0]["lift_height"], 0.015)
 
     def test_failed_height_recovery_stops_transport_without_fallback(self):
         driver = FakePhysicalTransportDriver(

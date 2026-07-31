@@ -670,7 +670,10 @@ def run_physical_transport(
     carried_object_angle = float(
         math.atan2(object_offset_base[1], object_offset_base[0])
     )
-    target_object_z = float(minimum_object_z) + config.object_drop_tolerance
+    target_object_z = max(
+        float(observation["object_pos"][2]),
+        float(minimum_object_z) + config.object_drop_tolerance,
+    )
     gripper_z_offsets = {
         arm: float(observation["gripper_positions"][arm][2])
         - float(observation["object_pos"][2])
