@@ -202,6 +202,18 @@ class PhysicalTransportGeometryTests(unittest.TestCase):
         )
         np.testing.assert_allclose(rotated_offset, [1.0, 0.0], atol=1e-9)
 
+    def test_grasp_pivot_is_midpoint_of_bilateral_grippers(self):
+        module = load_module()
+
+        pivot = module.bilateral_grasp_pivot_xy(
+            {
+                "right": np.array([1.2, -0.3, 0.9]),
+                "left": np.array([1.2, 0.5, 0.9]),
+            }
+        )
+
+        np.testing.assert_allclose(pivot, [1.2, 0.1])
+
     def test_long_route_step_budget_covers_slow_physical_carry(self):
         module = load_module()
 

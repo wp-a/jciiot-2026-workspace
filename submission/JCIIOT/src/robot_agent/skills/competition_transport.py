@@ -504,6 +504,18 @@ def pivot_compensated_base_velocity(
     return world_velocity_to_base_frame(world_velocity, yaw)
 
 
+def bilateral_grasp_pivot_xy(gripper_positions) -> np.ndarray:
+    """Return the rigid-body rotation center of the two active grippers."""
+    positions = np.stack(
+        [
+            np.asarray(gripper_positions[arm], dtype=float)[:2]
+            for arm in ("right", "left")
+        ],
+        axis=0,
+    )
+    return np.mean(positions, axis=0)
+
+
 def vertical_hold_delta(
     *,
     current_z: float,
@@ -1082,7 +1094,9 @@ def run_physical_transport(
             command[:2] = pivot_compensated_base_velocity(
                 base_xy=observation["base_xy"],
                 base_yaw=float(observation["base_yaw"]),
-                pivot_xy=observation["object_pos"][:2],
+                pivot_xy=bilateral_grasp_pivot_xy(
+                    observation["gripper_positions"]
+                ),
                 angular_velocity=float(command[2]),
                 control_dt=config.base_control_dt,
             )
