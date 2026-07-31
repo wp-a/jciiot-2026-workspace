@@ -999,6 +999,19 @@ def run_physical_transport(
         steps=steps,
         minimum_object_z=minimum_observed_z,
         max_planar_grasp_drift_m=maximum_planar_grasp_drift,
+        contacts={
+            arm: bool(observation["contacts"].get(arm, False))
+            for arm in ("right", "left")
+        },
+        final_object_pos=np.asarray(
+            observation["object_pos"], dtype=float
+        ).tolist(),
+        final_gripper_positions={
+            arm: np.asarray(
+                observation["gripper_positions"][arm], dtype=float
+            ).tolist()
+            for arm in ("right", "left")
+        },
     )
     return _transport_result(
         success=success,
