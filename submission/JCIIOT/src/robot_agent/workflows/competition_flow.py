@@ -501,10 +501,17 @@ class OfficialCompetitionDriver:
         if active_grasp_pose is not None:
             from robot_agent.skills.competition_navigation import (
                 SAFE_GRASP_YAW_CORRECTION,
+                align_base_for_grasp,
                 bounded_yaw_step,
                 grasp_orientation_from_base,
                 orient_base,
             )
+
+            if not align_base_for_grasp(
+                self.backend,
+                active_grasp_pose["base_xy"],
+            ):
+                return False
 
             reached_xy, reached_yaw = self.backend.get_base_pose()
             orientation = grasp_orientation_from_base(

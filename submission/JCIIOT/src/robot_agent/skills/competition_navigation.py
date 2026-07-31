@@ -4,9 +4,42 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
+
 
 REFERENCE_BASE_TO_GRASP_CENTER = 0.651001
 SAFE_GRASP_YAW_CORRECTION = 0.15
+PRECISE_GRASP_BASE_TOLERANCE = 0.04
+
+
+def align_base_for_grasp(
+    backend,
+    target_xy,
+    *,
+    tolerance: float = PRECISE_GRASP_BASE_TOLERANCE,
+) -> bool:
+    """Finish a coarse planned approach at the object-relative grasp pose."""
+    goal = np.asarray(target_xy, dtype=float).reshape(2)
+    if not np.all(np.isfinite(goal)):
+        raise ValueError("target_xy must contain finite coordinates")
+    tolerance = float(tolerance)
+    if not math.isfinite(tolerance) or tolerance <= 0.0:
+        raise ValueError("tolerance must be finite and positive")
+
+    current_xy, _ = backend.get_base_pose()
+    if float(np.linalg.norm(np.asarray(current_xy, dtype=float) - goal)) <= tolerance:
+        return True
+    reached = bool(
+        backend.follow_path(
+            [goal.copy()],
+            waypoint_tolerance=tolerance,
+        )
+    )
+    final_xy, _ = backend.get_base_pose()
+    final_error = float(
+        np.linalg.norm(np.asarray(final_xy, dtype=float) - goal)
+    )
+    return bool(reached and final_error <= tolerance)
 
 
 def bounded_yaw_step(

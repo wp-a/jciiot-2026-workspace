@@ -107,6 +107,45 @@ class CompetitionNavigationTests(unittest.TestCase):
 
         self.assertAlmostEqual(next_yaw, -math.pi + 0.025)
 
+    def test_grasp_base_alignment_uses_a_tight_final_tolerance(self):
+        calls = []
+        backend = SimpleNamespace(
+            xy=np.array([12.41, 3.10], dtype=float),
+        )
+        backend.get_base_pose = lambda: (backend.xy.copy(), 1.72)
+
+        def follow_path(path, *, waypoint_tolerance):
+            calls.append((path, waypoint_tolerance))
+            backend.xy = np.asarray(path[-1], dtype=float).copy()
+            return True
+
+        backend.follow_path = follow_path
+
+        success = self.module.align_base_for_grasp(
+            backend,
+            [11.867624, 3.758855],
+        )
+
+        self.assertTrue(success)
+        self.assertEqual(len(calls), 1)
+        self.assertAlmostEqual(
+            calls[0][1],
+            self.module.PRECISE_GRASP_BASE_TOLERANCE,
+        )
+        np.testing.assert_allclose(calls[0][0][-1], [11.867624, 3.758855])
+
+    def test_grasp_base_alignment_skips_motion_inside_tolerance(self):
+        backend = SimpleNamespace(
+            get_base_pose=lambda: (np.array([1.0, 2.0]), 0.0),
+            follow_path=lambda *_args, **_kwargs: self.fail(
+                "already-aligned base should not move"
+            ),
+        )
+
+        self.assertTrue(
+            self.module.align_base_for_grasp(backend, [1.01, 2.0])
+        )
+
     def test_scanned_grasp_yaw_limit_stays_below_collision_boundary(self):
         next_yaw = self.module.bounded_yaw_step(
             current_yaw=1.5701,
