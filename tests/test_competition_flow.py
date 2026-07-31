@@ -342,14 +342,14 @@ class CompetitionFlowTests(unittest.TestCase):
             )
         ]
 
-        np.testing.assert_allclose(slots[0], [-0.456, 8.473])
+        np.testing.assert_allclose(slots[0], [-0.106, 8.473])
         np.testing.assert_allclose(slots[1], [0.144, 8.473])
-        np.testing.assert_allclose(slots[2], [0.744, 8.473])
+        np.testing.assert_allclose(slots[2], [0.394, 8.473])
         self.assertTrue(
             all(float(np.linalg.norm(slot - center)) < 0.8 for slot in slots)
         )
-        self.assertGreater(abs(slots[0][0] - slots[1][0]), 0.4)
-        self.assertGreater(abs(slots[1][0] - slots[2][0]), 0.4)
+        self.assertGreater(abs(slots[0][0] - slots[1][0]), 0.2)
+        self.assertGreater(abs(slots[1][0] - slots[2][0]), 0.2)
         np.testing.assert_allclose(
             self.module.delivery_slot_target(center, "green_tote_b01_lower"),
             center,

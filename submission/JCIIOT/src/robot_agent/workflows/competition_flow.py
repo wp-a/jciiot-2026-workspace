@@ -7,6 +7,9 @@ from collections.abc import Mapping
 from typing import Any, Iterable
 
 
+L5_DELIVERY_SLOT_OFFSET = 0.25
+
+
 def auxiliary_source_detour(*, target: str, carrying: bool) -> list[float] | None:
     """Use the verified upper corridor when approaching upper-row inputs."""
     if (
@@ -66,9 +69,9 @@ def delivery_slot_target(center, object_name: str | None):
     if "white_tote_b01_left" not in name:
         return target
     if name.endswith("_front"):
-        target[0] -= 0.60
+        target[0] -= L5_DELIVERY_SLOT_OFFSET
     elif name.endswith("_back"):
-        target[0] += 0.60
+        target[0] += L5_DELIVERY_SLOT_OFFSET
     return target
 
 
