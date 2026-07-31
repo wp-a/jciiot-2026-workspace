@@ -518,7 +518,6 @@ class CompetitionGraspTests(unittest.TestCase):
         self.assertAlmostEqual(config.close_follow_max_distance, 0.10)
         self.assertEqual(config.close_follow_arms, ("left",))
         self.assertEqual(config.close_follow_requires_contact_arm, "right")
-        self.assertFalse(config.hold_close_pose)
 
     def test_l5_followup_totes_use_a_full_upper_body_clearance_seed(self):
         self.assertIsNone(

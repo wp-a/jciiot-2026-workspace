@@ -417,7 +417,6 @@ def apply_object_grasp_profile(
         config.close_follow_max_distance = 0.10
         config.close_follow_arms = ("left",)
         config.close_follow_requires_contact_arm = "right"
-        config.hold_close_pose = False
     elif uses_station_side_tote_grasp(object_name):
         config.mirrored_ik_height_offset = 0.06
         config.station_side_reach_offset = 0.04
