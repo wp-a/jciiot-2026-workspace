@@ -70,6 +70,7 @@ class ScriptedGraspConfig:
         mirrored_ik_max_error: float = 0.08,
         mirrored_ik_max_nfev: int = 300,
         station_side_reach_offset: float = 0.0,
+        station_side_lateral_squeeze: float = 0.0,
         station_side_seed_steps: int = 120,
         hold_close_pose: bool = True,
         face_insertion: float = 0.0,
@@ -115,6 +116,9 @@ class ScriptedGraspConfig:
         self.mirrored_ik_max_error = float(mirrored_ik_max_error)
         self.mirrored_ik_max_nfev = int(mirrored_ik_max_nfev)
         self.station_side_reach_offset = float(station_side_reach_offset)
+        self.station_side_lateral_squeeze = float(
+            station_side_lateral_squeeze
+        )
         self.station_side_seed_steps = int(station_side_seed_steps)
         self.hold_close_pose = bool(hold_close_pose)
         self.face_insertion = float(face_insertion)
@@ -343,6 +347,12 @@ def uses_station_side_tote_grasp(object_name: str) -> bool:
     return "white_tote_b01_left" in str(object_name).lower()
 
 
+def uses_reflected_station_side_targets(object_name: str) -> bool:
+    """Use two targets on the reachable station side for rotated totes."""
+    name = str(object_name).lower()
+    return uses_station_side_tote_grasp(name) or "blue_tote_b01" in name
+
+
 def interior_joint_seed(
     values: np.ndarray,
     *,
@@ -417,6 +427,7 @@ def apply_object_grasp_profile(
         config.close_follow_max_distance = 0.10
         config.close_follow_arms = ("left",)
         config.close_follow_requires_contact_arm = "right"
+        config.station_side_lateral_squeeze = 0.01
     elif uses_station_side_tote_grasp(object_name):
         config.mirrored_ik_height_offset = 0.06
         config.station_side_reach_offset = 0.04
@@ -430,6 +441,7 @@ def station_side_tote_grasp_targets(
     object_xy: np.ndarray,
     base_xy: np.ndarray,
     reach_offset: float = 0.0,
+    lateral_squeeze: float = 0.0,
 ) -> dict[str, np.ndarray]:
     """Reflect the reachable marked site across the robot heading axis."""
     targets = {
@@ -462,6 +474,16 @@ def station_side_tote_grasp_targets(
         result = {"right": reflected, "left": near}
     else:
         result = {"right": near, "left": reflected}
+    lateral = result["right"][:2] - result["left"][:2]
+    lateral_norm = float(np.linalg.norm(lateral))
+    squeeze = float(lateral_squeeze)
+    if not np.isfinite(squeeze) or squeeze < 0.0:
+        raise ValueError("lateral_squeeze must be finite and nonnegative")
+    if lateral_norm <= 1e-9 or 2.0 * squeeze >= lateral_norm:
+        raise ValueError("lateral_squeeze must preserve target separation")
+    lateral /= lateral_norm
+    result["right"][:2] -= squeeze * lateral
+    result["left"][:2] += squeeze * lateral
     toward_base = base - grasp_center
     toward_base /= float(np.linalg.norm(toward_base))
     for target in result.values():
@@ -929,13 +951,14 @@ class OfficialScriptedGraspDriver:
             config.site_below_offset,
         )
         body_id = backend.env.obj_body_id[object_name]
-        if uses_station_side_tote_grasp(object_name):
+        if uses_reflected_station_side_targets(object_name):
             base_xy, _ = backend.get_base_pose()
             raw_targets = station_side_tote_grasp_targets(
                 raw_targets,
                 object_xy=backend.env.sim.data.body_xpos[body_id][:2],
                 base_xy=base_xy,
                 reach_offset=config.station_side_reach_offset,
+                lateral_squeeze=config.station_side_lateral_squeeze,
             )
         grasp_targets = assigned_grasp_targets(
             raw_targets,
@@ -1529,7 +1552,7 @@ def run_scripted_grasp(
         object_name,
     )
     driver = driver or OfficialScriptedGraspDriver()
-    if uses_station_side_tote_grasp(object_name):
+    if uses_reflected_station_side_targets(object_name):
         quiesce_robot_for_grasp(backend.env)
     backend._mark_trajectory_event(
         "grasp_start",

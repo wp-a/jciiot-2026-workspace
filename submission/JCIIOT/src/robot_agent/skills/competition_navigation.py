@@ -24,6 +24,25 @@ def station_axis_standoff_for_object(object_name: str) -> float | None:
     return None
 
 
+def dominant_cardinal_axis(axis, *, max_minor_ratio: float = 0.10) -> np.ndarray:
+    """Snap a nearly cardinal semantic axis to remove small map skew."""
+    direction = np.asarray(axis, dtype=float).reshape(2)
+    if not np.all(np.isfinite(direction)):
+        raise ValueError("axis must contain finite coordinates")
+    norm = float(np.linalg.norm(direction))
+    if norm <= 1e-9:
+        raise ValueError("axis must be nonzero")
+    direction /= norm
+    magnitudes = np.abs(direction)
+    dominant = int(np.argmax(magnitudes))
+    minor = 1 - dominant
+    if magnitudes[minor] <= float(max_minor_ratio) * magnitudes[dominant]:
+        snapped = np.zeros(2, dtype=float)
+        snapped[dominant] = math.copysign(1.0, direction[dominant])
+        return snapped
+    return direction
+
+
 def align_base_for_grasp(
     backend,
     target_xy,
@@ -242,7 +261,7 @@ def station_axis_grasp_pose(
     axis_norm = float(np.linalg.norm(axis))
     if axis_norm <= 1e-9:
         raise ValueError("station approach must differ from station center")
-    axis /= axis_norm
+    axis = dominant_cardinal_axis(axis)
 
     base_xy = center + float(base_standoff) * axis
     staging_distance = max(

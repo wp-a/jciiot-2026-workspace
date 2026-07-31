@@ -449,6 +449,23 @@ class CompetitionGraspTests(unittest.TestCase):
             )
         )
 
+    def test_blue_tote_uses_reflected_station_side_targets(self):
+        self.assertTrue(
+            self.module.uses_reflected_station_side_targets(
+                "blue_tote_b01_far_right"
+            )
+        )
+        self.assertTrue(
+            self.module.uses_reflected_station_side_targets(
+                "white_tote_b01_left_front"
+            )
+        )
+        self.assertFalse(
+            self.module.uses_reflected_station_side_targets(
+                "green_tote_b01_lower"
+            )
+        )
+
     def test_rotated_blue_tote_keeps_near_left_far_right_assignment(self):
         self.assertFalse(
             self.module.should_swap_arm_targets(
@@ -476,6 +493,28 @@ class CompetitionGraspTests(unittest.TestCase):
             targets["left"],
             [-14.509088, 4.199868, 1.473978],
             atol=1e-4,
+        )
+
+    def test_blue_tote_reflected_targets_squeeze_one_centimeter_inward(self):
+        targets = self.module.station_side_tote_grasp_targets(
+            {
+                "right": np.array([-0.000201, 8.638143, 1.473978]),
+                "left": np.array([-0.000201, 8.308143, 1.473978]),
+            },
+            object_xy=np.array([-0.215201, 8.473143]),
+            base_xy=np.array([-0.000201, 7.693143]),
+            lateral_squeeze=0.01,
+        )
+
+        np.testing.assert_allclose(
+            targets["right"],
+            [-0.010201, 8.308143, 1.473978],
+            atol=1e-6,
+        )
+        np.testing.assert_allclose(
+            targets["left"],
+            [-0.420201, 8.308143, 1.473978],
+            atol=1e-6,
         )
 
     def test_white_tote_profile_uses_measured_mirrored_ik_height(self):
@@ -518,6 +557,7 @@ class CompetitionGraspTests(unittest.TestCase):
         self.assertAlmostEqual(config.close_follow_max_distance, 0.10)
         self.assertEqual(config.close_follow_arms, ("left",))
         self.assertEqual(config.close_follow_requires_contact_arm, "right")
+        self.assertAlmostEqual(config.station_side_lateral_squeeze, 0.01)
 
     def test_l5_followup_totes_use_a_full_upper_body_clearance_seed(self):
         self.assertIsNone(

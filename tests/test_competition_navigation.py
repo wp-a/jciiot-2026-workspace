@@ -95,15 +95,22 @@ class CompetitionNavigationTests(unittest.TestCase):
         self.assertAlmostEqual(standoff, 0.78)
         np.testing.assert_allclose(
             pose["base_xy"],
-            [-0.028921, 7.693672],
+            [-0.000201, 7.693143],
             atol=1e-4,
         )
         self.assertTrue(pose["precise_alignment"])
-        self.assertAlmostEqual(pose["yaw"], 1.805388, places=5)
+        self.assertAlmostEqual(pose["yaw"], 1.839758, places=5)
         np.testing.assert_allclose(
             pose["orientation_target_xy"],
             [-0.215201, 8.473143],
         )
+
+    def test_nearly_cardinal_station_axis_snaps_to_its_dominant_axis(self):
+        snapped = self.module.dominant_cardinal_axis(
+            np.array([-0.034, -0.923]),
+        )
+
+        np.testing.assert_allclose(snapped, [0.0, -1.0])
 
     def test_other_objects_keep_their_existing_grasp_pose_family(self):
         self.assertIsNone(
