@@ -64,6 +64,20 @@ class CompetitionNavigationTests(unittest.TestCase):
         self.assertAlmostEqual(pose["yaw"], math.pi / 2.0, places=3)
         self.assertFalse(pose["swap_arm_targets"])
 
+    def test_l2_upper_tote_uses_the_collision_free_station_side(self):
+        pose = self.module.station_axis_grasp_pose(
+            grasp_center_xy=[11.867624, 4.409856],
+            right_site_xy=[12.032624, 4.409856],
+            left_site_xy=[11.702624, 4.409856],
+            station_center=[11.937, 3.932],
+            station_approach=[13.0, 3.932],
+        )
+
+        np.testing.assert_allclose(pose["base_xy"], [12.518625, 4.409856])
+        np.testing.assert_allclose(pose["staging_xy"], [13.0, 4.409856])
+        self.assertAlmostEqual(abs(pose["yaw"]), math.pi)
+        self.assertTrue(pose["precise_alignment"])
+
     def test_candidate_selection_rejects_a_grasp_face_blocked_by_another_object(self):
         upper = self.module.grasp_aligned_base_pose(
             object_xy=[11.867624, 4.624856],
@@ -106,6 +120,41 @@ class CompetitionNavigationTests(unittest.TestCase):
         )
 
         self.assertAlmostEqual(next_yaw, -math.pi + 0.025)
+
+    def test_grasp_base_alignment_uses_a_tight_bounded_final_move(self):
+        calls = []
+        backend = SimpleNamespace(xy=np.array([13.0, 4.41], dtype=float))
+        backend.get_base_pose = lambda: (backend.xy.copy(), math.pi)
+
+        def follow_path(path, *, waypoint_tolerance, max_steps):
+            calls.append((path, waypoint_tolerance, max_steps))
+            backend.xy = np.asarray(path[-1], dtype=float).copy()
+            return True
+
+        backend.follow_path = follow_path
+        success = self.module.align_base_for_grasp(
+            backend,
+            [12.517624, 4.409856],
+        )
+
+        self.assertTrue(success)
+        self.assertEqual(len(calls), 1)
+        self.assertAlmostEqual(
+            calls[0][1], self.module.PRECISE_GRASP_BASE_TOLERANCE
+        )
+        self.assertEqual(calls[0][2], self.module.PRECISE_GRASP_BASE_MAX_STEPS)
+
+    def test_grasp_base_alignment_skips_motion_inside_tolerance(self):
+        backend = SimpleNamespace(
+            get_base_pose=lambda: (np.array([1.0, 2.0]), 0.0),
+            follow_path=lambda *_args, **_kwargs: self.fail(
+                "already-aligned base should not move"
+            ),
+        )
+
+        self.assertTrue(
+            self.module.align_base_for_grasp(backend, [1.01, 2.0])
+        )
 
     def test_scanned_grasp_yaw_limit_stays_below_collision_boundary(self):
         next_yaw = self.module.bounded_yaw_step(

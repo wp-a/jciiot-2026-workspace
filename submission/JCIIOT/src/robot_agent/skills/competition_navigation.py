@@ -4,9 +4,48 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
+
 
 REFERENCE_BASE_TO_GRASP_CENTER = 0.651001
 SAFE_GRASP_YAW_CORRECTION = 0.15
+PRECISE_GRASP_BASE_TOLERANCE = 0.04
+PRECISE_GRASP_BASE_MAX_STEPS = 120
+
+
+def align_base_for_grasp(
+    backend,
+    target_xy,
+    *,
+    tolerance: float = PRECISE_GRASP_BASE_TOLERANCE,
+    max_steps: int = PRECISE_GRASP_BASE_MAX_STEPS,
+) -> bool:
+    """Finish a coarse approach at a collision-checked grasp-side pose."""
+    goal = np.asarray(target_xy, dtype=float).reshape(2)
+    if not np.all(np.isfinite(goal)):
+        raise ValueError("target_xy must contain finite coordinates")
+    tolerance = float(tolerance)
+    if not math.isfinite(tolerance) or tolerance <= 0.0:
+        raise ValueError("tolerance must be finite and positive")
+    if int(max_steps) < 1:
+        raise ValueError("max_steps must be at least 1")
+
+    current_xy, _ = backend.get_base_pose()
+    if float(np.linalg.norm(np.asarray(current_xy, dtype=float) - goal)) <= tolerance:
+        return True
+    reached = bool(
+        backend.follow_path(
+            [goal.copy()],
+            waypoint_tolerance=tolerance,
+            max_steps=int(max_steps),
+        )
+    )
+    final_xy, _ = backend.get_base_pose()
+    return bool(
+        reached
+        and float(np.linalg.norm(np.asarray(final_xy, dtype=float) - goal))
+        <= tolerance
+    )
 
 
 def bounded_yaw_step(
@@ -171,6 +210,48 @@ def station_side_grasp_pose(
         "left_site_xy": [float(left_site_xy[0]), float(left_site_xy[1])],
         "yaw": orientation["yaw"],
         "swap_arm_targets": orientation["swap_arm_targets"],
+    }
+
+
+def station_axis_grasp_pose(
+    *,
+    grasp_center_xy,
+    right_site_xy,
+    left_site_xy,
+    station_center,
+    station_approach,
+    base_standoff: float = REFERENCE_BASE_TO_GRASP_CENTER,
+) -> dict:
+    """Approach a tote along the free station axis instead of its proxy."""
+    center = np.asarray(grasp_center_xy, dtype=float).reshape(2)
+    station_center = np.asarray(station_center, dtype=float).reshape(2)
+    station_approach = np.asarray(station_approach, dtype=float).reshape(2)
+    axis = station_approach - station_center
+    axis_norm = float(np.linalg.norm(axis))
+    if axis_norm <= 1e-9:
+        raise ValueError("station approach must differ from station center")
+    axis /= axis_norm
+
+    base_xy = center + float(base_standoff) * axis
+    staging_distance = max(
+        float(base_standoff),
+        float(np.dot(station_approach - center, axis)),
+    )
+    staging_xy = center + staging_distance * axis
+    orientation = grasp_orientation_from_base(
+        base_xy=base_xy,
+        right_site_xy=right_site_xy,
+        left_site_xy=left_site_xy,
+    )
+    return {
+        "base_xy": base_xy.tolist(),
+        "staging_xy": staging_xy.tolist(),
+        "grasp_center_xy": center.tolist(),
+        "right_site_xy": np.asarray(right_site_xy, dtype=float).tolist(),
+        "left_site_xy": np.asarray(left_site_xy, dtype=float).tolist(),
+        "yaw": orientation["yaw"],
+        "swap_arm_targets": orientation["swap_arm_targets"],
+        "precise_alignment": True,
     }
 
 

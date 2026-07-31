@@ -403,6 +403,17 @@ class CompetitionGraspTests(unittest.TestCase):
                 "green_tote_b01_lower"
             )
         )
+
+    def test_ik_seed_is_clipped_inside_joint_bounds(self):
+        seed = self.module.interior_joint_seed(
+            np.array([-1.2, 0.5, 1.3]),
+            lower=np.array([-1.0, 0.0, 0.0]),
+            upper=np.array([1.0, 1.0, 1.0]),
+        )
+
+        self.assertGreater(seed[0], -1.0)
+        self.assertAlmostEqual(seed[1], 0.5)
+        self.assertLess(seed[2], 1.0)
         self.assertTrue(
             self.module.uses_axis_aware_fingerpad_mirror(
                 "blue_tote_b01_near_right"
@@ -983,6 +994,33 @@ class CompetitionGraspTests(unittest.TestCase):
             driver.calls,
             [
                 "move_above",
+                "pregrasp",
+                "approach",
+                "wrist_adjust",
+                "close",
+                "lift",
+                "hold_metadata",
+            ],
+        )
+
+    def test_upper_green_tote_preconditions_wrist_before_descent(self):
+        backend = RecordingBackend()
+        driver = ScriptedDriver()
+
+        result = self.module.run_scripted_grasp(
+            backend,
+            source="input_6",
+            object_name="green_tote_b01_upper",
+            driver=driver,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(
+            driver.calls,
+            [
+                "raise_clearance",
+                "move_above",
+                "wrist_adjust",
                 "pregrasp",
                 "approach",
                 "wrist_adjust",

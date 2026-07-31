@@ -318,6 +318,7 @@ class OfficialCompetitionDriver:
         )
         from robot_agent.skills.competition_navigation import (
             grasp_aligned_base_pose,
+            station_axis_grasp_pose,
             station_side_grasp_pose,
         )
 
@@ -341,6 +342,14 @@ class OfficialCompetitionDriver:
             station_center=station.center,
             station_approach=station_approach,
         )
+        if str(object_name).lower() == "green_tote_b01_upper":
+            pose = station_axis_grasp_pose(
+                grasp_center_xy=pose["grasp_center_xy"],
+                right_site_xy=pose["right_site_xy"],
+                left_site_xy=pose["left_site_xy"],
+                station_center=station.center,
+                station_approach=station_approach,
+            )
         if str(source) == "input_1" and "white_tote_b01_left" in object_name.lower():
             pose = station_side_grasp_pose(
                 grasp_center_xy=pose["grasp_center_xy"],
@@ -501,10 +510,17 @@ class OfficialCompetitionDriver:
         if active_grasp_pose is not None:
             from robot_agent.skills.competition_navigation import (
                 SAFE_GRASP_YAW_CORRECTION,
+                align_base_for_grasp,
                 bounded_yaw_step,
                 grasp_orientation_from_base,
                 orient_base,
             )
+
+            if active_grasp_pose.get("precise_alignment") and not align_base_for_grasp(
+                self.backend,
+                active_grasp_pose["base_xy"],
+            ):
+                return False
 
             reached_xy, reached_yaw = self.backend.get_base_pose()
             orientation = grasp_orientation_from_base(

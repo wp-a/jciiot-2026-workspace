@@ -84,6 +84,7 @@ class ScriptedGraspConfig:
         lift_follower_lead: float = 0.003,
         swap_arm_targets: bool = False,
         clearance_prepared: bool = False,
+        pregrasp_wrist_adjustment: bool = False,
     ) -> None:
         self.clearance_height = float(clearance_height)
         self.clearance_raise_steps = int(clearance_raise_steps)
@@ -130,6 +131,7 @@ class ScriptedGraspConfig:
         self.lift_follower_lead = float(lift_follower_lead)
         self.swap_arm_targets = bool(swap_arm_targets)
         self.clearance_prepared = bool(clearance_prepared)
+        self.pregrasp_wrist_adjustment = bool(pregrasp_wrist_adjustment)
 
 
 def normalized_position_action(
@@ -324,6 +326,27 @@ def uses_station_side_tote_grasp(object_name: str) -> bool:
     return "white_tote_b01_left" in str(object_name).lower()
 
 
+def interior_joint_seed(
+    values: np.ndarray,
+    *,
+    lower: np.ndarray,
+    upper: np.ndarray,
+    margin: float = 1e-6,
+) -> np.ndarray:
+    """Clip an optimizer seed strictly inside finite joint bounds."""
+    values = np.asarray(values, dtype=float)
+    lower = np.asarray(lower, dtype=float)
+    upper = np.asarray(upper, dtype=float)
+    if values.shape != lower.shape or values.shape != upper.shape:
+        raise ValueError("joint seed and bounds must have the same shape")
+    if not all(np.all(np.isfinite(item)) for item in (values, lower, upper)):
+        raise ValueError("joint seed and bounds must be finite")
+    margin = float(margin)
+    if margin < 0.0 or np.any(upper - lower <= 2.0 * margin):
+        raise ValueError("joint bounds must contain the requested margin")
+    return np.clip(values, lower + margin, upper - margin)
+
+
 def station_side_clearance_joint_seed(object_name: str) -> np.ndarray | None:
     """Return the deterministic upper-body reset for later L5 transfers."""
     name = str(object_name).lower()
@@ -364,6 +387,8 @@ def apply_object_grasp_profile(
     elif "green_tote_b01" in str(object_name).lower():
         config.face_insertion = 0.03
         config.close_follow_max_distance = 0.10
+        if str(object_name).lower().endswith("_upper"):
+            config.pregrasp_wrist_adjustment = True
     elif uses_station_side_tote_grasp(object_name):
         config.mirrored_ik_height_offset = 0.06
         config.station_side_reach_offset = 0.04
@@ -1086,6 +1111,11 @@ class OfficialScriptedGraspDriver:
             [model.jnt_range[joint_id][1] for joint_id in joint_ids],
             dtype=float,
         )
+        solver_start = interior_joint_seed(
+            start,
+            lower=lower,
+            upper=upper,
+        )
 
         from scipy.optimize import least_squares
 
@@ -1096,13 +1126,13 @@ class OfficialScriptedGraspDriver:
                 fingerpad_positions("left") - target_fingerpads
             ).reshape(-1)
             regularization = (
-                config.mirrored_ik_regularization * (joints - start)
+                config.mirrored_ik_regularization * (joints - solver_start)
             )
             return np.concatenate([position_error, regularization])
 
         solution = least_squares(
             residual,
-            start,
+            solver_start,
             bounds=(lower, upper),
             max_nfev=config.mirrored_ik_max_nfev,
         )
@@ -1470,6 +1500,15 @@ def run_scripted_grasp(
             failure_stage = "raise_clearance"
         elif not driver.move_above_grasp_sites(backend, object_name, config):
             failure_stage = "move_above"
+        elif (
+            config.pregrasp_wrist_adjustment
+            and not driver.adjust_wrist_for_reach(
+                backend,
+                object_name,
+                config,
+            )
+        ):
+            failure_stage = "pregrasp_wrist_adjustment"
         elif not driver.move_to_pregrasp(backend, object_name, config):
             failure_stage = "pregrasp"
         elif not driver.approach_grasp_sites(backend, object_name, config):
