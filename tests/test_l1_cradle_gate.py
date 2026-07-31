@@ -2358,6 +2358,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.floor_base_route_corridor_y, -8.40)
         self.assertAlmostEqual(args.floor_base_route_arrival_margin_m, 0.05)
         self.assertAlmostEqual(args.floor_base_route_reposition_clearance_m, 0.90)
+        self.assertAlmostEqual(args.floor_base_route_minimum_retract_z_m, 0.80)
         self.assertAlmostEqual(args.floor_base_tracking_gain, 0.50)
         self.assertAlmostEqual(args.floor_base_alignment_gain, 0.50)
         self.assertAlmostEqual(args.floor_base_tracking_deadband_m, 0.05)
@@ -2522,6 +2523,8 @@ class JointSeedParserTests(unittest.TestCase):
                 "0.06",
                 "--floor-base-route-reposition-clearance-m",
                 "0.95",
+                "--floor-base-route-minimum-retract-z-m",
+                "0.85",
                 "--floor-base-tracking-gain",
                 "0.60",
                 "--floor-base-alignment-gain",
@@ -2668,6 +2671,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.floor_base_route_corridor_y, -8.55)
         self.assertAlmostEqual(args.floor_base_route_arrival_margin_m, 0.06)
         self.assertAlmostEqual(args.floor_base_route_reposition_clearance_m, 0.95)
+        self.assertAlmostEqual(args.floor_base_route_minimum_retract_z_m, 0.85)
         self.assertAlmostEqual(args.floor_base_tracking_gain, 0.60)
         self.assertAlmostEqual(args.floor_base_alignment_gain, 0.70)
         self.assertAlmostEqual(args.floor_base_tracking_deadband_m, 0.07)

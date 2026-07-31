@@ -3036,11 +3036,15 @@ def _reposition_base_for_floor_push(
     retract_forward_m: float,
     retract_lateral_m: float,
     retract_target_z: float,
+    minimum_retract_z_m: float,
 ) -> dict[str, Any]:
     """Move around a settled object and face the next physical push direction."""
     from robot_agent.skills.competition_navigation import orient_base
 
     raw_env = backend.env
+    minimum_retract_z = float(minimum_retract_z_m)
+    if not np.isfinite(minimum_retract_z) or minimum_retract_z <= 0.0:
+        raise ValueError("minimum route retract height must be finite and positive")
     body_id = raw_env.obj_body_id[object_name]
     object_position = np.asarray(
         raw_env.sim.data.body_xpos[body_id], dtype=float
@@ -3084,6 +3088,27 @@ def _reposition_base_for_floor_push(
         if oriented
         else None
     )
+    retract_positions = (
+        retract.get("final_positions", {})
+        if isinstance(retract, Mapping)
+        else {}
+    )
+    retract_minimum_z = min(
+        (
+            float(np.asarray(position, dtype=float)[2])
+            for position in retract_positions.values()
+            if np.asarray(position, dtype=float).shape == (3,)
+        ),
+        default=float("-inf"),
+    )
+    retract_clearance_safe = bool(
+        isinstance(retract, Mapping)
+        and not retract.get("collision", False)
+        and (
+            retract.get("success", False)
+            or retract_minimum_z >= minimum_retract_z
+        )
+    )
     refined_object = np.asarray(
         raw_env.sim.data.body_xpos[body_id], dtype=float
     ).copy()
@@ -3095,8 +3120,7 @@ def _reposition_base_for_floor_push(
         base_standoff_m=base_standoff_m,
     )
     stage_reached = bool(
-        isinstance(retract, Mapping)
-        and retract.get("success", False)
+        retract_clearance_safe
         and backend.follow_path(
             [refined_targets["stage_base_xy"]],
             max_steps=1200,
@@ -3119,6 +3143,8 @@ def _reposition_base_for_floor_push(
         "retreat_reached": retreat_reached,
         "oriented": oriented,
         "retract": retract,
+        "retract_minimum_z_m": retract_minimum_z,
+        "retract_clearance_safe": retract_clearance_safe,
         "stage_reached": stage_reached,
         "targets": {
             key: value.tolist() if isinstance(value, np.ndarray) else value
@@ -3346,6 +3372,7 @@ def _floor_corridor_push_probe(
     route_arrival_radius_m: float = 0.80,
     route_arrival_margin_m: float = 0.05,
     route_reposition_clearance_m: float = 0.90,
+    route_minimum_retract_z_m: float = 0.80,
     tracking_gain: float = 0.50,
     alignment_gain: float = 0.50,
     tracking_deadband_m: float = 0.05,
@@ -3797,6 +3824,7 @@ def _floor_corridor_push_probe(
                 retract_forward_m=oriented_retract_forward_m,
                 retract_lateral_m=oriented_retract_lateral_m,
                 retract_target_z=oriented_retract_target_z,
+                minimum_retract_z_m=route_minimum_retract_z_m,
             )
             if not reposition["success"]:
                 success = False
@@ -4162,6 +4190,7 @@ def _end_grasp_floor_push_probe(
     floor_base_route_corridor_y: float = -8.40,
     floor_base_route_arrival_margin_m: float = 0.05,
     floor_base_route_reposition_clearance_m: float = 0.90,
+    floor_base_route_minimum_retract_z_m: float = 0.80,
     floor_base_tracking_gain: float = 0.50,
     floor_base_alignment_gain: float = 0.50,
     floor_base_tracking_deadband_m: float = 0.05,
@@ -4252,6 +4281,9 @@ def _end_grasp_floor_push_probe(
                 route_arrival_margin_m=floor_base_route_arrival_margin_m,
                 route_reposition_clearance_m=(
                     floor_base_route_reposition_clearance_m
+                ),
+                route_minimum_retract_z_m=(
+                    floor_base_route_minimum_retract_z_m
                 ),
                 tracking_gain=floor_base_tracking_gain,
                 alignment_gain=floor_base_alignment_gain,
@@ -8502,6 +8534,9 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                                 floor_base_route_reposition_clearance_m=(
                                     args.floor_base_route_reposition_clearance_m
                                 ),
+                                floor_base_route_minimum_retract_z_m=(
+                                    args.floor_base_route_minimum_retract_z_m
+                                ),
                                 floor_base_tracking_gain=(
                                     args.floor_base_tracking_gain
                                 ),
@@ -9032,6 +9067,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--floor-base-route-reposition-clearance-m", type=float, default=0.90
+    )
+    parser.add_argument(
+        "--floor-base-route-minimum-retract-z-m", type=float, default=0.80
     )
     parser.add_argument("--floor-base-tracking-gain", type=float, default=0.50)
     parser.add_argument("--floor-base-alignment-gain", type=float, default=0.50)
