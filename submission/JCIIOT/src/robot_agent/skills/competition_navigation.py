@@ -8,9 +8,20 @@ import numpy as np
 
 
 REFERENCE_BASE_TO_GRASP_CENTER = 0.651001
+BLUE_TOTE_STATION_AXIS_STANDOFF = 0.78
 SAFE_GRASP_YAW_CORRECTION = 0.15
 PRECISE_GRASP_BASE_TOLERANCE = 0.04
 PRECISE_GRASP_BASE_MAX_STEPS = 120
+
+
+def station_axis_standoff_for_object(object_name: str) -> float | None:
+    """Return the measured collision-free station-axis standoff when needed."""
+    name = str(object_name).lower()
+    if name == "green_tote_b01_upper":
+        return REFERENCE_BASE_TO_GRASP_CENTER
+    if "blue_tote_b01" in name:
+        return BLUE_TOTE_STATION_AXIS_STANDOFF
+    return None
 
 
 def align_base_for_grasp(

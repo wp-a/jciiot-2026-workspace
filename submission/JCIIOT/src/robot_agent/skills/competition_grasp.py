@@ -391,6 +391,8 @@ def apply_object_grasp_profile(
             config.pregrasp_wrist_adjustment = True
             config.hold_close_pose = False
             config.site_below_offset = 0.03
+    elif "blue_tote_b01" in str(object_name).lower():
+        config.close_follow_max_distance = 0.10
     elif uses_station_side_tote_grasp(object_name):
         config.mirrored_ik_height_offset = 0.06
         config.station_side_reach_offset = 0.04

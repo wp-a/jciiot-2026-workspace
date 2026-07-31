@@ -78,6 +78,40 @@ class CompetitionNavigationTests(unittest.TestCase):
         self.assertAlmostEqual(abs(pose["yaw"]), math.pi)
         self.assertTrue(pose["precise_alignment"])
 
+    def test_l3_far_right_blue_tote_uses_the_south_station_axis(self):
+        standoff = self.module.station_axis_standoff_for_object(
+            "blue_tote_b01_far_right"
+        )
+        pose = self.module.station_axis_grasp_pose(
+            grasp_center_xy=[-0.000201, 8.473143],
+            right_site_xy=[-0.000201, 8.638143],
+            left_site_xy=[-0.000201, 8.308143],
+            station_center=[0.144, 8.473],
+            station_approach=[0.11, 7.55],
+            base_standoff=standoff,
+        )
+
+        self.assertAlmostEqual(standoff, 0.78)
+        np.testing.assert_allclose(
+            pose["base_xy"],
+            [-0.028921, 7.693672],
+            atol=1e-4,
+        )
+        self.assertTrue(pose["precise_alignment"])
+
+    def test_other_objects_keep_their_existing_grasp_pose_family(self):
+        self.assertIsNone(
+            self.module.station_axis_standoff_for_object(
+                "green_tote_b01_lower"
+            )
+        )
+        self.assertAlmostEqual(
+            self.module.station_axis_standoff_for_object(
+                "green_tote_b01_upper"
+            ),
+            self.module.REFERENCE_BASE_TO_GRASP_CENTER,
+        )
+
     def test_candidate_selection_rejects_a_grasp_face_blocked_by_another_object(self):
         upper = self.module.grasp_aligned_base_pose(
             object_xy=[11.867624, 4.624856],

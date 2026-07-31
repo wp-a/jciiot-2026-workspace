@@ -331,6 +331,7 @@ class OfficialCompetitionDriver:
         )
         from robot_agent.skills.competition_navigation import (
             grasp_aligned_base_pose,
+            station_axis_standoff_for_object,
             station_axis_grasp_pose,
             station_side_grasp_pose,
         )
@@ -355,13 +356,15 @@ class OfficialCompetitionDriver:
             station_center=station.center,
             station_approach=station_approach,
         )
-        if str(object_name).lower() == "green_tote_b01_upper":
+        station_axis_standoff = station_axis_standoff_for_object(object_name)
+        if station_axis_standoff is not None:
             pose = station_axis_grasp_pose(
                 grasp_center_xy=pose["grasp_center_xy"],
                 right_site_xy=pose["right_site_xy"],
                 left_site_xy=pose["left_site_xy"],
                 station_center=station.center,
                 station_approach=station_approach,
+                base_standoff=station_axis_standoff,
             )
         if str(source) == "input_1" and "white_tote_b01_left" in object_name.lower():
             pose = station_side_grasp_pose(

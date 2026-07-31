@@ -501,6 +501,14 @@ class CompetitionGraspTests(unittest.TestCase):
         self.assertFalse(upper.hold_close_pose)
         self.assertAlmostEqual(upper.site_below_offset, 0.03)
 
+    def test_blue_tote_profile_tracks_object_motion_during_close(self):
+        config = self.module.apply_object_grasp_profile(
+            self.module.ScriptedGraspConfig(),
+            "blue_tote_b01_far_right",
+        )
+
+        self.assertAlmostEqual(config.close_follow_max_distance, 0.10)
+
     def test_l5_followup_totes_use_a_full_upper_body_clearance_seed(self):
         self.assertIsNone(
             self.module.station_side_clearance_joint_seed(
