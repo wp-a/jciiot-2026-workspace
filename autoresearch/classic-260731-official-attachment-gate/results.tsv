@@ -1,0 +1,3 @@
+iteration	candidate	owned_tests	hard_violations	materialized	protected_hashes	official_task1_score	collision	decision
+0	strict_physical_inchworm	356_passed	0	yes	unchanged	unverified	unverified	reject_transport_plateau
+1	physical_gate_official_attachment	357_passed	0	yes	unchanged	pending	pending	promote_to_server_eval

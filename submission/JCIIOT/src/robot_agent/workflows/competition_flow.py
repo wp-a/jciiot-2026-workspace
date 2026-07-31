@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+from collections.abc import Mapping
 from typing import Any, Iterable
 
 
@@ -55,6 +57,30 @@ def delivery_slot_target(center, object_name: str | None):
     elif name.endswith("_back"):
         target[0] += 0.60
     return target
+
+
+def verified_transport_grasp(result: Mapping[str, Any]) -> bool:
+    """Require physical contact, lift, and finite hold state before transport."""
+    if not bool(result.get("success")) or not bool(result.get("lift_success")):
+        return False
+
+    contacts = result.get("contacts")
+    if not isinstance(contacts, Mapping) or not all(
+        bool(contacts.get(arm)) for arm in ("right", "left")
+    ):
+        return False
+
+    hold = result.get("hold")
+    if not isinstance(hold, Mapping):
+        return False
+    try:
+        object_pos = list(hold["object_pos"])
+        scalars = [hold["base_yaw"], hold["object_z"], *object_pos[:3]]
+    except (KeyError, TypeError, ValueError):
+        return False
+    return len(object_pos) >= 3 and all(
+        math.isfinite(float(value)) for value in scalars
+    )
 
 
 class CompetitionFlow:
@@ -180,6 +206,8 @@ class OfficialCompetitionDriver:
         self._swap_arm_targets = False
         self._clearance_prepared = False
         self._physical_hold: dict[str, Any] | None = None
+        self._transport_attached = False
+        self._transport_attachment: dict[str, Any] | None = None
         self._last_transport: dict[str, Any] | None = None
         self._last_alignment: dict[str, Any] | None = None
         self._last_place: dict[str, Any] | None = None
@@ -210,6 +238,86 @@ class OfficialCompetitionDriver:
         ports = getattr(self.backend.env, "output_ports", {})
         names = ports.keys() if hasattr(ports, "keys") else ports
         return physical_output_available(names, target)
+
+    def _attachment_is_active(self, object_name: str | None) -> bool:
+        attachment = getattr(self, "_transport_attachment", None)
+        return bool(
+            getattr(self, "_transport_attached", False)
+            and isinstance(attachment, Mapping)
+            and attachment.get("active", False)
+            and attachment.get("object_name") == object_name
+        )
+
+    def _reset_transport_attachment(self) -> None:
+        self._transport_attached = False
+        self._transport_attachment = None
+        self.backend._held_crate_name = None
+        self.backend._held_crate_body_id = None
+
+    def _activate_transport_attachment(
+        self,
+        *,
+        object_name: str,
+        grasp_result: Mapping[str, Any],
+    ) -> tuple[bool, str | None]:
+        if not verified_transport_grasp(grasp_result):
+            return False, "physical grasp gate was not satisfied"
+
+        try:
+            from robosuite.environments.factory_sorting.transport_attachment import (
+                capture_transport_attachment,
+            )
+
+            attachment = capture_transport_attachment(
+                self.backend.env,
+                object_name,
+            )
+            if not isinstance(attachment, dict):
+                raise RuntimeError("official attachment did not return state")
+            if not attachment.get("active", False):
+                raise RuntimeError("official attachment is inactive")
+            if attachment.get("object_name") != object_name:
+                raise RuntimeError("official attachment captured another object")
+
+            self._transport_attachment = attachment
+            self._transport_attached = True
+            self.backend._held_crate_name = object_name
+            body_ids = getattr(self.backend.env, "obj_body_id", {})
+            self.backend._held_crate_body_id = (
+                body_ids.get(object_name)
+                if hasattr(body_ids, "get")
+                else None
+            )
+            marker = getattr(self.backend, "_mark_trajectory_event", None)
+            if callable(marker):
+                marker(
+                    "transport_attachment_enabled",
+                    object_name=object_name,
+                    gate="bilateral_contact_lift_hold",
+                    method="official_transport_attachment",
+                )
+            recorder = getattr(self.backend, "_record_trajectory_frame", None)
+            if callable(recorder):
+                recorder()
+            return True, None
+        except Exception as exc:
+            try:
+                from robosuite.environments.factory_sorting.transport_attachment import (
+                    clear_transport_attachment,
+                )
+
+                clear_transport_attachment(self.backend.env)
+            except Exception:
+                pass
+            self._reset_transport_attachment()
+            marker = getattr(self.backend, "_mark_trajectory_event", None)
+            if callable(marker):
+                marker(
+                    "transport_attachment_failed",
+                    object_name=object_name,
+                    error=f"{type(exc).__name__}: {exc}",
+                )
+            return False, f"{type(exc).__name__}: {exc}"
 
     def _grasp_pose(self, source: str, object_name: str) -> dict:
         from robosuite.environments.factory_sorting.load_factory_sorting_evalization import (
@@ -311,7 +419,24 @@ class OfficialCompetitionDriver:
         object_name: str | None = None,
     ) -> bool:
         if carrying:
-            return self._move_physically_while_holding(target, object_name)
+            if (
+                not object_name
+                or not self._physical_hold
+                or not self._attachment_is_active(object_name)
+            ):
+                self._last_transport = {
+                    "success": False,
+                    "failure_stage": "transport_attachment",
+                    "method": "official_transport_attachment",
+                }
+                return False
+            success = self._move_to(target, carrying=True)
+            self._last_transport = {
+                "success": bool(success),
+                "failure_stage": None if success else "navigation",
+                "method": "official_transport_attachment",
+            }
+            return bool(success)
 
         resolved_target = target
         staging_target: str | None = None
@@ -480,50 +605,60 @@ class OfficialCompetitionDriver:
         config.swap_arm_targets = self._swap_arm_targets
         config.clearance_prepared = self._clearance_prepared
 
-        result = run_scripted_grasp(
+        result = dict(run_scripted_grasp(
             self.backend,
             source=source,
             object_name=object_name,
             config=config,
+        ))
+        self._physical_hold = None
+        self._transport_attached = False
+        self._transport_attachment = None
+        if not bool(result.get("success", False)):
+            return result
+        if not verified_transport_grasp(result):
+            result["success"] = False
+            result["failure_stage"] = "transport_gate"
+            result["error"] = "physical grasp gate was not satisfied"
+            return result
+
+        attached, attachment_error = self._activate_transport_attachment(
+            object_name=object_name,
+            grasp_result=result,
         )
-        if bool(result.get("success", False)):
-            self._physical_hold = dict(result.get("hold") or {})
-        else:
-            self._physical_hold = None
+        if not attached:
+            result["success"] = False
+            result["failure_stage"] = "transport_attachment"
+            result["error"] = attachment_error
+            return result
+
+        self._physical_hold = dict(result["hold"])
+        result["transport_attachment_active"] = True
         return result
 
     def place(self, target: str, object_name: str) -> bool:
-        from robot_agent.skills.competition_transport import (
-            run_physical_place,
-            run_physical_target_alignment,
-        )
-
         station = self.scene_context.output_ports.get(target)
-        if station is None or not self._physical_hold:
+        if (
+            station is None
+            or not self._physical_hold
+            or not self._attachment_is_active(object_name)
+        ):
             return False
-        target_xy = delivery_slot_target(station.center[:2], object_name)
-        minimum_object_z = float(
-            self._physical_hold.get(
-                "minimum_transport_object_z",
-                float(self._physical_hold["object_z"]) - 0.025,
-            )
+        place_object_physics = getattr(self.backend, "place_object_physics", None)
+        success = bool(
+            callable(place_object_physics)
+            and place_object_physics(target)
         )
-        self._last_alignment = run_physical_target_alignment(
-            self.backend,
-            object_name=object_name,
-            target_xy=target_xy,
-            minimum_object_z=minimum_object_z,
-        )
-        if not bool(self._last_alignment.get("success", False)):
-            return False
-        self._last_place = run_physical_place(
-            self.backend,
-            object_name=object_name,
-            target_xy=target_xy,
-        )
-        if bool(self._last_place.get("success", False)):
+        self._last_place = {
+            "success": success,
+            "failure_stage": None if success else "official_place",
+            "method": "official_constrained_lowering_and_release",
+        }
+        if success:
             self._physical_hold = None
-        return bool(self._last_place.get("success", False))
+            self._transport_attached = False
+            self._transport_attachment = None
+        return success
 
     def verify(self, target: str, object_name: str) -> bool:
         import numpy as np

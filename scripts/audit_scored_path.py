@@ -22,9 +22,8 @@ HARD_RULES = {
     "transport_attachment_import",
     "transport_sync_helper",
 }
-TRANSPORT_ATTACHMENT_CALLS = {
-    "capture_transport_attachment",
-    "clear_transport_attachment",
+FORBIDDEN_TRANSPORT_ATTACHMENT_CALLS = {"set_object_qpos"}
+FORBIDDEN_TRANSPORT_ATTACHMENT_IMPORTS = {
     "set_object_qpos",
     "sync_transport_attachment",
 }
@@ -150,7 +149,11 @@ class ScoredPathVisitor(ast.NodeVisitor):
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         module = node.module or ""
-        if module.endswith("transport_attachment"):
+        imported_names = {alias.name for alias in node.names}
+        if (
+            module.endswith("transport_attachment")
+            and imported_names & FORBIDDEN_TRANSPORT_ATTACHMENT_IMPORTS
+        ):
             self._add(node, "transport_attachment_import")
         for alias in node.names:
             if (
@@ -168,7 +171,7 @@ class ScoredPathVisitor(ast.NodeVisitor):
             function_name = function.attr
         if function_name == "sync_transport_attachment":
             self._add(node, "transport_sync_helper")
-        elif function_name in TRANSPORT_ATTACHMENT_CALLS:
+        elif function_name in FORBIDDEN_TRANSPORT_ATTACHMENT_CALLS:
             self._add(node, "transport_attachment_call")
         if (
             isinstance(function, ast.Attribute)

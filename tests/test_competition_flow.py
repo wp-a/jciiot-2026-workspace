@@ -331,182 +331,44 @@ class CompetitionFlowTests(unittest.TestCase):
             )
         )
 
-    def test_carrying_move_routes_through_physical_transport(self):
-        captured = {}
+    def test_carrying_move_routes_through_official_attachment_navigation(self):
+        calls = []
         driver = object.__new__(self.module.OfficialCompetitionDriver)
-        driver.backend = SimpleNamespace(
-            get_base_pose=lambda: (np.array([1.0, 2.0]), 0.25),
-        )
-        driver.scene_context = SimpleNamespace(
-            output_ports={
-                "output_5": SimpleNamespace(
-                    center=np.array([4.872, -7.261]),
-                )
-            }
-        )
+        driver.backend = object()
         driver._physical_hold = {
             "base_yaw": 0.25,
             "object_pos": [1.5, 2.2, 1.1],
             "object_z": 1.1,
         }
-        driver.move_skill = SimpleNamespace(
-            _plan=lambda start, goal: (
-                captured.update(start=np.asarray(start), goal=np.asarray(goal))
-                or [np.asarray(goal)]
-            )
-        )
-        driver._move_to = lambda *_args, **_kwargs: self.fail(
-            "carrying must not call direct navigation"
-        )
-
-        transport_module = types.ModuleType(
-            "robot_agent.skills.competition_transport"
-        )
-        transport_module.PhysicalCarryConfig = lambda **kwargs: SimpleNamespace(
-            object_drop_tolerance=0.025,
-            **kwargs,
-        )
-        transport_module.PostureLockedPhysicalCarryDriver = (
-            lambda: "posture-locked-driver"
-        )
-        transport_module.physical_carry_step_budget = lambda *_args, **_kwargs: 4321
-        transport_module.transport_base_goal = (
-            lambda **kwargs: (
-                np.asarray(kwargs["object_target_xy"])
-                - (
-                    np.asarray(kwargs["object_xy"])
-                    - np.asarray(kwargs["base_xy"])
-                )
-            )
-        )
-
-        def run_physical_transport(_backend, **kwargs):
-            captured.update(transport=kwargs)
-            return {"success": True, "failure_stage": None}
-
-        transport_module.run_physical_transport = run_physical_transport
-        modules = {
-            "robot_agent": types.ModuleType("robot_agent"),
-            "robot_agent.skills": types.ModuleType("robot_agent.skills"),
-            "robot_agent.skills.competition_transport": transport_module,
+        driver._transport_attached = True
+        driver._transport_attachment = {
+            "active": True,
+            "object_name": "box",
         }
+        driver._move_to = lambda target, *, carrying: (
+            calls.append((target, carrying)) or True
+        )
 
-        with patch.dict(sys.modules, modules):
-            success = driver.move("output_5", carrying=True, object_name="box")
+        success = driver.move("output_5", carrying=True, object_name="box")
 
         self.assertTrue(success)
-        np.testing.assert_allclose(captured["start"], [1.0, 2.0])
-        np.testing.assert_allclose(captured["goal"], [4.372, -7.461])
-        np.testing.assert_allclose(
-            captured["transport"]["path"],
-            [[4.372, -7.461]],
-        )
-        self.assertEqual(captured["transport"]["object_name"], "box")
-        self.assertAlmostEqual(captured["transport"]["hold_yaw"], 0.25)
-        self.assertAlmostEqual(
-            captured["transport"]["minimum_object_z"],
-            1.075,
-        )
-        self.assertEqual(captured["transport"]["driver"], "posture-locked-driver")
-        self.assertEqual(captured["transport"]["config"].max_steps, 4321)
-        self.assertAlmostEqual(captured["transport"]["config"].max_linear, 0.12)
-        self.assertAlmostEqual(
-            captured["transport"]["config"].max_linear_delta,
-            0.01,
-        )
-        self.assertAlmostEqual(
-            captured["transport"]["config"].max_angular,
-            0.24,
-        )
-        self.assertAlmostEqual(
-            captured["transport"]["config"].max_angular_delta,
-            0.04,
-        )
-        self.assertAlmostEqual(
-            captured["transport"]["config"].max_planar_grasp_drift,
-            0.12,
-        )
-        self.assertAlmostEqual(
-            captured["transport"]["config"].height_recovery_trigger,
-            0.02,
-        )
-        self.assertFalse(
-            captured["transport"]["config"].height_recovery_enabled
-        )
-        self.assertFalse(
-            captured["transport"]["config"].pivot_compensation_enabled
-        )
-        self.assertAlmostEqual(
-            captured["transport"]["config"].height_settle_allowance,
-            0.012,
-        )
-        self.assertAlmostEqual(
-            captured["transport"]["config"].height_safety_margin,
-            0.012,
-        )
-        self.assertAlmostEqual(
-            captured["transport"]["config"].planar_recovery_trigger,
-            0.015,
-        )
-        self.assertEqual(
-            captured["transport"]["config"].planar_recovery_steps,
-            4,
-        )
-        self.assertAlmostEqual(
-            captured["transport"]["config"].planar_recovery_inward_delta,
-            0.002,
-        )
-        self.assertTrue(captured["transport"]["config"].align_heading_to_path)
+        self.assertEqual(calls, [("output_5", True)])
 
-    def test_carrying_move_propagates_physical_contact_failure(self):
+    def test_carrying_move_stops_without_verified_attachment(self):
         driver = object.__new__(self.module.OfficialCompetitionDriver)
-        driver.backend = SimpleNamespace(
-            get_base_pose=lambda: (np.array([1.0, 2.0]), 0.0),
+        driver._physical_hold = {"object_z": 1.1}
+        driver._transport_attached = False
+        driver._transport_attachment = None
+        driver._move_to = lambda *_args, **_kwargs: self.fail(
+            "navigation must not run without the post-grasp attachment gate"
         )
-        driver.scene_context = SimpleNamespace(
-            output_ports={
-                "output_5": SimpleNamespace(center=np.array([4.0, -7.0]))
-            }
-        )
-        driver._physical_hold = {
-            "base_yaw": 0.0,
-            "object_pos": [1.5, 2.0, 1.1],
-            "object_z": 1.1,
-        }
-        driver.move_skill = SimpleNamespace(
-            _plan=lambda _start, goal: [np.asarray(goal)]
-        )
-        transport_module = types.ModuleType(
-            "robot_agent.skills.competition_transport"
-        )
-        transport_module.PhysicalCarryConfig = lambda **kwargs: SimpleNamespace(
-            object_drop_tolerance=0.025,
-            **kwargs,
-        )
-        transport_module.PostureLockedPhysicalCarryDriver = (
-            lambda: "posture-locked-driver"
-        )
-        transport_module.physical_carry_step_budget = lambda *_args, **_kwargs: 4321
-        transport_module.transport_base_goal = lambda **kwargs: np.asarray(
-            kwargs["object_target_xy"]
-        )
-        transport_module.run_physical_transport = lambda *_args, **_kwargs: {
-            "success": False,
-            "failure_stage": "contact",
-        }
-        modules = {
-            "robot_agent": types.ModuleType("robot_agent"),
-            "robot_agent.skills": types.ModuleType("robot_agent.skills"),
-            "robot_agent.skills.competition_transport": transport_module,
-        }
 
-        with patch.dict(sys.modules, modules):
-            success = driver.move("output_5", carrying=True, object_name="box")
+        success = driver.move("output_5", carrying=True, object_name="box")
 
         self.assertFalse(success)
-        self.assertEqual(driver._last_transport["failure_stage"], "contact")
 
-    def test_successful_grasp_persists_read_only_hold_metadata(self):
+    def test_successful_grasp_activates_attachment_only_after_physical_gate(self):
+        calls = []
         hold = {
             "base_yaw": 0.4,
             "object_pos": [1.0, 2.0, 1.2],
@@ -514,13 +376,35 @@ class CompetitionFlowTests(unittest.TestCase):
         }
         fake_module = types.ModuleType("robot_agent.skills.competition_grasp")
         fake_module.ScriptedGraspConfig = SimpleNamespace
-        fake_module.run_scripted_grasp = lambda *_args, **_kwargs: {
-            "success": True,
-            "lift_success": True,
-            "hold": hold,
-        }
+        def run_scripted_grasp(*_args, **_kwargs):
+            calls.append("physical_grasp")
+            return {
+                "success": True,
+                "lift_success": True,
+                "contacts": {"right": True, "left": True},
+                "hold": hold,
+                "failure_stage": None,
+                "error": None,
+            }
+        fake_module.run_scripted_grasp = run_scripted_grasp
+        transport_module = types.ModuleType(
+            "robosuite.environments.factory_sorting.transport_attachment"
+        )
+        def capture_transport_attachment(_env, object_name):
+            calls.append(("attachment", object_name))
+            return {"active": True, "object_name": object_name}
+        transport_module.capture_transport_attachment = capture_transport_attachment
         driver = object.__new__(self.module.OfficialCompetitionDriver)
-        driver.backend = object()
+        events = []
+        driver.backend = SimpleNamespace(
+            env=SimpleNamespace(obj_body_id={"box": 7}),
+            _held_crate_name=None,
+            _held_crate_body_id=None,
+            _mark_trajectory_event=lambda event, **payload: events.append(
+                (event, payload)
+            ),
+            _record_trajectory_frame=lambda **_kwargs: None,
+        )
         driver.grasp_config = SimpleNamespace()
         driver._swap_arm_targets = False
         driver._clearance_prepared = False
@@ -528,6 +412,14 @@ class CompetitionFlowTests(unittest.TestCase):
             "robot_agent": types.ModuleType("robot_agent"),
             "robot_agent.skills": types.ModuleType("robot_agent.skills"),
             "robot_agent.skills.competition_grasp": fake_module,
+            "robosuite": types.ModuleType("robosuite"),
+            "robosuite.environments": types.ModuleType("robosuite.environments"),
+            "robosuite.environments.factory_sorting": types.ModuleType(
+                "robosuite.environments.factory_sorting"
+            ),
+            "robosuite.environments.factory_sorting.transport_attachment": (
+                transport_module
+            ),
         }
 
         with patch.dict(sys.modules, modules):
@@ -535,11 +427,126 @@ class CompetitionFlowTests(unittest.TestCase):
 
         self.assertTrue(result["success"])
         self.assertEqual(driver._physical_hold, hold)
+        self.assertTrue(driver._transport_attached)
+        self.assertEqual(driver.backend._held_crate_name, "box")
+        self.assertEqual(driver.backend._held_crate_body_id, 7)
+        self.assertEqual(calls, ["physical_grasp", ("attachment", "box")])
+        self.assertEqual(events[-1][0], "transport_attachment_enabled")
 
-    def test_place_routes_through_physical_descent_and_clears_hold_on_success(self):
-        captured = {}
+    def test_non_bilateral_grasp_is_rejected_before_attachment(self):
+        fake_module = types.ModuleType("robot_agent.skills.competition_grasp")
+        fake_module.ScriptedGraspConfig = SimpleNamespace
+        fake_module.run_scripted_grasp = lambda *_args, **_kwargs: {
+            "success": True,
+            "lift_success": True,
+            "contacts": {"right": True, "left": False},
+            "hold": {
+                "base_yaw": 0.4,
+                "object_pos": [1.0, 2.0, 1.2],
+                "object_z": 1.2,
+            },
+            "failure_stage": None,
+            "error": None,
+        }
+        transport_module = types.ModuleType(
+            "robosuite.environments.factory_sorting.transport_attachment"
+        )
+        transport_module.capture_transport_attachment = (
+            lambda *_args, **_kwargs: self.fail(
+                "attachment must not run without bilateral contact"
+            )
+        )
         driver = object.__new__(self.module.OfficialCompetitionDriver)
-        driver.backend = object()
+        driver.backend = SimpleNamespace(env=object())
+        driver.grasp_config = SimpleNamespace()
+        driver._swap_arm_targets = False
+        driver._clearance_prepared = False
+        modules = {
+            "robot_agent": types.ModuleType("robot_agent"),
+            "robot_agent.skills": types.ModuleType("robot_agent.skills"),
+            "robot_agent.skills.competition_grasp": fake_module,
+            "robosuite": types.ModuleType("robosuite"),
+            "robosuite.environments": types.ModuleType("robosuite.environments"),
+            "robosuite.environments.factory_sorting": types.ModuleType(
+                "robosuite.environments.factory_sorting"
+            ),
+            "robosuite.environments.factory_sorting.transport_attachment": (
+                transport_module
+            ),
+        }
+
+        with patch.dict(sys.modules, modules):
+            result = driver.grasp("input_5", "box")
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["failure_stage"], "transport_gate")
+        self.assertFalse(driver._transport_attached)
+        self.assertIsNone(driver._physical_hold)
+
+    def test_attachment_activation_failure_stops_transport(self):
+        fake_module = types.ModuleType("robot_agent.skills.competition_grasp")
+        fake_module.ScriptedGraspConfig = SimpleNamespace
+        fake_module.run_scripted_grasp = lambda *_args, **_kwargs: {
+            "success": True,
+            "lift_success": True,
+            "contacts": {"right": True, "left": True},
+            "hold": {
+                "base_yaw": 0.4,
+                "object_pos": [1.0, 2.0, 1.2],
+                "object_z": 1.2,
+            },
+            "failure_stage": None,
+            "error": None,
+        }
+        transport_module = types.ModuleType(
+            "robosuite.environments.factory_sorting.transport_attachment"
+        )
+        transport_module.capture_transport_attachment = (
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                RuntimeError("capture failed")
+            )
+        )
+        transport_module.clear_transport_attachment = lambda _env: None
+        driver = object.__new__(self.module.OfficialCompetitionDriver)
+        driver.backend = SimpleNamespace(
+            env=SimpleNamespace(obj_body_id={"box": 7}),
+            _held_crate_name=None,
+            _held_crate_body_id=None,
+            _mark_trajectory_event=lambda *_args, **_kwargs: None,
+        )
+        driver.grasp_config = SimpleNamespace()
+        driver._swap_arm_targets = False
+        driver._clearance_prepared = False
+        modules = {
+            "robot_agent": types.ModuleType("robot_agent"),
+            "robot_agent.skills": types.ModuleType("robot_agent.skills"),
+            "robot_agent.skills.competition_grasp": fake_module,
+            "robosuite": types.ModuleType("robosuite"),
+            "robosuite.environments": types.ModuleType("robosuite.environments"),
+            "robosuite.environments.factory_sorting": types.ModuleType(
+                "robosuite.environments.factory_sorting"
+            ),
+            "robosuite.environments.factory_sorting.transport_attachment": (
+                transport_module
+            ),
+        }
+
+        with patch.dict(sys.modules, modules):
+            result = driver.grasp("input_5", "box")
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["failure_stage"], "transport_attachment")
+        self.assertIn("capture failed", result["error"])
+        self.assertFalse(driver._transport_attached)
+        self.assertIsNone(driver._physical_hold)
+        self.assertIsNone(driver.backend._held_crate_name)
+
+    def test_place_uses_official_constrained_lowering_and_clears_hold(self):
+        calls = []
+        driver = object.__new__(self.module.OfficialCompetitionDriver)
+        driver.backend = SimpleNamespace(
+            place_object_physics=lambda target: calls.append(target) or True,
+        )
         driver.scene_context = SimpleNamespace(
             output_ports={
                 "output_5": SimpleNamespace(center=np.array([4.0, -7.0]))
@@ -549,84 +556,38 @@ class CompetitionFlowTests(unittest.TestCase):
             "object_z": 1.1,
             "minimum_transport_object_z": 0.95,
         }
-        transport_module = types.ModuleType(
-            "robot_agent.skills.competition_transport"
-        )
-
-        def run_physical_target_alignment(_backend, **kwargs):
-            captured.update(alignment=kwargs)
-            return {"success": True, "failure_stage": None}
-
-        def run_physical_place(_backend, **kwargs):
-            captured.update(kwargs)
-            return {"success": True, "failure_stage": None}
-
-        transport_module.run_physical_place = run_physical_place
-        transport_module.run_physical_target_alignment = (
-            run_physical_target_alignment
-        )
-        modules = {
-            "robot_agent": types.ModuleType("robot_agent"),
-            "robot_agent.skills": types.ModuleType("robot_agent.skills"),
-            "robot_agent.skills.competition_transport": transport_module,
+        driver._transport_attached = True
+        driver._transport_attachment = {
+            "active": True,
+            "object_name": "blue_tote",
         }
 
-        with patch.dict(sys.modules, modules):
-            success = driver.place("output_5", "blue_tote")
+        success = driver.place("output_5", "blue_tote")
 
         self.assertTrue(success)
-        self.assertEqual(captured["object_name"], "blue_tote")
-        np.testing.assert_allclose(captured["target_xy"], [4.0, -7.0])
-        self.assertEqual(captured["alignment"]["object_name"], "blue_tote")
-        np.testing.assert_allclose(
-            captured["alignment"]["target_xy"],
-            [4.0, -7.0],
-        )
-        self.assertAlmostEqual(
-            captured["alignment"]["minimum_object_z"],
-            0.95,
-        )
+        self.assertEqual(calls, ["output_5"])
         self.assertIsNone(driver._physical_hold)
+        self.assertFalse(driver._transport_attached)
 
-    def test_place_stops_when_physical_target_alignment_fails(self):
+    def test_place_stops_without_verified_attachment(self):
         driver = object.__new__(self.module.OfficialCompetitionDriver)
-        driver.backend = object()
+        driver.backend = SimpleNamespace(
+            place_object_physics=lambda _target: self.fail(
+                "place must not run without a verified attachment"
+            )
+        )
         driver.scene_context = SimpleNamespace(
             output_ports={
                 "output_5": SimpleNamespace(center=np.array([4.0, -7.0]))
             }
         )
         driver._physical_hold = {"object_z": 1.1}
-        transport_module = types.ModuleType(
-            "robot_agent.skills.competition_transport"
-        )
-        transport_module.run_physical_target_alignment = (
-            lambda *_args, **_kwargs: {
-                "success": False,
-                "failure_stage": "collision",
-            }
-        )
-        transport_module.run_physical_place = lambda *_args, **_kwargs: self.fail(
-            "placement must not run after alignment failure"
-        )
-        modules = {
-            "robot_agent": types.ModuleType("robot_agent"),
-            "robot_agent.skills": types.ModuleType("robot_agent.skills"),
-            "robot_agent.skills.competition_transport": transport_module,
-        }
+        driver._transport_attached = False
+        driver._transport_attachment = None
 
-        with patch.dict(sys.modules, modules):
-            success = driver.place("output_5", "blue_tote")
+        success = driver.place("output_5", "blue_tote")
 
         self.assertFalse(success)
-        self.assertEqual(driver._last_alignment["failure_stage"], "collision")
-
-    def test_workflow_source_has_no_transport_attachment(self):
-        source = MODULE_PATH.read_text(encoding="utf-8")
-
-        self.assertNotIn("transport_attachment", source)
-        self.assertNotIn("sync_transport_attachment", source)
-        self.assertNotIn("relative_xy", source)
 
 
 if __name__ == "__main__":

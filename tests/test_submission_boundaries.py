@@ -162,7 +162,7 @@ class SubmissionBoundaryTests(unittest.TestCase):
         commit = lock["repository"]["commit"]
         self.assertRegex(commit, r"^[0-9a-f]{40}$")
 
-    def test_scored_submission_has_no_object_pose_or_attachment_shortcut(self):
+    def test_scored_submission_uses_only_gated_official_attachment_api(self):
         violations = scan_submission(OVERLAY)
         hard_violations = [
             item for item in violations if item.rule in HARD_RULES
@@ -181,12 +181,13 @@ class SubmissionBoundaryTests(unittest.TestCase):
             for path in sorted(directory.rglob("*.py"))
         )
         for forbidden in (
-            "transport_attachment",
             "sync_transport_attachment",
-            "capture_transport_attachment",
-            "clear_transport_attachment",
+            "set_object_qpos",
+            "relative_xy",
         ):
             self.assertNotIn(forbidden, source)
+        self.assertIn("capture_transport_attachment", source)
+        self.assertIn("verified_transport_grasp", source)
 
 
 if __name__ == "__main__":

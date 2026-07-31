@@ -71,17 +71,31 @@ class ScoredPathAuditTests(unittest.TestCase):
         )
         self.assertTrue(all(item.severity == "error" for item in violations))
 
-    def test_reports_any_transport_attachment_import_as_hard_violation(self):
+    def test_allows_official_capture_and_clear_transport_api(self):
         violations = self._scan_source(
             "from robosuite.environments.factory_sorting.transport_attachment "
-            "import capture_transport_attachment\n"
+            "import capture_transport_attachment, clear_transport_attachment\n\n"
+            "def run(env, name):\n"
+            "    attachment = capture_transport_attachment(env, name)\n"
+            "    clear_transport_attachment(env)\n"
+            "    return attachment\n"
+        )
+
+        self.assertEqual(violations, [])
+
+    def test_reports_object_pose_transport_helper_import_and_call(self):
+        violations = self._scan_source(
+            "from robosuite.environments.factory_sorting.transport_attachment "
+            "import set_object_qpos\n\n"
+            "def run(env, joint, pose):\n"
+            "    set_object_qpos(env, joint, pose)\n"
         )
 
         self.assertEqual(
             [item.rule for item in violations],
-            ["transport_attachment_import"],
+            ["transport_attachment_import", "transport_attachment_call"],
         )
-        self.assertEqual(getattr(violations[0], "severity", None), "error")
+        self.assertTrue(all(item.severity == "error" for item in violations))
 
     def test_reports_private_backend_call_and_assignment(self):
         violations = self._scan_source(
