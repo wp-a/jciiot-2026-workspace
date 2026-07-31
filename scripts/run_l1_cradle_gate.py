@@ -2883,6 +2883,7 @@ def _floor_corridor_push_probe(
         hand_height_m=hand_height_m,
         precontact_clearance_m=precontact_clearance_m,
     )
+    navigation_targets = targets
     direction = np.asarray(targets["direction"], dtype=float)
     marker = getattr(backend, "_mark_trajectory_event", None)
     if callable(marker):
@@ -2925,6 +2926,32 @@ def _floor_corridor_push_probe(
         if oriented
         else None
     )
+    interaction_start_object = np.asarray(
+        raw_env.sim.data.body_xpos[body_id], dtype=float
+    ).copy()
+    if isinstance(oriented_retract, Mapping) and oriented_retract.get(
+        "success", False
+    ):
+        refined_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
+        targets = floor_push_staging_targets(
+            object_xy=interaction_start_object[:2],
+            current_base_xy=refined_base_xy,
+            push_direction_xy=[push_direction_x, push_direction_y],
+            base_standoff_m=base_standoff_m,
+            orientation_clearance_m=orientation_clearance_m,
+            lateral_offset_m=lateral_offset_m,
+            maximum_lateral_offset_m=maximum_lateral_offset_m,
+            face_offset_m=face_offset_m,
+            hand_separation_m=hand_separation_m,
+            hand_height_m=hand_height_m,
+            precontact_clearance_m=precontact_clearance_m,
+        )
+        if callable(marker):
+            marker(
+                "floor_corridor_push_refined",
+                object_position=interaction_start_object.tolist(),
+                stage_base_xy=targets["stage_base_xy"].tolist(),
+            )
     stage_reached = bool(
         isinstance(oriented_retract, Mapping)
         and oriented_retract.get("success", False)
@@ -2995,7 +3022,7 @@ def _floor_corridor_push_probe(
             object_position = np.asarray(
                 raw_env.sim.data.body_xpos[body_id], dtype=float
             ).copy()
-            object_delta = object_position[:2] - start_object[:2]
+            object_delta = object_position[:2] - interaction_start_object[:2]
             object_progress = float(np.dot(object_delta, direction))
             lateral_drift = abs(
                 float(np.dot(object_delta, np.asarray(targets["left_axis"])))
@@ -3057,6 +3084,7 @@ def _floor_corridor_push_probe(
     steps = 0
     if failure_stage is None:
         hold_targets = carry_driver.capture_hold_targets(backend)
+        push_start_base_xy = np.asarray(backend.get_base_pose()[0], dtype=float)
         base_control_dt = 0.05
         arm_step = direction * requested_speed * base_control_dt
         for step in range(requested_steps):
@@ -3090,12 +3118,15 @@ def _floor_corridor_push_probe(
             object_position = np.asarray(
                 raw_env.sim.data.body_xpos[body_id], dtype=float
             ).copy()
-            object_delta = object_position[:2] - start_object[:2]
+            object_delta = object_position[:2] - interaction_start_object[:2]
             object_progress = float(np.dot(object_delta, direction))
             lateral_drift = abs(
                 float(np.dot(object_delta, np.asarray(targets["left_axis"])))
             )
-            base_delta = np.asarray(backend.get_base_pose()[0], dtype=float) - start_base_xy
+            base_delta = (
+                np.asarray(backend.get_base_pose()[0], dtype=float)
+                - push_start_base_xy
+            )
             base_progress = float(np.dot(base_delta, direction))
             if step % 10 == 0 or collision or object_progress >= requested_distance:
                 observations.append(
@@ -3160,10 +3191,13 @@ def _floor_corridor_push_probe(
         "lateral_drift_m": lateral_drift,
         "base_progress_m": base_progress,
         "start_object_position": start_object.tolist(),
+        "interaction_start_object_position": interaction_start_object.tolist(),
         "end_object_position": final_object.tolist(),
         "targets": {
-            "escape_base_xy": targets["escape_base_xy"].tolist(),
-            "orientation_base_xy": targets["orientation_base_xy"].tolist(),
+            "escape_base_xy": navigation_targets["escape_base_xy"].tolist(),
+            "orientation_base_xy": navigation_targets[
+                "orientation_base_xy"
+            ].tolist(),
             "stage_base_xy": targets["stage_base_xy"].tolist(),
             "target_yaw": float(targets["target_yaw"]),
             "lateral_offset_m": float(targets["lateral_offset_m"]),
