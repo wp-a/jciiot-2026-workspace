@@ -439,7 +439,7 @@ class OfficialCompetitionDriver:
             max_linear_delta=0.005,
             max_angular_delta=0.01,
             base_control_dt=control_dt,
-            align_heading_to_path=True,
+            align_heading_to_path=False,
             heading_translation_tolerance=0.05,
             max_planar_grasp_drift=0.12,
         )
