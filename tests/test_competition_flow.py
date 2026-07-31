@@ -322,6 +322,14 @@ class CompetitionFlowTests(unittest.TestCase):
             [12.4, 7.2],
         )
 
+    def test_l5_carry_egress_pulls_tote_clear_of_remaining_source_objects(self):
+        waypoints = self.module.carrying_egress_waypoints(
+            "white_tote_b01_left_center",
+            [-13.65, 4.75],
+        )
+
+        self.assertEqual(waypoints, [[-12.05, 4.75]])
+
     def test_delivery_inset_moves_unregistered_output_toward_center(self):
         target = self.module.delivery_inset_target(
             center=np.array([4.872, -7.261]),

@@ -24,8 +24,11 @@ def carrying_egress_waypoints(
     object_name: str | None,
     base_xy,
 ) -> list[list[float]]:
-    """Route the L2 tote outside line 6 before entering the lower corridor."""
-    if str(object_name or "").lower() != "green_tote_b01_upper":
+    """Pull carried objects clear of their source row before corridor travel."""
+    name = str(object_name or "").lower()
+    if "white_tote_b01_left" in name:
+        return [[float(base_xy[0]) + 1.60, float(base_xy[1])]]
+    if name != "green_tote_b01_upper":
         return []
     return [
         [13.5, float(base_xy[1])],
