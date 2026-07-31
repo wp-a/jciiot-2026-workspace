@@ -356,8 +356,13 @@ def station_side_clearance_joint_seed(object_name: str) -> np.ndarray | None:
 
 
 def should_swap_arm_targets(object_name: str, *, requested: bool) -> bool:
-    """Keep the dynamic wall-side assignment from being swapped twice."""
-    return bool(requested) and not uses_station_side_tote_grasp(object_name)
+    """Keep axis-aware tote assignments from being swapped twice."""
+    name = str(object_name).lower()
+    axis_assignment_is_dynamic = (
+        uses_station_side_tote_grasp(name)
+        or "blue_tote_b01" in name
+    )
+    return bool(requested) and not axis_assignment_is_dynamic
 
 
 def apply_object_grasp_profile(

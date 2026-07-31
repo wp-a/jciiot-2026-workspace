@@ -449,6 +449,14 @@ class CompetitionGraspTests(unittest.TestCase):
             )
         )
 
+    def test_rotated_blue_tote_keeps_near_left_far_right_assignment(self):
+        self.assertFalse(
+            self.module.should_swap_arm_targets(
+                "blue_tote_b01_far_right",
+                requested=True,
+            )
+        )
+
     def test_wall_side_tote_targets_reflect_near_site_across_heading(self):
         targets = self.module.station_side_tote_grasp_targets(
             {
