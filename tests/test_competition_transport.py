@@ -875,6 +875,31 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
         self.assertEqual(len(driver.recover_calls), 1)
         self.assertAlmostEqual(driver.recover_calls[0]["lift_height"], 0.015)
 
+    def test_height_recovery_allows_configured_post_lift_settling(self):
+        driver = FakePhysicalTransportDriver(
+            object_heights=[1.0, 0.975, 0.975, 0.975]
+        )
+        config = self.module.PhysicalCarryConfig(
+            waypoint_tolerance=0.02,
+            max_steps=20,
+            k_linear=1.0,
+            max_linear=0.10,
+            max_linear_delta=0.10,
+            height_recovery_trigger=0.004,
+            height_settle_allowance=0.02,
+            height_safety_margin=0.01,
+        )
+
+        result = self.run_transport(
+            driver,
+            config=config,
+            minimum_object_z=0.90,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(len(driver.recover_calls), 1)
+        self.assertAlmostEqual(driver.recover_calls[0]["lift_height"], 0.005)
+
     def test_locked_posture_skips_recenter_before_height_recovery(self):
         driver = FakePhysicalTransportDriver(
             object_heights=[1.0, 0.985, 0.985, 0.985]

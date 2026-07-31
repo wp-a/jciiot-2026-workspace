@@ -443,6 +443,8 @@ class OfficialCompetitionDriver:
             heading_translation_tolerance=0.05,
             max_planar_grasp_drift=0.12,
             height_recovery_trigger=0.006,
+            height_settle_allowance=0.012,
+            height_safety_margin=0.012,
             planar_recovery_trigger=0.015,
             planar_recovery_steps=4,
             planar_recovery_inward_delta=0.002,

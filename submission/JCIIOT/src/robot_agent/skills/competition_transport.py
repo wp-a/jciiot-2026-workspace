@@ -303,6 +303,8 @@ class PhysicalCarryConfig:
         planar_recovery_steps: int = 0,
         planar_recovery_inward_delta: float = 0.0,
         height_recovery_trigger: float = 0.01,
+        height_settle_allowance: float = 0.0,
+        height_safety_margin: float | None = None,
         height_recovery_steps: int = 80,
         height_recovery_max_action: float = 0.65,
         height_recenter_steps: int = 5,
@@ -342,6 +344,12 @@ class PhysicalCarryConfig:
             planar_recovery_inward_delta
         )
         self.height_recovery_trigger = float(height_recovery_trigger)
+        self.height_settle_allowance = float(height_settle_allowance)
+        self.height_safety_margin = float(
+            object_drop_tolerance
+            if height_safety_margin is None
+            else height_safety_margin
+        )
         self.height_recovery_steps = int(height_recovery_steps)
         self.height_recovery_max_action = float(height_recovery_max_action)
         self.height_recenter_steps = int(height_recenter_steps)
@@ -741,8 +749,9 @@ def run_physical_transport(
         math.atan2(object_offset_base[1], object_offset_base[0])
     )
     target_object_z = max(
-        float(observation["object_pos"][2]),
-        float(minimum_object_z) + config.object_drop_tolerance,
+        float(observation["object_pos"][2])
+        - config.height_settle_allowance,
+        float(minimum_object_z) + config.height_safety_margin,
     )
     gripper_z_offsets = {
         arm: float(observation["gripper_positions"][arm][2])

@@ -423,6 +423,14 @@ class CompetitionFlowTests(unittest.TestCase):
             0.006,
         )
         self.assertAlmostEqual(
+            captured["transport"]["config"].height_settle_allowance,
+            0.012,
+        )
+        self.assertAlmostEqual(
+            captured["transport"]["config"].height_safety_margin,
+            0.012,
+        )
+        self.assertAlmostEqual(
             captured["transport"]["config"].planar_recovery_trigger,
             0.015,
         )
