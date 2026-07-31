@@ -296,10 +296,21 @@ class EndGraspSetdownGateTests(unittest.TestCase):
             lateral_error_m=0.10,
             forward_speed_m_s=0.04,
             lateral_gain=0.50,
+            lateral_deadband_m=0.05,
             maximum_lateral_speed_m_s=0.02,
         )
 
         np.testing.assert_allclose(velocity, [-0.02, -0.04])
+
+        deadband_velocity = floor_base_tracking_velocity(
+            push_direction_xy=[0.0, -1.0],
+            lateral_error_m=-0.04,
+            forward_speed_m_s=0.04,
+            lateral_gain=0.50,
+            lateral_deadband_m=0.05,
+            maximum_lateral_speed_m_s=0.02,
+        )
+        np.testing.assert_allclose(deadband_velocity, [0.0, -0.04])
 
     def test_hybrid_exit_gate_requires_strict_official_exit_and_physics(self):
         self.assertEqual(hybrid_exit_gate_failures(VALID_HYBRID_EXIT_RECORD), [])
@@ -2329,6 +2340,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.floor_base_route_arrival_margin_m, 0.05)
         self.assertAlmostEqual(args.floor_base_route_reposition_clearance_m, 0.90)
         self.assertAlmostEqual(args.floor_base_tracking_gain, 0.50)
+        self.assertAlmostEqual(args.floor_base_tracking_deadband_m, 0.05)
         self.assertAlmostEqual(args.floor_base_max_lateral_speed_m_s, 0.02)
         self.assertAlmostEqual(args.center_carry_distance_m, 0.0)
         self.assertFalse(args.center_carry_away_from_object)
@@ -2491,6 +2503,8 @@ class JointSeedParserTests(unittest.TestCase):
                 "0.95",
                 "--floor-base-tracking-gain",
                 "0.60",
+                "--floor-base-tracking-deadband-m",
+                "0.07",
                 "--floor-base-max-lateral-speed-m-s",
                 "0.03",
                 "--center-carry-away-from-object",
@@ -2630,6 +2644,7 @@ class JointSeedParserTests(unittest.TestCase):
         self.assertAlmostEqual(args.floor_base_route_arrival_margin_m, 0.06)
         self.assertAlmostEqual(args.floor_base_route_reposition_clearance_m, 0.95)
         self.assertAlmostEqual(args.floor_base_tracking_gain, 0.60)
+        self.assertAlmostEqual(args.floor_base_tracking_deadband_m, 0.07)
         self.assertAlmostEqual(args.floor_base_max_lateral_speed_m_s, 0.03)
         self.assertTrue(args.center_carry_away_from_object)
         self.assertAlmostEqual(args.center_carry_corner_seat_m, 0.08)

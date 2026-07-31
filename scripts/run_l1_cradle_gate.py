@@ -351,6 +351,7 @@ def floor_base_tracking_velocity(
     lateral_error_m: float,
     forward_speed_m_s: float,
     lateral_gain: float,
+    lateral_deadband_m: float,
     maximum_lateral_speed_m_s: float,
 ) -> np.ndarray:
     """Return world velocity with bounded feedback toward the push centerline."""
@@ -360,6 +361,7 @@ def floor_base_tracking_velocity(
             lateral_error_m,
             forward_speed_m_s,
             lateral_gain,
+            lateral_deadband_m,
             maximum_lateral_speed_m_s,
         ],
         dtype=float,
@@ -373,15 +375,23 @@ def floor_base_tracking_velocity(
         raise ValueError("tracking parameters must be finite")
     speed = float(forward_speed_m_s)
     gain = float(lateral_gain)
+    deadband = float(lateral_deadband_m)
     maximum_lateral_speed = float(maximum_lateral_speed_m_s)
-    if speed <= 0.0 or gain < 0.0 or maximum_lateral_speed <= 0.0:
+    if (
+        speed <= 0.0
+        or gain < 0.0
+        or deadband < 0.0
+        or maximum_lateral_speed <= 0.0
+    ):
         raise ValueError("tracking speed limits must be positive and gain nonnegative")
 
     direction /= direction_norm
     left_axis = np.array([-direction[1], direction[0]], dtype=float)
+    error = float(lateral_error_m)
+    controlled_error = np.sign(error) * max(abs(error) - deadband, 0.0)
     correction = float(
         np.clip(
-            -gain * float(lateral_error_m),
+            -gain * controlled_error,
             -maximum_lateral_speed,
             maximum_lateral_speed,
         )
@@ -3105,6 +3115,7 @@ def _physical_base_push_segment(
     distance_m: float,
     base_speed_m_s: float,
     tracking_gain: float,
+    tracking_deadband_m: float,
     maximum_lateral_speed_m_s: float,
     max_steps: int,
 ) -> dict[str, Any]:
@@ -3169,6 +3180,7 @@ def _physical_base_push_segment(
                 lateral_error_m=signed_lateral_error,
                 forward_speed_m_s=requested_speed,
                 lateral_gain=tracking_gain,
+                lateral_deadband_m=tracking_deadband_m,
                 maximum_lateral_speed_m_s=maximum_lateral_speed_m_s,
             )
             base_velocity = world_velocity_to_base_frame(
@@ -3295,6 +3307,7 @@ def _floor_corridor_push_probe(
     route_arrival_margin_m: float = 0.05,
     route_reposition_clearance_m: float = 0.90,
     tracking_gain: float = 0.50,
+    tracking_deadband_m: float = 0.05,
     maximum_lateral_speed_m_s: float = 0.02,
 ) -> dict[str, Any]:
     """Push a floor object through its current lane using two actuated arms."""
@@ -3579,6 +3592,7 @@ def _floor_corridor_push_probe(
                 lateral_error_m=signed_lateral_error,
                 forward_speed_m_s=requested_speed,
                 lateral_gain=tracking_gain,
+                lateral_deadband_m=tracking_deadband_m,
                 maximum_lateral_speed_m_s=maximum_lateral_speed_m_s,
             )
             base_velocity = world_velocity_to_base_frame(
@@ -3744,6 +3758,7 @@ def _floor_corridor_push_probe(
                 distance_m=remaining_distance,
                 base_speed_m_s=requested_speed,
                 tracking_gain=tracking_gain,
+                tracking_deadband_m=tracking_deadband_m,
                 maximum_lateral_speed_m_s=maximum_lateral_speed_m_s,
                 max_steps=requested_steps,
             )
@@ -4083,6 +4098,7 @@ def _end_grasp_floor_push_probe(
     floor_base_route_arrival_margin_m: float = 0.05,
     floor_base_route_reposition_clearance_m: float = 0.90,
     floor_base_tracking_gain: float = 0.50,
+    floor_base_tracking_deadband_m: float = 0.05,
     floor_base_max_lateral_speed_m_s: float = 0.02,
     _extraction_probe=None,
     _navigation_retract=None,
@@ -4171,6 +4187,7 @@ def _end_grasp_floor_push_probe(
                     floor_base_route_reposition_clearance_m
                 ),
                 tracking_gain=floor_base_tracking_gain,
+                tracking_deadband_m=floor_base_tracking_deadband_m,
                 maximum_lateral_speed_m_s=(
                     floor_base_max_lateral_speed_m_s
                 ),
@@ -8417,6 +8434,9 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
                                 floor_base_tracking_gain=(
                                     args.floor_base_tracking_gain
                                 ),
+                                floor_base_tracking_deadband_m=(
+                                    args.floor_base_tracking_deadband_m
+                                ),
                                 floor_base_max_lateral_speed_m_s=(
                                     args.floor_base_max_lateral_speed_m_s
                                 ),
@@ -8937,6 +8957,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--floor-base-route-reposition-clearance-m", type=float, default=0.90
     )
     parser.add_argument("--floor-base-tracking-gain", type=float, default=0.50)
+    parser.add_argument(
+        "--floor-base-tracking-deadband-m", type=float, default=0.05
+    )
     parser.add_argument(
         "--floor-base-max-lateral-speed-m-s", type=float, default=0.02
     )
