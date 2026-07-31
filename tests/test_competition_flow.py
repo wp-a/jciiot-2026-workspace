@@ -409,10 +409,18 @@ class CompetitionFlowTests(unittest.TestCase):
         )
         self.assertEqual(captured["transport"]["driver"], "posture-locked-driver")
         self.assertEqual(captured["transport"]["config"].max_steps, 4321)
-        self.assertAlmostEqual(captured["transport"]["config"].max_linear, 0.04)
+        self.assertAlmostEqual(captured["transport"]["config"].max_linear, 0.12)
         self.assertAlmostEqual(
             captured["transport"]["config"].max_linear_delta,
-            0.005,
+            0.01,
+        )
+        self.assertAlmostEqual(
+            captured["transport"]["config"].max_angular,
+            0.12,
+        )
+        self.assertAlmostEqual(
+            captured["transport"]["config"].max_angular_delta,
+            0.02,
         )
         self.assertAlmostEqual(
             captured["transport"]["config"].max_planar_grasp_drift,
@@ -420,7 +428,7 @@ class CompetitionFlowTests(unittest.TestCase):
         )
         self.assertAlmostEqual(
             captured["transport"]["config"].height_recovery_trigger,
-            0.006,
+            0.02,
         )
         self.assertAlmostEqual(
             captured["transport"]["config"].height_settle_allowance,

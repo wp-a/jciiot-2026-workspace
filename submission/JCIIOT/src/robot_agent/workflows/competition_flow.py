@@ -425,7 +425,7 @@ class OfficialCompetitionDriver:
                 "failure_stage": "path",
             }
             return False
-        max_linear = 0.04
+        max_linear = 0.12
         control_dt = 0.05
         config = PhysicalCarryConfig(
             max_steps=physical_carry_step_budget(
@@ -435,14 +435,14 @@ class OfficialCompetitionDriver:
                 control_dt=control_dt,
             ),
             max_linear=max_linear,
-            max_angular=0.04,
-            max_linear_delta=0.005,
-            max_angular_delta=0.01,
+            max_angular=0.12,
+            max_linear_delta=0.01,
+            max_angular_delta=0.02,
             base_control_dt=control_dt,
             align_heading_to_path=True,
             heading_translation_tolerance=0.05,
             max_planar_grasp_drift=0.12,
-            height_recovery_trigger=0.006,
+            height_recovery_trigger=0.02,
             height_settle_allowance=0.012,
             height_safety_margin=0.012,
             planar_recovery_trigger=0.015,

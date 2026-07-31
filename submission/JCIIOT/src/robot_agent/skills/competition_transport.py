@@ -781,6 +781,7 @@ def run_physical_transport(
         "physical_transport_start",
         object_name=object_name,
         waypoint_count=len(waypoints),
+        waypoints=[point.tolist() for point in waypoints],
     )
 
     if next_contact_stability(observation["contacts"], 0) == 0:
