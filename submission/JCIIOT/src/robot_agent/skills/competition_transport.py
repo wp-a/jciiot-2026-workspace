@@ -302,6 +302,7 @@ class PhysicalCarryConfig:
         planar_recovery_trigger: float = 0.0,
         planar_recovery_steps: int = 0,
         planar_recovery_inward_delta: float = 0.0,
+        height_recovery_enabled: bool = True,
         height_recovery_trigger: float = 0.01,
         height_settle_allowance: float = 0.0,
         height_safety_margin: float | None = None,
@@ -343,6 +344,7 @@ class PhysicalCarryConfig:
         self.planar_recovery_inward_delta = float(
             planar_recovery_inward_delta
         )
+        self.height_recovery_enabled = bool(height_recovery_enabled)
         self.height_recovery_trigger = float(height_recovery_trigger)
         self.height_settle_allowance = float(height_settle_allowance)
         self.height_safety_margin = float(
@@ -894,7 +896,10 @@ def run_physical_transport(
             failure_stage = "planar_grasp_drift"
             break
         height_error = target_object_z - float(observation["object_pos"][2])
-        if height_error >= config.height_recovery_trigger:
+        if (
+            config.height_recovery_enabled
+            and height_error >= config.height_recovery_trigger
+        ):
             driver.record_event(
                 backend,
                 "physical_height_recenter_start",

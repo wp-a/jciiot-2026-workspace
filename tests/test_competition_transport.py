@@ -950,6 +950,30 @@ class PhysicalTransportRunnerTests(unittest.TestCase):
         self.assertEqual(result["failure_stage"], "height_recovery")
         self.assertEqual(len(driver.recover_calls), 1)
 
+    def test_disabled_height_recovery_preserves_physical_drop_gate(self):
+        driver = FakePhysicalTransportDriver(
+            object_heights=[1.0, 0.975, 0.975, 0.975]
+        )
+        config = self.module.PhysicalCarryConfig(
+            waypoint_tolerance=0.02,
+            max_steps=20,
+            k_linear=1.0,
+            max_linear=0.10,
+            max_linear_delta=0.10,
+            height_recovery_enabled=False,
+            height_recovery_trigger=0.01,
+        )
+
+        result = self.run_transport(
+            driver,
+            config=config,
+            minimum_object_z=0.98,
+        )
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["failure_stage"], "object_drop")
+        self.assertEqual(driver.recover_calls, [])
+
     def test_measured_recovery_accepts_height_even_if_helper_target_was_stricter(self):
         driver = FakePhysicalTransportDriver(
             object_heights=[1.0, 0.985, 0.985, 0.985],

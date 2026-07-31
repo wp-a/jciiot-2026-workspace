@@ -416,11 +416,11 @@ class CompetitionFlowTests(unittest.TestCase):
         )
         self.assertAlmostEqual(
             captured["transport"]["config"].max_angular,
-            0.12,
+            0.24,
         )
         self.assertAlmostEqual(
             captured["transport"]["config"].max_angular_delta,
-            0.02,
+            0.04,
         )
         self.assertAlmostEqual(
             captured["transport"]["config"].max_planar_grasp_drift,
@@ -429,6 +429,9 @@ class CompetitionFlowTests(unittest.TestCase):
         self.assertAlmostEqual(
             captured["transport"]["config"].height_recovery_trigger,
             0.02,
+        )
+        self.assertFalse(
+            captured["transport"]["config"].height_recovery_enabled
         )
         self.assertAlmostEqual(
             captured["transport"]["config"].height_settle_allowance,
