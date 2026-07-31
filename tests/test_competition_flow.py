@@ -765,11 +765,11 @@ class CompetitionFlowTests(unittest.TestCase):
         self.assertIsNone(driver._physical_hold)
         self.assertFalse(driver._transport_attached)
 
-    def test_unregistered_non_l5_output_does_not_use_sequential_release(self):
+    def test_unregistered_l4_output_does_not_use_sequential_release(self):
         backend = SimpleNamespace(
             env=SimpleNamespace(
                 output_ports={},
-                obj_body_id={"blue_tote_b01_far_right": 7},
+                obj_body_id={"blue_container_h01_back_upper": 7},
             ),
             _held_crate_name=None,
             _held_crate_body_id=None,
@@ -786,10 +786,10 @@ class CompetitionFlowTests(unittest.TestCase):
         driver._transport_attached = True
         driver._transport_attachment = {
             "active": True,
-            "object_name": "blue_tote_b01_far_right",
+            "object_name": "blue_container_h01_back_upper",
         }
 
-        success = driver.place("output_5", "blue_tote_b01_far_right")
+        success = driver.place("output_5", "blue_container_h01_back_upper")
 
         self.assertFalse(success)
         self.assertIsNotNone(driver._physical_hold)
