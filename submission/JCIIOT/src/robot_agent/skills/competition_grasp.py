@@ -1513,7 +1513,14 @@ def run_scripted_grasp(
             failure_stage = "pregrasp"
         elif not driver.approach_grasp_sites(backend, object_name, config):
             failure_stage = "approach"
-        elif not driver.adjust_wrist_for_reach(backend, object_name, config):
+        elif (
+            not config.pregrasp_wrist_adjustment
+            and not driver.adjust_wrist_for_reach(
+                backend,
+                object_name,
+                config,
+            )
+        ):
             failure_stage = "wrist_adjustment"
         else:
             contacts = dict(driver.close_and_check_contacts(backend, object_name, config))

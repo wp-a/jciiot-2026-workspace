@@ -1023,7 +1023,6 @@ class CompetitionGraspTests(unittest.TestCase):
                 "wrist_adjust",
                 "pregrasp",
                 "approach",
-                "wrist_adjust",
                 "close",
                 "lift",
                 "hold_metadata",
