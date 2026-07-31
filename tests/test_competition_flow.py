@@ -418,6 +418,10 @@ class CompetitionFlowTests(unittest.TestCase):
             captured["transport"]["config"].max_planar_grasp_drift,
             0.12,
         )
+        self.assertAlmostEqual(
+            captured["transport"]["config"].height_recovery_trigger,
+            0.004,
+        )
         self.assertFalse(captured["transport"]["config"].align_heading_to_path)
 
     def test_carrying_move_propagates_physical_contact_failure(self):

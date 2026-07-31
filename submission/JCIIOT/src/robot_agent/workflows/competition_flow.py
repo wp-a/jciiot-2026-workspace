@@ -442,6 +442,7 @@ class OfficialCompetitionDriver:
             align_heading_to_path=False,
             heading_translation_tolerance=0.05,
             max_planar_grasp_drift=0.12,
+            height_recovery_trigger=0.004,
         )
         self._last_transport = run_physical_transport(
             self.backend,
