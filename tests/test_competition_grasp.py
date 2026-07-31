@@ -499,6 +499,7 @@ class CompetitionGraspTests(unittest.TestCase):
             "green_tote_b01_upper",
         )
         self.assertFalse(upper.hold_close_pose)
+        self.assertAlmostEqual(upper.site_below_offset, 0.03)
 
     def test_l5_followup_totes_use_a_full_upper_body_clearance_seed(self):
         self.assertIsNone(
