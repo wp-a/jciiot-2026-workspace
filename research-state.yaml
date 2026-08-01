@@ -68,18 +68,24 @@ hypotheses:
     priority: high
   - id: H4
     statement: "Same-data Diffusion Policy action sequences will reduce compounding contact-mode error relative to BC-RNN."
-    status: active
-    motivation: "The validated BC-RNN interface passed offline but failed all closed-loop grasps, activating the pre-registered challenger."
+    status: rejected
+    motivation: "The validation-selected policy passed its offline gate but achieved only 2/5 unseen closed-loop grasp-and-lift successes, below the locked 4/5 promotion threshold."
     parent: null
     priority: medium
+  - id: H5
+    statement: "Teacher-labeled approach-drift and asymmetric-contact recovery trajectories will raise the unchanged H4 Diffusion Policy to at least 8/10 unseen L1 grasp-and-lift successes."
+    status: active
+    motivation: "H4's three failures isolate missing learner-state coverage: two bilateral contacts without lift and one approach that never made contact."
+    parent: H4
+    priority: high
 
 experiments:
   proxy_metric: "Held-out full-score rate subject to zero scored collisions."
   baseline_value: 0.0
   best_value: 0.0
-  total_runs: 19
-  active_protocol: "experiments/h4-diffusion-policy/protocol.md"
-  next_experiment: "Train bundled low-dimensional Diffusion Policy on the frozen H3 split, then evaluate new seeds without tuning on H3 closed-loop failures."
+  total_runs: 24
+  active_protocol: "experiments/h5-recovery-data/protocol.md"
+  next_experiment: "Collect 24 pre-registered learner-state recovery windows across approach-drift and asymmetric-contact buckets before retraining the unchanged H4 Diffusion configuration."
   trajectory:
     - experiment: H2_teacher_collection
       value: 1.0
@@ -87,11 +93,14 @@ experiments:
     - experiment: H3_bc_rnn_closed_loop
       value: 0.0
       runs: 5
+    - experiment: H4_diffusion_closed_loop
+      value: 0.4
+      runs: 5
 
 outer_loop:
-  cycle: 2
-  last_direction: "Escalate from deterministic BC-RNN to same-data action-sequence diffusion, while retaining the deterministic teacher as the scored incumbent."
-  last_reflection: "BC-RNN's low held-out MSE concealed single-arm contact collapse in 5/5 closed-loop runs; model selection must remain rollout-gated."
+  cycle: 3
+  last_direction: "Stop same-data model escalation and add teacher-labeled learner-state recovery coverage while retaining the deterministic teacher as the scored incumbent."
+  last_reflection: "Diffusion improved closed-loop success from 0/5 to 2/5 but failed the 4/5 gate; architecture alone cannot compensate for missing approach-drift and contact-recovery states."
 
 workspace:
   findings: "findings.md"

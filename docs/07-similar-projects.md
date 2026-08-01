@@ -13,7 +13,16 @@
 - 已采用 robomimic 的原生 HDF5、BC-RNN、Diffusion Policy 和 checkpoint 接口，没有迁移第二套训练框架。
 - 已按 MimicLabs/MimicGen 的“少量源示范 + 对象相对扰动 + 筛选”思想独立采集 14 条 Tiago L1 轨迹；不复制受限实现。结果见 [`experiments/h2-native-tiago-grasp-dataset/results.md`](../experiments/h2-native-tiago-grasp-dataset/results.md)。
 - BC-RNN held-out 动作 MSE 比常数基线改善 92.76%，但新扰动闭环为 0/5，说明当前主要缺口是恢复状态覆盖，不是继续增加 epoch。结果见 [`experiments/h3-bc-rnn/results.md`](../experiments/h3-bc-rnn/results.md)。
-- 同数据 Diffusion Policy 是最后一个模型表达力对照，协议见 [`experiments/h4-diffusion-policy/protocol.md`](../experiments/h4-diffusion-policy/protocol.md)。若闭环低于 4/5，停止 BC-Transformer、ACT、VLA 和从零 RL 的同数据升级，直接采集 approach drift 与单臂接触恢复轨迹。
+- 同数据 Diffusion Policy 已完成：离线 MSE 比常数基线改善 84.89%，但新扰动闭环只有 2/5，低于预注册 4/5 门槛。结果见 [`experiments/h4-diffusion-policy/results.md`](../experiments/h4-diffusion-policy/results.md)。
+- 已触发硬停规则：不再用同一批 12 条示范搜索 BC-Transformer、ACT、VLA 或从零 RL。H5 改为 MimicLabs/MimicGen/DAgger 思路的数据干预，先采 24 条 approach drift 和非对称接触恢复轨迹，协议见 [`experiments/h5-recovery-data/protocol.md`](../experiments/h5-recovery-data/protocol.md)。
+
+## 本地材料入口
+
+- 固定源码 checkout：`/Users/wangpeng/jciiot-2026-workspace/references/repos/`。
+- 仓库、commit、许可证和采用状态：[`references/repositories.json`](../references/repositories.json)。
+- 来源、访问日期和用途账本：[`research/source-ledger.csv`](../research/source-ledger.csv)。
+- 同类项目代码审计：[`research/notes/github-project-audit-2026-07-22.md`](../research/notes/github-project-audit-2026-07-22.md)。
+- 完整性复核命令：`bash scripts/check_references.sh --dest /Users/wangpeng/jciiot-2026-workspace/references/repos`；最近结果为 12 个已固定、0 个缺失。
 
 ## 参考项目决策表
 
@@ -31,7 +40,7 @@
 ## 防止无效迭代的停止规则
 
 1. 训练 loss、held-out 动作 MSE、自报榜单和固定 reset 重复成功都不能单独晋级模型。
-2. 同一数据只完成 BC-RNN 与 Diffusion 两个预注册对照；Diffusion 闭环失败后不再尝试 ACT/Transformer 超参数搜索。
+2. 同一数据的 BC-RNN 与 Diffusion 两个预注册对照已经完成且均未晋级；不再尝试 ACT/Transformer 超参数搜索。
 3. 下一次训练必须增加已标注的失败恢复覆盖，并保持独立 train/valid/heldout 和新闭环种子。
 4. 强化学习仅在“模仿初始化 + 恢复数据”仍有小幅系统残差时考虑，且只学习有动作幅度和碰撞屏障的局部 residual；不从零训练 20 维全机器人 PPO/SAC。
 5. 每个实验必须有协议、冻结 commit/数据哈希、随机种子、结果文件和 keep/reject 决策；失败记录保留，不用新结果覆盖旧证据。
@@ -53,8 +62,8 @@
 ### robomimic
 
 - 匹配模块：抓取策略、数据格式、训练、rollout 和 checkpoint。
-- 可用方案：先建立低维/图像 BC-RNN 基线，再比较 BC-Transformer；只有 BC 在多峰动作上明确失败且数据充足时才试 Diffusion Policy。
-- 本赛题做法：继续使用官方已内嵌版本，先核对 RGB 翻转、相机键、动作维度、normalization、horizon 和 base approach pose。
+- 已验证方案：官方内嵌 BC-RNN 和 Diffusion Policy 共用同一 Tiago 低维接口、数据划分和闭环门槛；结果分别为 0/5 和 2/5。
+- 本赛题做法：继续使用官方已内嵌版本和已经核验的相机键、动作维度、normalization、horizon 与 base approach pose，但下一轮只改变恢复数据覆盖。
 - 不做事项：第一阶段不迁移 LeRobot，不额外接入原版 Diffusion Policy 仓库。
 
 ### PythonRobotics
@@ -86,7 +95,7 @@ OK-Robot 是与“移动到目标、抓取、运输、放置”最相似的系�
 
 ### ACT++
 
-ACT++ 提供 action chunking、temporal ensembling、Diffusion Policy 和 HDF5 处理示例。它能缓解长动作序列抖动，但 Mobile ALOHA 双臂动作空间、相机和控制周期与 Tiago 不同，只在官方 BC-RNN 基线稳定后做离线对比。
+ACT++ 提供 action chunking、temporal ensembling、Diffusion Policy 和 HDF5 处理示例。它能缓解长动作序列抖动，但 Mobile ALOHA 双臂动作空间、相机和控制周期与 Tiago 不同；H4 已证明当前瓶颈是恢复数据，因此暂停迁移。
 
 ### RoboMonkey
 
@@ -124,9 +133,11 @@ MimicGen 代码采用 NVIDIA 非商业许可证。比赛包含奖金且获奖代
 DOCX/VLM schema + evidence
     -> deterministic task graph
     -> risk-aware A*/Theta* navigation
-    -> robomimic BC-RNN grasp
+    -> deterministic physical grasp incumbent
+    -> policy-state recovery data
+    -> rollout-gated robomimic Diffusion challenger
     -> physical place and object-pose verification
     -> bounded retry / per-object state recovery
 ```
 
-第一阶段只实现能够提高官方重复分数的部分。任何新模型或大框架必须通过相同数据、相同种子、相同 scorer 的消融实验后才能进入主线。
+任何新模型或大框架必须先证明现有恢复数据仍不足，并通过相同数据、相同种子、相同 scorer 的消融实验后才能进入主线。当前不再扩展模型栈。

@@ -1,14 +1,16 @@
 # 当前技术路线、竞争优势与优化计划
 
-更新时间：2026-07-28（Asia/Shanghai）
+更新时间：2026-08-01（Asia/Shanghai）
 
 ## 结论
 
-当前继续采用方案 B：**可验证的混合式移动操作系统**，但现有候选降级为固定公开场景基线。最终路线保留确定性语义校验、安全导航和物理验证，把现有几何控制器用作离线示范教师，并用比赛专用 Tiago 数据训练对象族抓取策略；最终放置必须回到真实底盘/机械臂动作和 `EnvBackend` 边界。
+当前继续采用方案 B：**可验证的混合式移动操作系统**。确定性物理控制器仍是提交主线和示范教师；学习只负责接触密集的局部抓取，并且必须通过未见扰动闭环门槛才能替换主线。现阶段没有学习模型获得晋级：BC-RNN 为 0/5，同数据 Diffusion Policy 为 2/5，均零碰撞但低于门槛。下一步不是换更大模型，而是补 learner-reachable 的接近漂移和非对称接触恢复数据。
 
 在公开提交 `0dcdddf18a9e694569aa1433cdfc04eb097fed78` 和未修改公开评分器下，L1-L5 固定场景达到 `10/10、15/15、20/20、25/25、30/30`，全部零碰撞。L2-L5 随后各完成 20 次重复执行，共 80/80 满分、120/120 抓取事件、零碰撞。由于这些 seed 没有改变轨迹帧数或最终几何，该证据只支持相同几何下的重复执行稳定性，不支持几何扰动鲁棒性，也不是 BienData 或组委会成绩。
 
-允许目录内的 `CompetitionTaskSkill` 已接入公开 `RobotAgent.run()`；干净物化候选五关本地公开评分器再次达到 100/100，且 `app.py`、`task_config.json`、`task_subprocess_runner.py` 与锁定源码哈希一致。当前首匹配聚合技能和禁用 planner 的设计仍需组委会澄清或恢复原子技能轨迹；L5 私有 attachment 相对位姿修改也必须在最终提交前移除。资产与成绩口径审计见 `research/notes/official-assets-and-score-reality-audit-2026-07-28.md`。
+允许目录内的 `CompetitionTaskSkill` 已接入公开 `RobotAgent.run()`；干净物化候选五关本地公开评分器再次达到 100/100，且 `app.py`、`task_config.json`、`task_subprocess_runner.py` 与锁定源码哈希一致。该 100/100 仍只是固定公开场景的本地评分器结果，长距离运输使用组委会代码中的 `transport_attachment`，不能写成摩擦力全程夹持或官网验证成绩。资产与成绩口径审计见 `research/notes/official-assets-and-score-reality-audit-2026-07-28.md`。
+
+学习路线的完整结果分别记录在 `experiments/h3-bc-rnn/results.md` 和 `experiments/h4-diffusion-policy/results.md`。H5 的数据干预在 `experiments/h5-recovery-data/protocol.md` 预注册；不满足数据验收门槛前不启动训练。
 
 ## 实际执行链
 
@@ -36,7 +38,7 @@ LLM/VLM 只进入语义层，不直接生成底盘或关节动作。物理层的
 | 任务编排 | 每件物体维护 `pending -> verified` 状态和有限重试 | L5 三件均一次完成 | 加入阶段化恢复策略和已完成对象持久化检查 |
 | 对象选择 | 按可抓取性和接近成本过滤/排序 | 五关均选中可评分对象 | 多种子验证候选顺序；增加抓取可达性预评分 |
 | 导航 | A* 路径、上方安全走廊、接近位与航向分离 | 五关碰撞帧均为 0 | 做 clearance 消融、载荷 footprint 和路径耗时优化 |
-| 抓取 | container、green tote、blue/white tote 分对象族参数；OSC + 约束 IK | 固定五关 7/7；L2-L5 重复实验 120/120 | 几何控制器转为 teacher；单轨迹 overfit 后采集比赛专用 Tiago 数据，对比 BC-RNN/BC-Transformer |
+| 抓取 | container、green tote、blue/white tote 分对象族参数；OSC + 约束 IK；低维 BC-RNN/Diffusion 对照 | 固定五关 7/7；BC-RNN 0/5；Diffusion 2/5 | 保留几何 teacher；采 24 条接近漂移/单臂接触恢复轨迹，原架构复训并以 8/10 闭环为门槛 |
 | 运输 | 抓取后收臂；沿官方 attachment 同步载荷 | 零掉落、零评分碰撞 | 周期持物验证；测量载荷最小障碍间隙 |
 | 放置 | 单物体中心安全区；L5 统一世界航向、三槽位、列式入场 | 固定场景 L5 三件距离 `0.60/0.00/0.60 m` | 先移除 attachment 相对位姿修改，用物理动作复现；之后再缩短等待 |
 | 验证恢复 | 双侧接触、累计抬升、最终距离、碰撞、事件账本 | 固定种子总分 `100/100` | 引入错误码、最近安全状态回退和恢复成功率指标 |
@@ -47,7 +49,7 @@ LLM/VLM 只进入语义层，不直接生成底盘或关节动作。物理层的
 ### 相比公开 LLM + BC baseline
 
 - 不把公开 checkpoint 当作可靠现成策略：其元数据保存的最佳 rollout 成功率为 0.0，requirements-pinned L1 evaluator 复跑为 0/3。
-- 不把无关的 Fetch/iGibson 10 维 HDF5 混入 Tiago 20 维训练；演示数据从真实赛题场景和动作接口采集。
+- 不把无关的 Fetch/iGibson 10 维 HDF5 混入 Tiago 20 维训练；现有 4,065 个样本来自真实赛题接口，并保留 seed、动作、观测和轨迹哈希。
 - L5 不受固定四步计划限制，逐物体账本能表达三次完整搬运。
 - 抓取成功要求双侧接触和物理抬升，避免语言层或技能层误报。
 - 每个对象族的坐标轴、接近方向和抓取参数显式隔离，减少一关修复破坏另一关。
@@ -86,12 +88,12 @@ LLM/VLM 只进入语义层，不直接生成底盘或关节动作。物理层的
 3. 移除私有 attachment 相对位姿修改，恢复真实底盘/机械臂放置动作。
 4. 向组委会确认 planner fallback 和私有 backend/sim helper 边界，并把答复固化到规则快照。
 
-### P0：比赛专用抓取数据与训练
+### P0：恢复数据覆盖，而不是模型升级
 
-1. 扩展官方 L1 collector 到四个对象族，严格验证 20 维 action、128 x 128 robotview 和观察键。
-2. 先做单轨迹 overfit；不能成功回放前不扩大数据集。
-3. 先采 50 条成功演示/族，对比 BC-RNN 与 BC-Transformer，各跑三个训练 seed。
-4. 只按 held-out 抓取成功率选模型；失败状态再用 DAgger 风格纠正数据补齐。
+1. 按 H5 固定的新 seed 采 24 条 learner-state correction：左右接近漂移、左右单臂接触各 6 条。
+2. 每条必须通过真实双侧接触、抬升和零碰撞门槛；不足 20/24 时先修 collector，不训练。
+3. 保持 H4 Diffusion 架构、优化器和选模规则不变，只改变数据，隔离数据覆盖收益。
+4. 使用十个全新闭环 seed；达到 8/10 才进入单独 L1 全流程回归，否则按预注册分支停止或仅补一个已证实的缺失模式。
 
 ### P1：在满分约束下提速
 
@@ -106,16 +108,17 @@ LLM/VLM 只进入语义层，不直接生成底盘或关节动作。物理层的
 3. 报告失败案例、额外计算成本和适用边界。
 4. 录制五关完整视频和关键失败/修复对比，不剪掉恢复与等待阶段。
 
-### P2：只在简单模仿学习不足时升级模型
+### P2：强化学习的进入条件
 
-- BC-RNN/BC-Transformer 是第一轮正式学习基线，不再等待固定场景失败才启动。
-- 若 held-out 动作明显多峰且简单 BC 达不到门槛，再评估 Diffusion Policy 或 ACT；轻量 VLA 仍不进入主线。
-- 学习策略必须与当前几何基线使用相同种子、对象和评分器比较，并保留几何安全验证器。
+- BC-RNN 与 Diffusion 的同数据对照已经结束，不再增加 epoch、搜索 ACT/Transformer 或迁移 VLA。
+- 只有 H5 模仿初始化后仍留下幅度小、模式稳定、可测量的残差，才考虑带动作幅度和碰撞屏障的局部 residual RL。
+- 不从零训练 20 维整机 PPO/SAC；其样本成本、碰撞探索和复现风险与当前缺口不匹配。
 
 ## 近期验收门槛
 
 - 固定公开五场景每关 20 次满分、零碰撞；结果只标为本地公开评分器。
-- 四个对象族 held-out 抓取达到小扰动不低于 95%、中扰动不低于 90%。
+- H5 recovery collector 至少 20/24 合格，四个失败桶都有 train/valid/heldout 覆盖且无 seed 泄漏。
+- H5 L1 新小扰动闭环至少 8/10、零碰撞，再进入四个对象族扩展；最终目标仍为小扰动不低于 95%、中扰动不低于 90%。
 - 每关小/中扰动各至少 20 次完整任务，有独立统计和 Wilson 区间。
 - scored path 不修改物体 qpos、attachment 相对位姿或受保护 backend 私有状态。
 - 最终候选在干净 Linux 环境从 README 一次复现。

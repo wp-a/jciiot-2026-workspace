@@ -1,0 +1,46 @@
+{
+  "status": "failed",
+  "seed": 20260884,
+  "policy_sampling_seed": 20260884,
+  "policy_method": "diffusion_policy_lowdim",
+  "observation_horizon": 2,
+  "perturbation_tier": "small",
+  "checkpoint": "/data01/user/jciiot-2026/model-research/h4-diffusion-policy/training/h4_diffusion_l1_lowdim_v3_io_bounded/20260801222301/models/model_epoch_80.pth",
+  "checkpoint_sha256": "5a24744c8453d74f8e902cd8bdb3c9fb83091824052a36d7a29a4b753fda09af",
+  "checkpoint_epoch": 80,
+  "observation_keys": [
+    "line_5_container_h01_near_pos",
+    "line_5_container_h01_near_quat",
+    "robot0_left_eef_pos",
+    "robot0_left_eef_quat",
+    "robot0_left_gripper_qpos",
+    "robot0_right_eef_pos",
+    "robot0_right_eef_quat",
+    "robot0_right_gripper_qpos"
+  ],
+  "policy_result": {
+    "success": false,
+    "failure_stage": "timeout",
+    "error": null,
+    "steps": 400,
+    "stable_steps": 0,
+    "contacts": {
+      "right": true,
+      "left": true
+    },
+    "initial_object_z": 1.2504781521965824,
+    "final_object_z": 1.2576015201108537,
+    "lift_m": 0.007123367914271261,
+    "required_lift_m": 0.13,
+    "clipping_count": 114,
+    "max_abs_raw_action": 1.0000139474868774
+  },
+  "grasp_gate_passed": false,
+  "full_workflow_gate_passed": false,
+  "manifest": "/data01/user/jciiot-2026/model-research/h4-diffusion-policy/closed-loop/seed20260884/manifest.json",
+  "trajectory": "/data01/user/jciiot-2026/model-research/h4-diffusion-policy/closed-loop/seed20260884/trajectory.json",
+  "official_score": 0,
+  "collision_frames": 0,
+  "successful_grasp_events": 0,
+  "error": null
+}

@@ -38,6 +38,10 @@ justify a policy. Model complexity is promoted only by held-out rollout evidence
 - Low-dimensional BC-RNN: epoch 11 improved held-out action MSE by 92.76% over
   the better constant baseline, but failed 0/5 unseen small-perturbation
   closed-loop grasps. Every failure ended with only one arm in contact.
+- Same-data Diffusion Policy: validation selected epoch 80 after a 300-epoch,
+  10-minute-50-second low-dimensional run. Median held-out MSE improved 84.89%
+  over the constant baseline, but closed-loop grasp-and-lift success was only
+  2/5 versus the locked 4/5 gate. All five runs had zero collision frames.
 
 ## Patterns and Insights
 
@@ -53,7 +57,9 @@ justify a policy. Model complexity is promoted only by held-out rollout evidence
   direct state-setting helpers are unsuitable for the final scored path.
 - The official source already embeds robomimic 0.5.0, including BC-Transformer
   future-action prediction and UNet Diffusion Policy. A second training stack
-  is unnecessary until the bundled algorithms are compared correctly.
+  is unnecessary; the bundled same-data comparison is now complete.
+- BC-RNN 0/5 and Diffusion 2/5 show that the next useful variable is recovery
+  data, not more epochs or a larger sequence model on the same 12 demonstrations.
 
 ## Lessons and Constraints
 
@@ -70,17 +76,17 @@ justify a policy. Model complexity is promoted only by held-out rollout evidence
 
 ## Open Questions
 
-- Can a same-data action-sequence model avoid the BC-RNN's single-arm contact
-  collapse, or is explicit recovery data required?
+- Can 24 stratified learner-state recovery windows raise the unchanged
+  Diffusion Policy to at least 8/10 unseen grasp-and-lift successes?
 - Can supported controller actions reproduce L5 placement without private
   attachment mutation while retaining all three objects within 0.8 m?
-- After the data interface is verified, does BC-Transformer improve held-out
-  success over BC-RNN enough to justify image inference and temporal context?
+- If H5 passes L1, how much additional recovery coverage is required before the
+  same local policy can be evaluated on the other object families?
 
 ## Optimization Trajectory
 
 The deterministic object-relative teacher passed 14/14 registered L1 data
 collection runs. BC-RNN passed its offline gate but was rejected after 0/5
-closed-loop successes. The next registered point is a same-data Diffusion Policy
-comparison; it cannot alter the split or use the five BC-RNN closed-loop seeds
-for checkpoint selection.
+closed-loop successes. Same-data Diffusion improved to 2/5 but also failed its
+locked promotion gate. The next registered point is H5 recovery-data collection;
+same-data BC-Transformer, ACT, VLA, and from-scratch RL escalation are stopped.
