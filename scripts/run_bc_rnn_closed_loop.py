@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Run one pre-registered BC-RNN grasp in the full official L1 workflow."""
+"""Run one pre-registered learned grasp policy in the official L1 workflow."""
 
 from __future__ import annotations
 
 import argparse
 import json
+import random
 from pathlib import Path
 from typing import Any, Callable
 
@@ -19,6 +20,25 @@ except ImportError:
 
 
 EXPECTED_ACTION_DIM = 20
+POLICY_RESULT_KEYS = {
+    "bc_rnn_lowdim": "bc_rnn",
+    "diffusion_policy_lowdim": "diffusion_policy",
+}
+
+
+def policy_result_key(policy_method: str) -> str:
+    try:
+        return POLICY_RESULT_KEYS[policy_method]
+    except KeyError as exc:
+        raise ValueError(f"unsupported policy method: {policy_method}") from exc
+
+
+def seed_policy_sampling(seed: int, torch_module) -> None:
+    random.seed(seed)
+    np.random.seed(seed)
+    torch_module.manual_seed(seed)
+    if torch_module.cuda.is_available():
+        torch_module.cuda.manual_seed_all(seed)
 
 
 def execute_policy_window(
@@ -274,8 +294,12 @@ def run_closed_loop(args: argparse.Namespace) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=False)
     trajectory_path = output_dir / "trajectory.json"
     manifest_path = output_dir / "manifest.json"
-    summary_path = output_dir / "bc-rnn-summary.json"
+    policy_method = getattr(args, "policy_method", "bc_rnn_lowdim")
+    result_key = policy_result_key(policy_method)
+    summary_filename = getattr(args, "summary_filename", "bc-rnn-summary.json")
+    summary_path = output_dir / summary_filename
     checkpoint = Path(args.checkpoint).resolve()
+    seed_policy_sampling(args.seed, torch)
     policy, checkpoint_dict = FileUtils.policy_from_checkpoint(
         device=torch.device(args.device),
         ckpt_path=str(checkpoint),
@@ -314,7 +338,7 @@ def run_closed_loop(args: argparse.Namespace) -> dict[str, Any]:
 
             def marked_event(name, *event_args, **details):
                 if name == "grasp_start":
-                    details["method"] = "bc_rnn_lowdim"
+                    details["method"] = policy_method
                     details["checkpoint_sha256"] = sha256_file(checkpoint)
                 return original_marker(name, *event_args, **details)
 
@@ -331,7 +355,7 @@ def run_closed_loop(args: argparse.Namespace) -> dict[str, Any]:
                 )
             finally:
                 grasp_backend._mark_trajectory_event = original_marker
-            result["bc_rnn"] = dict(driver_instance.last_result or {})
+            result[result_key] = dict(driver_instance.last_result or {})
             return result
 
         driver_instance = driver
@@ -386,6 +410,8 @@ def run_closed_loop(args: argparse.Namespace) -> dict[str, Any]:
     summary = {
         "status": "complete" if full_workflow_gate else "failed",
         "seed": args.seed,
+        "policy_sampling_seed": args.seed,
+        "policy_method": policy_method,
         "perturbation_tier": "small",
         "checkpoint": str(checkpoint),
         "checkpoint_sha256": sha256_file(checkpoint),
@@ -414,6 +440,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--workspace-commit", required=True)
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--device", default="cuda:0")
+    parser.add_argument(
+        "--policy-method",
+        choices=tuple(POLICY_RESULT_KEYS),
+        default="bc_rnn_lowdim",
+    )
+    parser.add_argument("--summary-filename", default="bc-rnn-summary.json")
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--perturbation-object")
     parser.add_argument("--max-policy-steps", type=int, default=400)

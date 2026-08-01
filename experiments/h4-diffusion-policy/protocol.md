@@ -48,7 +48,9 @@ unseen L1 pose perturbations, without changing data coverage or the robot API.
    constant baseline and emit finite 20-dimensional actions.
 3. Closed-loop evaluation uses five new small-perturbation seeds `20260880`
    through `20260884`, one valid policy attempt each. The learned window is
-   capped at 400 controller steps and receives no geometric fallback.
+   capped at 400 controller steps and receives no geometric fallback. Each run's
+   scene seed also fixes Python, NumPy, PyTorch, and CUDA policy sampling before
+   checkpoint loading.
 4. Each closed-loop success requires five consecutive frames of bilateral
    contact above the configured lift target minus tolerance, no collision, and
    no direct object-state write or attachment inside the learned grasp window.

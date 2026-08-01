@@ -1,4 +1,5 @@
 import unittest
+import random
 
 import numpy as np
 
@@ -98,6 +99,44 @@ class PolicyWindowTests(unittest.TestCase):
         self.assertFalse(result["success"])
         self.assertEqual(result["failure_stage"], "action_shape")
         self.assertEqual(calls, [])
+
+
+class PolicyMetadataTests(unittest.TestCase):
+    def test_result_key_identifies_supported_policy_method(self):
+        self.assertEqual(module.policy_result_key("bc_rnn_lowdim"), "bc_rnn")
+        self.assertEqual(
+            module.policy_result_key("diffusion_policy_lowdim"),
+            "diffusion_policy",
+        )
+
+    def test_sampling_seed_controls_python_numpy_and_torch(self):
+        class FakeCuda:
+            def __init__(self):
+                self.seeds = []
+
+            def is_available(self):
+                return True
+
+            def manual_seed_all(self, seed):
+                self.seeds.append(seed)
+
+        class FakeTorch:
+            def __init__(self):
+                self.seeds = []
+                self.cuda = FakeCuda()
+
+            def manual_seed(self, seed):
+                self.seeds.append(seed)
+
+        fake_torch = FakeTorch()
+        module.seed_policy_sampling(20260880, fake_torch)
+        first = (random.random(), float(np.random.random()))
+        module.seed_policy_sampling(20260880, fake_torch)
+        second = (random.random(), float(np.random.random()))
+
+        self.assertEqual(first, second)
+        self.assertEqual(fake_torch.seeds, [20260880, 20260880])
+        self.assertEqual(fake_torch.cuda.seeds, [20260880, 20260880])
 
 
 if __name__ == "__main__":
