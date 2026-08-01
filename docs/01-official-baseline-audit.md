@@ -110,3 +110,11 @@ Planner 让 LLM 输出严格结构化 JSON，但示例主路径被压成固定�
 ## 2026-07-27 远程场景冒烟
 
 在 Ubuntu 24.04.3、Python 3.11.15、MuJoCo 3.9.0 和官方 robosuite 1.5.2 环境中，固定 seed `20260727`，五个场景都成功完成构造、reset 和一个零动作 step，action shape 均为 20。该实验不加载 checkpoint，不启用 renderer，不执行任务 workflow，也不调用评分器；它只证明普通 Git 场景资产和基础动力学链可用。完整记录见 `experiments/2026-07-27-scene-smoke.md`。
+
+## 2026-08-01 官方 HEAD 核对（0dcdddf -> 129e94a）
+
+在线 `master` 比实验锁定提交新增 1 个提交，只修改根目录
+`README.md` 的参赛者自报榜单。评分器、任务配置、五个场景、机器人接口、
+robomimic、模型和数据资源均无差异。因此训练与评测继续锁定
+`0dcdddf18a9e694569aa1433cdfc04eb097fed78`，不因未经官方复现的榜单文本
+改变实验基线。
