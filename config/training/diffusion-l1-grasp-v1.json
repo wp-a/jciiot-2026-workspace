@@ -1,0 +1,109 @@
+{
+  "algo_name": "diffusion_policy",
+  "experiment": {
+    "name": "h4_diffusion_l1_lowdim_v1",
+    "validate": true,
+    "logging": {
+      "terminal_output_to_txt": true,
+      "log_tb": false,
+      "log_wandb": false
+    },
+    "save": {
+      "enabled": true,
+      "every_n_seconds": null,
+      "every_n_epochs": 25,
+      "epochs": [1],
+      "on_best_validation": true,
+      "on_best_rollout_return": false,
+      "on_best_rollout_success_rate": false
+    },
+    "epoch_every_n_steps": null,
+    "validation_epoch_every_n_steps": null,
+    "render": false,
+    "render_video": false,
+    "keep_all_videos": false,
+    "rollout": {
+      "enabled": false
+    }
+  },
+  "train": {
+    "data": [
+      {
+        "path": "/data01/user/jciiot-2026/model-research/h3-bc-rnn/data/l1-grasp-lowdim-v1.hdf5",
+        "eval": false,
+        "key": "l1_grasp"
+      }
+    ],
+    "output_dir": "/data01/user/jciiot-2026/model-research/h4-diffusion-policy/training",
+    "num_data_workers": 0,
+    "hdf5_cache_mode": "low_dim",
+    "hdf5_use_swmr": true,
+    "hdf5_load_next_obs": false,
+    "hdf5_normalize_obs": true,
+    "hdf5_filter_key": "train",
+    "hdf5_validation_filter_key": "valid",
+    "seq_length": 16,
+    "pad_seq_length": true,
+    "frame_stack": 2,
+    "pad_frame_stack": true,
+    "cuda": true,
+    "batch_size": 64,
+    "num_epochs": 300,
+    "seed": 20260802,
+    "max_grad_norm": 10.0
+  },
+  "algo": {
+    "horizon": {
+      "observation_horizon": 2,
+      "action_horizon": 8,
+      "prediction_horizon": 16
+    },
+    "unet": {
+      "enabled": true,
+      "diffusion_step_embed_dim": 256,
+      "down_dims": [256, 512, 1024],
+      "kernel_size": 5,
+      "n_groups": 8
+    },
+    "ema": {
+      "enabled": true,
+      "power": 0.75
+    },
+    "ddpm": {
+      "enabled": true,
+      "num_train_timesteps": 100,
+      "num_inference_timesteps": 100,
+      "beta_schedule": "squaredcos_cap_v2",
+      "clip_sample": true,
+      "prediction_type": "epsilon"
+    },
+    "ddim": {
+      "enabled": false
+    }
+  },
+  "observation": {
+    "modalities": {
+      "obs": {
+        "low_dim": [
+          "robot0_left_eef_pos",
+          "robot0_left_eef_quat",
+          "robot0_left_gripper_qpos",
+          "robot0_right_eef_pos",
+          "robot0_right_eef_quat",
+          "robot0_right_gripper_qpos",
+          "line_5_container_h01_near_pos",
+          "line_5_container_h01_near_quat"
+        ],
+        "rgb": [],
+        "depth": [],
+        "scan": []
+      },
+      "goal": {
+        "low_dim": [],
+        "rgb": [],
+        "depth": [],
+        "scan": []
+      }
+    }
+  }
+}
