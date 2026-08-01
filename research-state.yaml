@@ -43,49 +43,55 @@ literature:
     - "Physical multi-object placement without direct qpos or attachment-state mutation."
     - "Separating task-policy error from data and action-interface error."
   evidence_gaps:
-    - "No explicit pose or dynamics perturbation results for the incumbent."
-    - "No competition-native Tiago HDF5 with issued actions and exact observations."
-    - "No clean scored-path compliance result."
+    - "No learned policy has passed unseen closed-loop bilateral grasp and lift."
+    - "No recovery demonstrations cover single-arm contact or approach drift."
+    - "No learned local grasp policy has passed a full five-level regression."
 
 hypotheses:
   - id: H1
     statement: "Explicit object and base pose perturbations will reveal failures hidden by deterministic multi-seed resets."
-    status: active
+    status: confirmed
     motivation: "The previous 80-run batch had identical trajectory lengths and final geometry."
     parent: null
     priority: high
   - id: H2
-    statement: "Object-relative, physically replayed teacher segments will be more robust than fixed world-waypoint replay."
-    status: pending
+    statement: "Competition-native object-relative teacher segments remain collectable under registered pose perturbations."
+    status: confirmed
     motivation: "MimicGen-style transformation preserves task geometry while varying initial state."
     parent: null
     priority: high
   - id: H3
-    statement: "BC-Transformer will improve over BC-RNN only after exact Tiago action, observation, and temporal alignment are validated."
-    status: pending
-    motivation: "The official 500-epoch checkpoint recorded zero best rollout success despite a relevant architecture."
+    statement: "Low-dimensional BC-RNN trained on the validated Tiago interface will reproduce bilateral grasp and lift on unseen small perturbations."
+    status: rejected
+    motivation: "Offline held-out MSE improved by 92.76%, but closed-loop success was 0/5 due to single-arm contact collapse."
     parent: null
     priority: high
   - id: H4
-    statement: "Diffusion Policy or ACT will add value only when simple BC failures remain multimodal or temporally inconsistent after data correction."
-    status: pending
-    motivation: "Larger generative policies cannot repair an invalid dataset or evaluation adapter."
+    statement: "Same-data Diffusion Policy action sequences will reduce compounding contact-mode error relative to BC-RNN."
+    status: active
+    motivation: "The validated BC-RNN interface passed offline but failed all closed-loop grasps, activating the pre-registered challenger."
     parent: null
     priority: medium
 
 experiments:
   proxy_metric: "Held-out full-score rate subject to zero scored collisions."
-  baseline_value: null
-  best_value: null
-  total_runs: 0
-  active_protocol: "experiments/h1-explicit-pose-perturbation/protocol.md"
-  next_experiment: "Run nominal L1/L5 sanity, then five pre-registered L1 small-pose runs."
-  trajectory: []
+  baseline_value: 0.0
+  best_value: 0.0
+  total_runs: 19
+  active_protocol: "experiments/h4-diffusion-policy/protocol.md"
+  next_experiment: "Train bundled low-dimensional Diffusion Policy on the frozen H3 split, then evaluate new seeds without tuning on H3 closed-loop failures."
+  trajectory:
+    - experiment: H2_teacher_collection
+      value: 1.0
+      runs: 14
+    - experiment: H3_bc_rnn_closed_loop
+      value: 0.0
+      runs: 5
 
 outer_loop:
-  cycle: 0
-  last_direction: null
-  last_reflection: "H1 protocol locked; do not modify the incumbent until all seven registered runs are retained and aggregated."
+  cycle: 2
+  last_direction: "Escalate from deterministic BC-RNN to same-data action-sequence diffusion, while retaining the deterministic teacher as the scored incumbent."
+  last_reflection: "BC-RNN's low held-out MSE concealed single-arm contact collapse in 5/5 closed-loop runs; model selection must remain rollout-gated."
 
 workspace:
   findings: "findings.md"

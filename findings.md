@@ -32,11 +32,20 @@ justify a policy. Model complexity is promoted only by held-out rollout evidence
   0/3 identical failed resets.
 - Official sample-data audit: the HDF5 contains Fetch/iGibson action width 10,
   not the Tiago action width 20 and competition observation schema.
+- Competition-native teacher data: 14/14 pre-registered L1 nominal, small, and
+  medium perturbation runs scored 10/10 with zero collision frames and produced
+  4,065 aligned Tiago grasp samples with action width 20.
+- Low-dimensional BC-RNN: epoch 11 improved held-out action MSE by 92.76% over
+  the better constant baseline, but failed 0/5 unseen small-perturbation
+  closed-loop grasps. Every failure ended with only one arm in contact.
 
 ## Patterns and Insights
 
 - More epochs are not evidence of a usable policy. Physical replay success is
   the gate between training and deployment.
+- Low offline imitation error is also insufficient. Bilateral manipulation can
+  fail catastrophically when a small per-arm error changes contact mode, even
+  while aggregate action MSE and action bounds look good.
 - Deterministic repeat seeds can create false confidence when the environment
   reset distribution is fixed. Perturbations must be applied, measured, and
   written into each manifest.
@@ -61,10 +70,8 @@ justify a policy. Model complexity is promoted only by held-out rollout evidence
 
 ## Open Questions
 
-- How much does L1 success degrade under +/- 2 cm object pose and small base
-  errors?
-- Which stage fails first: approach, bilateral contact, lift, transport, or
-  placement?
+- Can a same-data action-sequence model avoid the BC-RNN's single-arm contact
+  collapse, or is explicit recovery data required?
 - Can supported controller actions reproduce L5 placement without private
   attachment mutation while retaining all three objects within 0.8 m?
 - After the data interface is verified, does BC-Transformer improve held-out
@@ -72,6 +79,8 @@ justify a policy. Model complexity is promoted only by held-out rollout evidence
 
 ## Optimization Trajectory
 
-No perturbation optimization run has been accepted yet. The first registered
-point will be the unmodified incumbent on the explicit H1 protocol; the existing
-100/100 fixed-scene result is retained separately as a compatibility baseline.
+The deterministic object-relative teacher passed 14/14 registered L1 data
+collection runs. BC-RNN passed its offline gate but was rejected after 0/5
+closed-loop successes. The next registered point is a same-data Diffusion Policy
+comparison; it cannot alter the split or use the five BC-RNN closed-loop seeds
+for checkpoint selection.
