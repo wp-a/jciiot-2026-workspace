@@ -1,2 +1,3 @@
 iteration	candidate	tier	score	collision_frames	grasp_events	workflow_success	final_distance_m	decision	notes
 0	final-100-l3-release-hold-20260801	nominal	25	0	1	true	0.747841	reject-margin	Baseline is only 0.052159 m inside the public threshold.
+1	l4-target-margin-c58811b	nominal	12	0	1	false	1.263721	reject	Base yaw changed without official attachment sync; the object fell from z=1.38 m to z=0.125 m during alignment.

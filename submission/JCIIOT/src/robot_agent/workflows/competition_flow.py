@@ -794,7 +794,11 @@ class OfficialCompetitionDriver:
                     "method": "aligned_verified_attachment_scoring_pose_hold",
                 }
                 return False
-            if not orient_base(self.backend, target_yaw):
+            if not orient_base(
+                self.backend,
+                target_yaw,
+                maintain_official_attachment=True,
+            ):
                 self._last_place = {
                     "success": False,
                     "failure_stage": "target_alignment",

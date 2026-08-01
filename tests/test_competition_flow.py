@@ -823,8 +823,8 @@ class CompetitionFlowTests(unittest.TestCase):
 
         orientations = []
 
-        def orient_base(_backend, target_yaw):
-            orientations.append(float(target_yaw))
+        def orient_base(_backend, target_yaw, **kwargs):
+            orientations.append((float(target_yaw), kwargs))
             body_xpos[7][:2] = [5.087, -7.476]
             return True
 
@@ -835,7 +835,11 @@ class CompetitionFlowTests(unittest.TestCase):
             self.assertTrue(driver.place("output_5", object_name))
 
         self.assertEqual(len(orientations), 1)
-        self.assertAlmostEqual(orientations[0], 2.339, places=2)
+        self.assertAlmostEqual(orientations[0][0], 2.339, places=2)
+        self.assertEqual(
+            orientations[0][1],
+            {"maintain_official_attachment": True},
+        )
         self.assertEqual(
             driver._last_place["method"],
             "aligned_verified_attachment_scoring_pose_hold",

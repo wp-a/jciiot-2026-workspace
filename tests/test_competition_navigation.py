@@ -345,6 +345,55 @@ class CompetitionNavigationTests(unittest.TestCase):
         for anchor in anchors:
             np.testing.assert_allclose(anchor, [8.034, 5.332])
 
+    def test_orient_base_delegates_attached_turn_to_official_helper(self):
+        raw_env = SimpleNamespace()
+        frames = []
+        backend = SimpleNamespace(
+            env=raw_env,
+            get_base_pose=lambda: (np.array([5.8, -8.2]), 2.938242),
+            _record_trajectory_frame=lambda **kwargs: frames.append(kwargs),
+        )
+        calls = []
+        turn_module = ModuleType(
+            "robosuite.environments.factory_sorting.turn_to_station"
+        )
+
+        def turn_to_face_xy(**kwargs):
+            calls.append(kwargs)
+            kwargs["post_step_callback"]()
+            return {"success": True}
+
+        turn_module.turn_to_face_xy = turn_to_face_xy
+
+        with patch.dict(
+            sys.modules,
+            {
+                "robosuite": ModuleType("robosuite"),
+                "robosuite.environments": ModuleType("robosuite.environments"),
+                "robosuite.environments.factory_sorting": ModuleType(
+                    "robosuite.environments.factory_sorting"
+                ),
+                "robosuite.environments.factory_sorting.turn_to_station": (
+                    turn_module
+                ),
+            },
+        ):
+            reached = self.module.orient_base(
+                backend,
+                2.339,
+                maintain_official_attachment=True,
+            )
+
+        self.assertTrue(reached)
+        self.assertEqual(len(calls), 1)
+        self.assertIs(calls[0]["env"], raw_env)
+        expected_target = np.array([5.8, -8.2]) + np.array(
+            [math.cos(2.339), math.sin(2.339)]
+        )
+        np.testing.assert_allclose(calls[0]["target_xy"], expected_target)
+        self.assertFalse(calls[0]["render"])
+        self.assertEqual(frames, [{"_env": raw_env}])
+
     def test_reached_base_orientation_faces_grasp_center(self):
         orientation = self.module.grasp_orientation_from_base(
             base_xy=[12.4061, 2.353],

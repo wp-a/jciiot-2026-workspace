@@ -410,9 +410,50 @@ def orient_base(
     tolerance: float = 0.02,
     max_steps: int = 180,
     max_yaw_step: float = 0.025,
+    maintain_official_attachment: bool = False,
 ) -> bool:
     """Rotate smoothly using the official direct-navigation yaw helper."""
     import numpy as np
+
+    if maintain_official_attachment:
+        from robosuite.environments.factory_sorting.turn_to_station import (
+            turn_to_face_xy,
+        )
+
+        base_xy, current_yaw = backend.get_base_pose()
+        base_xy = np.asarray(base_xy, dtype=float).reshape(2)
+        target_xy = base_xy + np.array(
+            [math.cos(float(target_yaw)), math.sin(float(target_yaw))],
+            dtype=float,
+        )
+        yaw_error = (float(target_yaw) - float(current_yaw) + math.pi) % (
+            2.0 * math.pi
+        ) - math.pi
+        turn_steps = max(
+            1,
+            min(
+                int(max_steps),
+                int(math.ceil(abs(yaw_error) / float(max_yaw_step))),
+            ),
+        )
+        recorder = getattr(backend, "_record_trajectory_frame", None)
+
+        def record_frame() -> None:
+            if callable(recorder):
+                recorder(_env=backend.env)
+
+        result = turn_to_face_xy(
+            env=backend.env,
+            target_xy=target_xy,
+            tolerance=float(tolerance),
+            turn_steps=turn_steps,
+            settle_steps=5,
+            render=False,
+            render_sleep=0.0,
+            sync_attachment=True,
+            post_step_callback=record_frame,
+        )
+        return bool(result.get("success", False))
 
     from robot_agent.environments.robosuite_backend import (
         _capture_upper_body_posture,
@@ -421,7 +462,6 @@ def orient_base(
         _set_base_xy_direct,
         _set_base_world_yaw_direct,
     )
-
     raw_env = backend.env
     robot = raw_env.robots[0]
     anchor_xy, _ = backend.get_base_pose()
