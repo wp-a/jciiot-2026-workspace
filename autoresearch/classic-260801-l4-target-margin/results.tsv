@@ -1,3 +1,5 @@
 iteration	candidate	tier	score	collision_frames	grasp_events	workflow_success	final_distance_m	decision	notes
 0	final-100-l3-release-hold-20260801	nominal	25	0	1	true	0.747841	reject-margin	Baseline is only 0.052159 m inside the public threshold.
 1	l4-target-margin-c58811b	nominal	12	0	1	false	1.263721	reject	Base yaw changed without official attachment sync; the object fell from z=1.38 m to z=0.125 m during alignment.
+2	l4-target-margin-cc1b5b3	nominal	25	0	1	true	0.302334	promote	Official attached turn preserved the held object at z=1.383604 m and increased the score-boundary margin to 0.497666 m.
+3	l4-target-margin-cc1b5b3	small	25	0	1	true	0.315929	promote	Deterministic pose perturbation retained the physical grasp, zero collisions, and a 0.484071 m score-boundary margin.
