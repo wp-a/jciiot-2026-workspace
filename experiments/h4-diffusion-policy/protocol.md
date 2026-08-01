@@ -79,3 +79,17 @@ optimizer, checkpoint persistence was changed to epoch 1 plus every 10 epochs.
 Model selection remains validation-only and is restricted to those saved epochs.
 The aborted directory is retained as failure evidence and is not eligible for
 H4 model selection.
+
+The `v2_io` restart showed that the bundled trainer additionally writes
+`last.pth` and copies `last_bak.pth` after every epoch regardless of the save
+configuration. Each file was 1,059,246,585 bytes; epoch 1 therefore created
+three approximately 1.06 GB files including the eligible periodic checkpoint.
+That run was stopped before any held-out evaluation.
+
+The final `v3_io_bounded` launch uses the research-only
+`scripts/train_robomimic_io_bounded.py` wrapper. It suppresses only the two
+unconditional resume artifacts at runtime and leaves periodic calls to the
+official `TrainUtils.save_model` unchanged. The wrapper must pass its own smoke
+run before the full restart. It is training infrastructure, not submission code,
+and does not change gradients, optimizer state, validation, or checkpoint
+contents.

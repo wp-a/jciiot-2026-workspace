@@ -1,7 +1,7 @@
 {
   "algo_name": "diffusion_policy",
   "experiment": {
-    "name": "h4_diffusion_l1_lowdim_v2_io",
+    "name": "h4_diffusion_l1_lowdim_v3_io_bounded",
     "validate": true,
     "logging": {
       "terminal_output_to_txt": true,
