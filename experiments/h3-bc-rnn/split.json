@@ -1,0 +1,27 @@
+{
+  "dataset_root": "/data01/user/jciiot-2026/model-research/h2-native-tiago-grasp-dataset",
+  "splits": {
+    "train": [
+      "pilot-nominal-seed20260840",
+      "pilot-small-seed20260841",
+      "expansion-small-seed20260852",
+      "expansion-small-seed20260853",
+      "expansion-small-seed20260854",
+      "expansion-small-seed20260855",
+      "expansion-small-seed20260856",
+      "expansion-small-seed20260857"
+    ],
+    "valid": [
+      "expansion-small-seed20260858",
+      "expansion-medium-seed20260860"
+    ],
+    "heldout": [
+      "expansion-small-seed20260859",
+      "expansion-medium-seed20260861"
+    ],
+    "excluded_duplicate": [
+      "expansion-nominal-seed20260850",
+      "expansion-nominal-seed20260851"
+    ]
+  }
+}
