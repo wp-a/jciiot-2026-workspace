@@ -62,6 +62,10 @@ The split is fixed by run seed, never by individual frames.
    `20260870` through `20260874`, one attempt each. Success requires bilateral
    contact, verified lift, no collision, and no direct object-state write or
    attachment during the learned grasp window.
+   Each learned window is capped at 400 controller steps and must maintain
+   bilateral contact while exceeding the configured lift target minus tolerance
+   for five consecutive frames. A failed learned window receives no geometric
+   approach, close, contact-polish, or lift fallback.
 5. Promotion to a submission experiment requires at least 4/5 closed-loop grasp
    and lift successes. A lower result keeps the deterministic teacher as primary
    and triggers a same-data Diffusion Policy comparison; it is not repaired by
