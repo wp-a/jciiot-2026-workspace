@@ -14,9 +14,11 @@ import numpy as np
 try:
     from scripts import run_official_experiment as official_runner
     from scripts.evaluate_bc_rnn_offline import sha256_file
+    from scripts.policy_observation_history import ObservationHistoryPolicy
 except ImportError:
     import run_official_experiment as official_runner
     from evaluate_bc_rnn_offline import sha256_file
+    from policy_observation_history import ObservationHistoryPolicy
 
 
 EXPECTED_ACTION_DIM = 20
@@ -305,6 +307,11 @@ def run_closed_loop(args: argparse.Namespace) -> dict[str, Any]:
         ckpt_path=str(checkpoint),
         verbose=False,
     )
+    if args.observation_horizon > 1:
+        policy = ObservationHistoryPolicy(
+            policy,
+            horizon=args.observation_horizon,
+        )
     observation_keys = list(
         checkpoint_dict["shape_metadata"]["all_obs_keys"]
     )
@@ -412,6 +419,7 @@ def run_closed_loop(args: argparse.Namespace) -> dict[str, Any]:
         "seed": args.seed,
         "policy_sampling_seed": args.seed,
         "policy_method": policy_method,
+        "observation_horizon": args.observation_horizon,
         "perturbation_tier": "small",
         "checkpoint": str(checkpoint),
         "checkpoint_sha256": sha256_file(checkpoint),
@@ -446,6 +454,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="bc_rnn_lowdim",
     )
     parser.add_argument("--summary-filename", default="bc-rnn-summary.json")
+    parser.add_argument("--observation-horizon", type=int, default=1)
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--perturbation-object")
     parser.add_argument("--max-policy-steps", type=int, default=400)

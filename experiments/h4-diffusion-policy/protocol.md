@@ -27,6 +27,9 @@ unseen L1 pose perturbations, without changing data coverage or the robot API.
   used by H3. RGB remains excluded for a controlled algorithm comparison.
 - Outputs: 20-dimensional normalized Tiago actions.
 - Observation horizon: 2; prediction horizon: 16; action horizon: 8.
+- Offline and environment rollouts reproduce robomimic's `FrameStackWrapper`
+  contract: the first observation is repeated twice, then a two-frame sliding
+  history is passed to the policy while its eight-action queue executes.
 - Network: bundled conditional 1D UNet with dimensions `[256, 512, 1024]`,
   diffusion embedding 256, kernel size 5, and EMA enabled.
 - Scheduler: DDPM, 100 training and 100 inference diffusion steps, cosine beta

@@ -24,6 +24,7 @@ try:
         sha256_file,
         write_json_atomic,
     )
+    from scripts.policy_observation_history import ObservationHistoryPolicy
 except ImportError:
     from evaluate_bc_rnn_offline import (
         ACTION_GROUPS,
@@ -35,6 +36,7 @@ except ImportError:
         sha256_file,
         write_json_atomic,
     )
+    from policy_observation_history import ObservationHistoryPolicy
 
 
 DEFAULT_SAMPLING_SEEDS = (20260820, 20260821, 20260822)
@@ -148,6 +150,7 @@ def evaluate_checkpoint(
     *,
     sampling_seeds: Iterable[int] = DEFAULT_SAMPLING_SEEDS,
     device_name: str = "cuda:0",
+    observation_horizon: int = 2,
 ) -> dict[str, Any]:
     import h5py
     import robomimic.utils.file_utils as FileUtils
@@ -168,6 +171,7 @@ def evaluate_checkpoint(
         ckpt_path=str(checkpoint),
         verbose=False,
     )
+    policy = ObservationHistoryPolicy(policy, horizon=observation_horizon)
     observation_keys = list(checkpoint_dict["shape_metadata"]["all_obs_keys"])
 
     with h5py.File(dataset, "r") as handle:
@@ -230,6 +234,7 @@ def evaluate_checkpoint(
         "checkpoint_epoch": variable_state.get("epoch"),
         "checkpoint_best_valid_loss": variable_state.get("best_valid_loss"),
         "device": str(device),
+        "observation_horizon": int(observation_horizon),
         "observation_keys": observation_keys,
         "action_groups": {key: list(value) for key, value in ACTION_GROUPS.items()},
         "heldout_demo_names": heldout_names,
@@ -250,6 +255,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--sampling-seeds", nargs="+", type=int, default=DEFAULT_SAMPLING_SEEDS)
     parser.add_argument("--training-log", type=Path)
     parser.add_argument("--device", default="cuda:0")
+    parser.add_argument("--observation-horizon", type=int, default=2)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
 
@@ -287,6 +293,7 @@ def main(argv: list[str] | None = None) -> int:
         checkpoint,
         sampling_seeds=args.sampling_seeds,
         device_name=args.device,
+        observation_horizon=args.observation_horizon,
     )
     results["checkpoint_selection"] = selection
     write_json_atomic(args.output, results)
