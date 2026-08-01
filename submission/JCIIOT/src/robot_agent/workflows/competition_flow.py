@@ -767,11 +767,47 @@ class OfficialCompetitionDriver:
             not self._physical_output_available(target)
             and "blue_container_h01" in object_name.lower()
         ):
+            import numpy as np
+
+            from robot_agent.skills.competition_navigation import (
+                carried_object_alignment_yaw,
+                orient_base,
+            )
+
+            try:
+                body_id = self.backend.env.obj_body_id[object_name]
+                object_xy = np.asarray(
+                    self.backend.env.sim.data.body_xpos[body_id][:2],
+                    dtype=float,
+                )
+                base_xy, base_yaw = self.backend.get_base_pose()
+                target_yaw = carried_object_alignment_yaw(
+                    base_xy=base_xy,
+                    base_yaw=base_yaw,
+                    object_xy=object_xy,
+                    target_xy=station.center[:2],
+                )
+            except (AttributeError, KeyError, TypeError, ValueError):
+                self._last_place = {
+                    "success": False,
+                    "failure_stage": "target_alignment_geometry",
+                    "method": "aligned_verified_attachment_scoring_pose_hold",
+                }
+                return False
+            if not orient_base(self.backend, target_yaw):
+                self._last_place = {
+                    "success": False,
+                    "failure_stage": "target_alignment",
+                    "method": "aligned_verified_attachment_scoring_pose_hold",
+                    "target_yaw": float(target_yaw),
+                }
+                return False
             success = bool(self.verify(target, object_name))
             self._last_place = {
                 "success": success,
                 "failure_stage": None if success else "target_distance",
-                "method": "verified_attachment_scoring_pose_hold",
+                "method": "aligned_verified_attachment_scoring_pose_hold",
+                "target_yaw": float(target_yaw),
             }
             return success
         place_object_physics = getattr(self.backend, "place_object_physics", None)

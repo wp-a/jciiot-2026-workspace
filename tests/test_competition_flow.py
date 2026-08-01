@@ -797,16 +797,18 @@ class CompetitionFlowTests(unittest.TestCase):
 
     def test_unregistered_l4_output_accepts_verified_scoring_pose_hold(self):
         object_name = "blue_container_h01_back_upper"
+        body_xpos = {7: np.array([4.800908, -8.005454, 1.38])}
         backend = SimpleNamespace(
             env=SimpleNamespace(
                 output_ports={},
                 obj_body_id={object_name: 7},
                 sim=SimpleNamespace(
                     data=SimpleNamespace(
-                        body_xpos={7: np.array([4.80, -8.00, 1.38])}
+                        body_xpos=body_xpos
                     )
                 ),
-            )
+            ),
+            get_base_pose=lambda: (np.array([5.8, -8.2]), 2.938242),
         )
         driver = object.__new__(self.module.OfficialCompetitionDriver)
         driver.backend = backend
@@ -819,10 +821,24 @@ class CompetitionFlowTests(unittest.TestCase):
         driver._transport_attached = True
         driver._transport_attachment = {"active": True, "object_name": object_name}
 
-        self.assertTrue(driver.place("output_5", object_name))
+        orientations = []
+
+        def orient_base(_backend, target_yaw):
+            orientations.append(float(target_yaw))
+            body_xpos[7][:2] = [5.087, -7.476]
+            return True
+
+        with patch(
+            "robot_agent.skills.competition_navigation.orient_base",
+            side_effect=orient_base,
+        ):
+            self.assertTrue(driver.place("output_5", object_name))
+
+        self.assertEqual(len(orientations), 1)
+        self.assertAlmostEqual(orientations[0], 2.339, places=2)
         self.assertEqual(
             driver._last_place["method"],
-            "verified_attachment_scoring_pose_hold",
+            "aligned_verified_attachment_scoring_pose_hold",
         )
         self.assertTrue(driver._transport_attached)
 

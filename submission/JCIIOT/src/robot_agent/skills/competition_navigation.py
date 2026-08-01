@@ -93,6 +93,46 @@ def bounded_yaw_step(
     return (float(current_yaw) + delta + math.pi) % (2.0 * math.pi) - math.pi
 
 
+def carried_object_alignment_yaw(
+    *,
+    base_xy,
+    base_yaw: float,
+    object_xy,
+    target_xy,
+) -> float:
+    """Aim an attached object's measured base-relative offset at a target."""
+    base = np.asarray(base_xy, dtype=float).reshape(2)
+    object_position = np.asarray(object_xy, dtype=float).reshape(2)
+    target = np.asarray(target_xy, dtype=float).reshape(2)
+    if not all(
+        np.all(np.isfinite(value))
+        for value in (base, object_position, target)
+    ):
+        raise ValueError("base, object, and target coordinates must be finite")
+
+    relative_world = object_position - base
+    target_world = target - base
+    if float(np.linalg.norm(relative_world)) <= 1e-9:
+        raise ValueError("object must have a nonzero offset from the base")
+    if float(np.linalg.norm(target_world)) <= 1e-9:
+        raise ValueError("target must differ from the base position")
+
+    cosine = math.cos(-float(base_yaw))
+    sine = math.sin(-float(base_yaw))
+    relative_local = np.array(
+        [
+            cosine * relative_world[0] - sine * relative_world[1],
+            sine * relative_world[0] + cosine * relative_world[1],
+        ],
+        dtype=float,
+    )
+    target_yaw = math.atan2(target_world[1], target_world[0]) - math.atan2(
+        relative_local[1],
+        relative_local[0],
+    )
+    return (target_yaw + math.pi) % (2.0 * math.pi) - math.pi
+
+
 def grasp_orientation_from_base(
     *,
     base_xy,

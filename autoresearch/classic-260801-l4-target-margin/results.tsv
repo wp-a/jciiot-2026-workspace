@@ -1,0 +1,2 @@
+iteration	candidate	tier	score	collision_frames	grasp_events	workflow_success	final_distance_m	decision	notes
+0	final-100-l3-release-hold-20260801	nominal	25	0	1	true	0.747841	reject-margin	Baseline is only 0.052159 m inside the public threshold.

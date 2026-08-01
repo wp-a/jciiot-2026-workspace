@@ -212,6 +212,40 @@ class CompetitionNavigationTests(unittest.TestCase):
 
         self.assertAlmostEqual(next_yaw, -math.pi + 0.025)
 
+    def test_carried_object_alignment_yaw_reduces_l4_target_distance(self):
+        base_xy = np.array([5.8, -8.2])
+        object_xy = np.array([4.800908, -8.005454])
+        target_xy = np.array([4.872, -7.261])
+        current_yaw = 2.938242
+
+        target_yaw = self.module.carried_object_alignment_yaw(
+            base_xy=base_xy,
+            base_yaw=current_yaw,
+            object_xy=object_xy,
+            target_xy=target_xy,
+        )
+
+        relative_world = object_xy - base_xy
+        cosine = math.cos(-current_yaw)
+        sine = math.sin(-current_yaw)
+        relative_local = np.array(
+            [
+                cosine * relative_world[0] - sine * relative_world[1],
+                sine * relative_world[0] + cosine * relative_world[1],
+            ]
+        )
+        cosine = math.cos(target_yaw)
+        sine = math.sin(target_yaw)
+        aligned_object_xy = base_xy + np.array(
+            [
+                cosine * relative_local[0] - sine * relative_local[1],
+                sine * relative_local[0] + cosine * relative_local[1],
+            ]
+        )
+
+        self.assertAlmostEqual(target_yaw, 2.339, places=2)
+        self.assertLess(float(np.linalg.norm(aligned_object_xy - target_xy)), 0.40)
+
     def test_grasp_base_alignment_uses_a_tight_bounded_final_move(self):
         calls = []
         backend = SimpleNamespace(xy=np.array([13.0, 4.41], dtype=float))
