@@ -7,6 +7,7 @@ import argparse
 import json
 import math
 import random
+import re
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -38,6 +39,39 @@ except ImportError:
 
 DEFAULT_SAMPLING_SEEDS = (20260820, 20260821, 20260822)
 EXPECTED_ACTION_DIM = 20
+PERIODIC_CHECKPOINT_PATTERN = re.compile(r"^model_epoch_(\d+)\.pth$")
+VALIDATION_LOSS_PATTERN = re.compile(
+    r"Validation Epoch\s+(\d+)\s*\r?\n\{.*?"
+    r'"Loss":\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)',
+    re.DOTALL,
+)
+
+
+def parse_validation_losses(log_text: str) -> dict[int, float]:
+    losses = {
+        int(epoch): float(loss)
+        for epoch, loss in VALIDATION_LOSS_PATTERN.findall(log_text)
+    }
+    if not losses:
+        raise ValueError("no validation losses were found in the training log")
+    return losses
+
+
+def select_periodic_checkpoint_by_validation(
+    paths: Iterable[str | Path],
+    validation_losses: dict[int, float],
+) -> Path:
+    candidates = []
+    for raw_path in paths:
+        path = Path(raw_path)
+        match = PERIODIC_CHECKPOINT_PATTERN.match(path.name)
+        if match:
+            epoch = int(match.group(1))
+            if epoch in validation_losses:
+                candidates.append((float(validation_losses[epoch]), epoch, path))
+    if not candidates:
+        raise ValueError("no periodic checkpoint has a logged validation loss")
+    return min(candidates, key=lambda item: (item[0], item[1], item[2].name))[2]
 
 
 def set_sampling_seed(seed: int, torch_module) -> None:
@@ -214,19 +248,47 @@ def main(argv: list[str] | None = None) -> int:
     checkpoint_group.add_argument("--checkpoint", type=Path)
     checkpoint_group.add_argument("--models-dir", type=Path)
     parser.add_argument("--sampling-seeds", nargs="+", type=int, default=DEFAULT_SAMPLING_SEEDS)
+    parser.add_argument("--training-log", type=Path)
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
 
     checkpoint = args.checkpoint
+    selection: dict[str, Any]
     if checkpoint is None:
-        checkpoint = select_best_validation_checkpoint(args.models_dir.glob("*.pth"))
+        model_paths = list(args.models_dir.glob("*.pth"))
+        try:
+            checkpoint = select_best_validation_checkpoint(model_paths)
+            selection = {"method": "best_validation_checkpoint_filename"}
+        except ValueError:
+            if args.training_log is None:
+                raise ValueError(
+                    "--training-log is required for periodic checkpoints"
+                )
+            validation_losses = parse_validation_losses(
+                args.training_log.read_text(encoding="utf-8", errors="replace")
+            )
+            checkpoint = select_periodic_checkpoint_by_validation(
+                model_paths,
+                validation_losses,
+            )
+            checkpoint_epoch = int(
+                PERIODIC_CHECKPOINT_PATTERN.match(checkpoint.name).group(1)
+            )
+            selection = {
+                "method": "minimum_logged_validation_loss_at_saved_epoch",
+                "training_log": str(args.training_log.resolve()),
+                "logged_validation_loss": validation_losses[checkpoint_epoch],
+            }
+    else:
+        selection = {"method": "explicit_checkpoint"}
     results = evaluate_checkpoint(
         args.dataset,
         checkpoint,
         sampling_seeds=args.sampling_seeds,
         device_name=args.device,
     )
+    results["checkpoint_selection"] = selection
     write_json_atomic(args.output, results)
     print(json.dumps(results, ensure_ascii=True, indent=2, sort_keys=True))
     return 0 if results["summary"]["offline_gate_passed"] else 1

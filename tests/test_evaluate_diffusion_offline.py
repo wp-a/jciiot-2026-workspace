@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from scripts import evaluate_diffusion_offline as module
 
@@ -64,6 +65,42 @@ class TrialSummaryTests(unittest.TestCase):
                 constant_baseline_mse=0.40,
                 expected_action_dim=20,
             )
+
+
+class PeriodicCheckpointSelectionTests(unittest.TestCase):
+    def test_selects_saved_epoch_with_lowest_logged_validation_loss(self):
+        paths = [
+            Path("model_epoch_1.pth"),
+            Path("model_epoch_10.pth"),
+            Path("model_epoch_20.pth"),
+        ]
+        validation_losses = {1: 0.8, 10: 0.2, 20: 0.3}
+
+        selected = module.select_periodic_checkpoint_by_validation(
+            paths,
+            validation_losses,
+        )
+
+        self.assertEqual(selected.name, "model_epoch_10.pth")
+
+    def test_parses_validation_losses_from_robomimic_log(self):
+        log = """
+Validation Epoch 1
+{
+    "Loss": 1.25,
+    "Time_Epoch": 0.1
+}
+Validation Epoch 2
+{
+    "Loss": 2.5e-02,
+    "Time_Epoch": 0.1
+}
+"""
+
+        self.assertEqual(
+            module.parse_validation_losses(log),
+            {1: 1.25, 2: 0.025},
+        )
 
 
 if __name__ == "__main__":

@@ -35,8 +35,9 @@ unseen L1 pose perturbations, without changing data coverage or the robot API.
   500 warmup updates.
 - Training: 300 epochs, full train/validation passes, batch size 64, observation
   normalization from train only, seed `20260802`.
-- Select the checkpoint with minimum validation diffusion loss. Neither held-out
-  actions nor closed-loop runs may select a checkpoint.
+- Save checkpoints at epoch 1 and every 10 epochs. Select the saved checkpoint
+  with minimum validation diffusion loss parsed from the immutable training log.
+  Neither held-out actions nor closed-loop runs may select a checkpoint.
 
 ## Gates
 
@@ -63,3 +64,18 @@ unseen L1 pose perturbations, without changing data coverage or the robot API.
 Diffusion validation loss and held-out action MSE are not competition scores.
 The deterministic teacher remains the scored incumbent unless a later separate
 full-workflow regression promotes a learned grasp policy.
+
+## Infrastructure amendment before confirmatory restart
+
+The initial full launch (`h4_diffusion_l1_lowdim_v1`, started
+`20260801215827`) was stopped after validation epoch 51. With
+`on_best_validation=true`, robomimic wrote a full model and optimizer checkpoint
+for nearly every early improvement; 33 GB had accumulated by epoch 48 and the
+training process was blocked in Linux `rq_qos_wait` while GPU utilization was
+zero. No held-out action or closed-loop result was inspected.
+
+Before restarting from epoch 1 with the same seed, data, split, network, and
+optimizer, checkpoint persistence was changed to epoch 1 plus every 10 epochs.
+Model selection remains validation-only and is restricted to those saved epochs.
+The aborted directory is retained as failure evidence and is not eligible for
+H4 model selection.

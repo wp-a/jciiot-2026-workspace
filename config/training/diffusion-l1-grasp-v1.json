@@ -1,7 +1,7 @@
 {
   "algo_name": "diffusion_policy",
   "experiment": {
-    "name": "h4_diffusion_l1_lowdim_v1",
+    "name": "h4_diffusion_l1_lowdim_v2_io",
     "validate": true,
     "logging": {
       "terminal_output_to_txt": true,
@@ -11,9 +11,9 @@
     "save": {
       "enabled": true,
       "every_n_seconds": null,
-      "every_n_epochs": 25,
+      "every_n_epochs": 10,
       "epochs": [1],
-      "on_best_validation": true,
+      "on_best_validation": false,
       "on_best_rollout_return": false,
       "on_best_rollout_success_rate": false
     },
