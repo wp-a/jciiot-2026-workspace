@@ -56,3 +56,17 @@ GitHub 还逐一比较了 8 个公开 fork 相对官方仓库的 ahead/behind �
 2. 比较 Erratum、手册、scorer、task config 和允许修改边界；
 3. 更新 `docs/05-open-questions.md`；
 4. 只有通过固定实验协议复现后，才更新技术路线中的优先级。
+
+## 2026-08-01 增量复核
+
+- 官方 `master` 从实验锁定提交 `0dcdddf` 更新到 `129e94a`，差异只有根
+  `README.md` 的参赛者自报榜单；评分器、任务配置、场景和模型接口未变。
+- 用固定清单重新校验 12 个本地参考 checkout，origin、commit 和干净状态
+  全部通过。
+- 在线复核 robomimic、MimicLabs、CP-Gen、ACT++、MobileManiBench 和
+  `QiShengZhao/JCIIOT2026` 的分支 HEAD，均与 2026-07-22 固定 commit 一致。
+- 没有发现符合当前官方修改边界、覆盖五关且带未修改评分器复现证据的完整
+  方案。同赛题 fork 继续只用于 DAgger/HDF5/headless 诊断参考。
+- 实验结果改变了采用优先级：BC-RNN 虽通过 held-out 动作误差门槛，但闭环
+  0/5。Diffusion Policy 是最后一个同数据模型对照；若闭环失败，下一步固定为
+  补采 approach drift 和单臂接触恢复数据，不继续无数据覆盖的模型搜索或从零 RL。

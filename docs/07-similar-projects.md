@@ -1,10 +1,40 @@
 # 同类项目与可复用方案
 
-核对日期：2026-07-22。仓库版本、许可证和采用状态以 [`research/source-ledger.csv`](../research/source-ledger.csv) 与 [`references/repositories.json`](../references/repositories.json) 为准。
+核对日期：2026-08-01。仓库版本、许可证和采用状态以 [`research/source-ledger.csv`](../research/source-ledger.csv) 与 [`references/repositories.json`](../references/repositories.json) 为准。
 
 ## 结论
 
 当前没有公开、可复现、覆盖 JCIIOT 五个场景且符合官方修改边界的完整方案。最可行的组合是：官方框架和评分器作为固定边界，robomimic 负责局部抓取，PythonRobotics/Nav2 概念增强导航，轻量行为树或状态机负责编排和恢复，MimicLabs/CP-Gen 只提供数据方法参考。
+
+## 2026-08-01 执行状态
+
+- 12 个固定参考 checkout 已全部下载；origin、commit 和干净状态重新校验通过。
+- 六个最相关仓库（robomimic、MimicLabs、CP-Gen、ACT++、MobileManiBench、同赛题 fork）的在线分支 HEAD 与固定审计 commit 仍一致。
+- 已采用 robomimic 的原生 HDF5、BC-RNN、Diffusion Policy 和 checkpoint 接口，没有迁移第二套训练框架。
+- 已按 MimicLabs/MimicGen 的“少量源示范 + 对象相对扰动 + 筛选”思想独立采集 14 条 Tiago L1 轨迹；不复制受限实现。结果见 [`experiments/h2-native-tiago-grasp-dataset/results.md`](../experiments/h2-native-tiago-grasp-dataset/results.md)。
+- BC-RNN held-out 动作 MSE 比常数基线改善 92.76%，但新扰动闭环为 0/5，说明当前主要缺口是恢复状态覆盖，不是继续增加 epoch。结果见 [`experiments/h3-bc-rnn/results.md`](../experiments/h3-bc-rnn/results.md)。
+- 同数据 Diffusion Policy 是最后一个模型表达力对照，协议见 [`experiments/h4-diffusion-policy/protocol.md`](../experiments/h4-diffusion-policy/protocol.md)。若闭环低于 4/5，停止 BC-Transformer、ACT、VLA 和从零 RL 的同数据升级，直接采集 approach drift 与单臂接触恢复轨迹。
+
+## 参考项目决策表
+
+| 项目 | 最值得借鉴 | 当前状态 | 不直接采用的原因 |
+|---|---|---|---|
+| 官方内嵌 robomimic | Tiago 数据接口、BC/BC-RNN/Diffusion、rollout | 已采用 | 无需再接原版 Diffusion 或 LeRobot |
+| QiShengZhao/JCIIOT2026 | L1 DAgger 诊断、HDF5 聚合、headless 排错 | 只比较 | 修改了禁止目录和评分器，自报分不可比 |
+| MimicLabs / CP-Gen | 源示范采集、约束保持增强、恢复数据组织 | 方法参考 | 依赖 MimicGen/cuRobo/自定义环境，许可证链需审查 |
+| ACT++ | action chunking、temporal aggregation | 暂停 | Tiago 接口不同；无恢复数据时仍会复现分布外失败 |
+| MobileManiBench | 技能级数据和跨场景评测结构 | 评测参考 | Isaac Sim/IsaacLab 与官方 MuJoCo 栈不兼容 |
+| RoboMonkey | 多候选动作的安全 verifier | 概念参考 | 依赖额外 VLA/reward 权重和多 GPU 服务 |
+| OK-Robot | 导航-抓取-运输-放置模块划分 | 架构参考 | AnyGrasp 需要授权，不能用于本比赛 |
+| PythonRobotics / Nav2 | clearance、footprint、路径平滑与重规划 | 算法参考 | 不引入 ROS 2 或整套导航栈 |
+
+## 防止无效迭代的停止规则
+
+1. 训练 loss、held-out 动作 MSE、自报榜单和固定 reset 重复成功都不能单独晋级模型。
+2. 同一数据只完成 BC-RNN 与 Diffusion 两个预注册对照；Diffusion 闭环失败后不再尝试 ACT/Transformer 超参数搜索。
+3. 下一次训练必须增加已标注的失败恢复覆盖，并保持独立 train/valid/heldout 和新闭环种子。
+4. 强化学习仅在“模仿初始化 + 恢复数据”仍有小幅系统残差时考虑，且只学习有动作幅度和碰撞屏障的局部 residual；不从零训练 20 维全机器人 PPO/SAC。
+5. 每个实验必须有协议、冻结 commit/数据哈希、随机种子、结果文件和 keep/reject 决策；失败记录保留，不用新结果覆盖旧证据。
 
 ## 同一比赛公开实现
 
