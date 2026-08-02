@@ -1,5 +1,7 @@
+import importlib.util
 import inspect
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -117,6 +119,66 @@ VALID_ORIENTATION_RECORD = {
     "orientation_collision_frames": 0,
     "infrastructure_error": None,
 }
+
+
+class AttachmentFreeProbeGuardTests(unittest.TestCase):
+    @staticmethod
+    def load_guard_module():
+        path = Path(__file__).resolve().parents[1] / "scripts" / (
+            "run_attachment_free_l1_probe.py"
+        )
+        if not path.is_file():
+            raise AssertionError(f"missing attachment-free guard: {path}")
+        spec = importlib.util.spec_from_file_location(
+            "run_attachment_free_l1_probe",
+            path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        return module
+
+    def test_guard_forces_raw_grasp_for_inchworm(self):
+        module = self.load_guard_module()
+        observed_stages = []
+
+        def execute_probe_grasp(*args, full_physical_stage, **kwargs):
+            del args, kwargs
+            observed_stages.append(full_physical_stage)
+            return {"success": True}
+
+        runner = SimpleNamespace(
+            _execute_probe_grasp=execute_probe_grasp,
+            _end_grasp_inchworm_probe=lambda *args, **kwargs: {"success": True},
+        )
+
+        module.install_attachment_free_guards(runner)
+        result = runner._execute_probe_grasp(
+            object(),
+            "input_5",
+            "line_5_container_h01_near",
+            full_physical_stage=None,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(observed_stages, [module.RAW_PHYSICAL_GRASP_SENTINEL])
+
+    def test_guard_rejects_any_attachment_state(self):
+        module = self.load_guard_module()
+        runner = SimpleNamespace(
+            _execute_probe_grasp=lambda *args, **kwargs: {"success": True},
+            _end_grasp_inchworm_probe=lambda *args, **kwargs: {
+                "success": True,
+                "attachment_activations": 0,
+                "transport_attachment_active_before": True,
+                "transport_attachment_active_after": True,
+            },
+        )
+
+        module.install_attachment_free_guards(runner)
+
+        with self.assertRaisesRegex(RuntimeError, "transport attachment"):
+            runner._end_grasp_inchworm_probe(object(), "box")
 
 VALID_JOINT_SEED_RECORD = {
     "joint_seed_success": True,

@@ -56,6 +56,10 @@ zero collision, and zero attachment/teleport/state writes.
   `/home/user/jciiot-2026/tools/full-physical-l1-c8a6bf2/run_l1_cradle_gate.py`;
 - runner SHA-256:
   `50ade2e8609a6c7ea1dac7fbb59ae6a2e6b99b3de240e10d19d8cdce6e405732`;
+- attachment-free guard:
+  `/home/user/jciiot-2026/tools/attachment-free-l1-4b69d4e/run_attachment_free_l1_probe.py`;
+- attachment-free guard SHA-256:
+  `4b69d4e2422ac8b616137110d4779b4ae6c9a8155294462651731d5403bde1f2`;
 - canonical auditor SHA-256:
   `6ce0a9b350ad94521a9313f30ae94bedc27700599e9a4bd64ad399f3a467d1a8`;
 - public L1, seed `0`, near container;
@@ -94,3 +98,25 @@ The outer compact record and trajectory will then be converted to the canonical
 full-physical audit schema before any training-data or score claim. Otherwise
 record the exact failing macro and revise the reset architecture rather than
 sweeping unrelated grasp parameters.
+
+## Excluded Interface-Incompatible Launch
+
+The first launch through the frozen runner's legacy end-grasp entry is excluded
+before physical interpretation. Its log and result explicitly report
+`transport_attachment_active_before=true` and
+`transport_attachment_active_after=true`: the legacy entry called
+`OfficialCompetitionDriver.grasp()` because only `--full-physical-stage` had
+previously selected raw grasping. The outer `attachment_calls=0` counter did not
+cover the earlier grasp activation and was therefore not authoritative.
+
+- excluded result SHA-256:
+  `3fad979282502509adc11a92161eb441e09ebe8e7f34e374040b81b485e20dd4`;
+- excluded trajectory SHA-256:
+  `222cb70ebf3e703b3f16c077518f3e532afe5d267bdb5a0ca90b792cb689b2c1`.
+
+The guard used for the replacement launch forces the frozen runner's existing
+raw scripted physical grasp and rejects any attachment active-before/after,
+attachment activation, or object-pose write. It does not clear an attachment,
+modify the candidate, or alter inchworm parameters. This is an interface
+correction, so the original physical hypothesis and keep/discard gate remain
+unchanged.
