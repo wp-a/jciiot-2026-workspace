@@ -74,18 +74,36 @@ hypotheses:
     priority: medium
   - id: H5
     statement: "Teacher-labeled approach-drift and asymmetric-contact recovery trajectories will raise the unchanged H4 Diffusion Policy to at least 8/10 unseen L1 grasp-and-lift successes."
-    status: active
+    status: paused
     motivation: "H4's three failures isolate missing learner-state coverage: two bilateral contacts without lift and one approach that never made contact."
     parent: H4
+    priority: high
+  - id: H6
+    statement: "Recovery-augmented H2 plus H5b data will produce a deployable Diffusion grasp policy without a complete physical-transport teacher."
+    status: rejected
+    motivation: "The 36-trajectory epoch-140 model only passed offline MSE; severe action clipping remained and no valid transport rollout existed, so further same-data training was stopped."
+    parent: H5
+    priority: high
+  - id: H7
+    statement: "The locked Tiago composite wheel action can provide enough base motion for a complete pure-dynamics L1 carry."
+    status: rejected
+    motivation: "The corrected 635-step run moved the base only 0.002161 m; the archived full-scale controller test had already measured only about 5.6 mm in 100 actions."
+    parent: null
+    priority: high
+  - id: H8
+    statement: "A supported physical push or drag can satisfy L1 scoring without object attachment or object-pose writes, with any simulator-level navigation abstraction explicitly separated from pure dynamics."
+    status: active
+    motivation: "Side-grasp carry repeatedly slips, while the source support can carry the object weight; the remaining open variable is contact topology rather than model capacity."
+    parent: H7
     priority: high
 
 experiments:
   proxy_metric: "Held-out full-score rate subject to zero scored collisions."
   baseline_value: 0.0
   best_value: 0.0
-  total_runs: 24
-  active_protocol: "experiments/h5-recovery-data/protocol.md"
-  next_experiment: "Collect 24 pre-registered learner-state recovery windows across approach-drift and asymmetric-contact buckets before retraining the unchanged H4 Diffusion configuration."
+  total_runs: 25
+  active_protocol: "autoresearch/classic-260802-l1-exposed-edge-setdown/config.md"
+  next_experiment: "Do not launch a new run until the supported-push, drag, cradle, inchworm, and direct-base evidence inventory identifies one untested contact topology and preregisters a single-seed gate."
   trajectory:
     - experiment: H2_teacher_collection
       value: 1.0
@@ -96,11 +114,14 @@ experiments:
     - experiment: H4_diffusion_closed_loop
       value: 0.4
       runs: 5
+    - experiment: H7_pure_actuator_transport
+      value: 0.0
+      runs: 1
 
 outer_loop:
-  cycle: 3
-  last_direction: "Stop same-data model escalation and add teacher-labeled learner-state recovery coverage while retaining the deterministic teacher as the scored incumbent."
-  last_reflection: "Diffusion improved closed-loop success from 0/5 to 2/5 but failed the 4/5 gate; architecture alone cannot compensate for missing approach-drift and contact-recovery states."
+  cycle: 4
+  last_direction: "Pause model scaling, reconcile physical-transport evidence, and test only a genuinely new supported contact topology."
+  last_reflection: "The latest probe repeated an archived wheel-controller limitation because that boundary was absent from the active state index. Direct base-qpos contact transport must no longer be reported as complete pure dynamics."
 
 workspace:
   findings: "findings.md"

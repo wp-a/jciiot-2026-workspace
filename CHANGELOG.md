@@ -4,6 +4,9 @@
 
 ## 2026-08-02
 
+- 纠正“纯物理运输”证据边界：先前最佳 `0.265401 m` 记录使用 direct base-qpos 步进，虽无 attachment / 物体位姿写入，但不是完整机器人动力学；不得再作为纯动力学训练成功标签。
+- 完成唯一一条纯 composite-action 纠错复现：真实抓取后底盘 635 步仅移动 `0.002161 m`，箱体跌回源支撑并向错误方向滑移；零碰撞、零状态捷径但严格 rejected。停止 wheel-action 幅值、时长和 seed 扫描。
+- 将 H5 同数据训练暂停，把 H6 恢复数据模型记为 rejected，并新增 H7 纯底盘动作 rejected / H8 supported transport active；下一步先形成 supported-push/drag/inchworm 单一证据索引，再决定唯一必要实验。
 - 新增纯物理运输数据门禁：使用运输阶段物体起止位置重算真实位移，不再接受底盘位移、旧 runner 的 `accepted` 标志或自报 `transport_success` 作为数据标签。
 - 审计 41 份唯一 L1 纯物理紧凑结果：严格 `0.50 m` 合格数为 0，13 份保留为 recovery，28 份因缺证据、碰撞、attachment、非法状态写入或基础设施错误被拒绝。最佳干净轨迹真实移动 `0.265401 m`。
 - 核实 H5b 为 24 条、6,521 步恢复数据；H6 为 36 条、9,866 步。H6 Diffusion 仅通过离线 MSE 门槛，动作裁剪严重且尚无闭环结果，因此停止同数据扩训。

@@ -73,11 +73,20 @@ justify a policy. Model complexity is promoted only by held-out rollout evidence
 - The final scored path must not assign robot/object qpos or attachment-relative
   state. Research-only perturbation setup may set initial state before recording,
   and must record the exact measured change.
+- The previous `0.265401 m` best contact-transport record used direct base-qpos
+  stepping. It is evidence of free-object contact transport without attachment,
+  but not of complete robot dynamics. A corrected composite-action run moved
+  the base only `0.002161 m` in 635 steps and was rejected.
+- Wheel-action navigation was already structurally rejected by the archived
+  `classic-260728-1443` full-scale test. Do not spend runs on action magnitude,
+  duration, or seed sweeps. Any future direct-base result must be labelled as an
+  organizer-facing navigation abstraction, not pure dynamics.
 
 ## Open Questions
 
-- Can 24 stratified learner-state recovery windows raise the unchanged
-  Diffusion Policy to at least 8/10 unseen grasp-and-lift successes?
+- Can a supported physical push/drag topology move L1 more than `1 m` while
+  preserving zero collision, attachment, object-pose writes, and an explicitly
+  declared navigation boundary?
 - Can supported controller actions reproduce L5 placement without private
   attachment mutation while retaining all three objects within 0.8 m?
 - If H5 passes L1, how much additional recovery coverage is required before the
@@ -85,8 +94,9 @@ justify a policy. Model complexity is promoted only by held-out rollout evidence
 
 ## Optimization Trajectory
 
-The deterministic object-relative teacher passed 14/14 registered L1 data
-collection runs. BC-RNN passed its offline gate but was rejected after 0/5
-closed-loop successes. Same-data Diffusion improved to 2/5 but also failed its
-locked promotion gate. The next registered point is H5 recovery-data collection;
-same-data BC-Transformer, ACT, VLA, and from-scratch RL escalation are stopped.
+The deterministic object-relative teacher passed 14/14 registered L1 grasp
+data runs. BC-RNN passed its offline gate but was rejected after 0/5 closed-loop
+successes; same-data Diffusion reached 2/5 and also failed promotion. Recovery
+training is paused because no strict full-transport teacher exists. The next
+step is a no-run inventory of supported-transport evidence, followed by one
+pre-registered L1 topology experiment only if it adds information.

@@ -1,0 +1,3 @@
+run	classification	physical_grasp	base_translation_m	true_object_translation_m	minimum_object_lift_m	max_object_gripper_drift_m	continuous_bilateral_contact	collision_frames	attachment_activations	object_pose_writes	robot_state_writes	place_attempted	stable_support_contact_steps	directed_exposed_bottom_m	decision	result_sha256
+seed0	excluded_setup_error	false	0.0	0.0				0	1	0	0	false	0	0.0	exclude: default grasp wrapper activated attachment before transport	873e79b4bdd8d982ce3848f0d58d4502a96eb52066f02e67e1afd5a0968c7f3d
+seed0-corrected	rejected	true	0.002160790	0.100385737	0.000016264	0.015390389	true	0	0	0	0	false	0	0.0	reject: actuator-only base timed out and object fell/slipped opposite command	8a36cc58e1c77b051b1594acf2748fc35f5451e4d22787f1f27d05f2ecab3eeb
