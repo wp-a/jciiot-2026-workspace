@@ -1,0 +1,2 @@
+source_path	classification	eligible	object_translation_m	minimum_object_lift_m	max_object_gripper_drift_m	failures	duplicate_of	source_sha256
+/home/user/jciiot-2026/results/l1-reverse-egress-20260802/seed0-xplus-0p50.json	recovery	false	0.12314848526830907	0.026332585685933996	0.029638127430340718	dropped,minimum_object_lift_m,object_translation_m		393e8d420b3f8896e279e648574d28fe16159a849b7f39257646aca41fe7253c

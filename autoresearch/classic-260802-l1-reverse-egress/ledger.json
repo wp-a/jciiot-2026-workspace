@@ -1,0 +1,33 @@
+{
+  "classification_counts": {
+    "recovery": 1,
+    "rejected": 0,
+    "transport_success": 0
+  },
+  "eligible_count": 0,
+  "record_count": 1,
+  "records": [
+    {
+      "classification": "recovery",
+      "eligible": false,
+      "failures": [
+        "dropped",
+        "minimum_object_lift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.029638127430340718,
+        "minimum_object_lift_m": 0.026332585685933996,
+        "object_translation_m": 0.12314848526830907
+      },
+      "source_path": "/home/user/jciiot-2026/results/l1-reverse-egress-20260802/seed0-xplus-0p50.json",
+      "source_sha256": "393e8d420b3f8896e279e648574d28fe16159a849b7f39257646aca41fe7253c",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    }
+  ],
+  "unique_content_count": 1
+}

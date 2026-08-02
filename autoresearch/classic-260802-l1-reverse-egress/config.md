@@ -80,3 +80,16 @@ Keep only if the independent auditor classifies `transport_success` with:
 
 Any failure is preserved under its measured class. The final gate is not
 relaxed, and no failed run is relabeled as successful training data.
+
+## Audit Tool Formatting Note
+
+The preregistered auditor produced the same classification but used the older
+CRLF/trailing-empty-field TSV format. The already-tested canonical-output
+revision was copied to the isolated path
+`/home/user/jciiot-2026/tools/physical-data-gate-6ce0a9b/` and used for the
+committed ledger. Its SHA-256 is
+`6ce0a9b350ad94521a9313f30ae94bedc27700599e9a4bd64ad399f3a467d1a8`.
+The only relevant change is TSV line/column formatting; audit thresholds and
+classification semantics are unchanged. Both revisions classified the result
+as `recovery`, and both ledger JSON files have SHA-256
+`0a72a3292d0ca8e4948b3c063fe03fa4c8e183b48b62b1aa0943badc49a79fd3`.
