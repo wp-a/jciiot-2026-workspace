@@ -1,0 +1,2 @@
+source_path	classification	eligible	object_translation_m	minimum_object_lift_m	max_object_gripper_drift_m	failures	duplicate_of	source_sha256
+/home/user/jciiot-2026/results/physical-carry-drift04-20260802/seed0-drift04-interface-match.json	rejected	false	0.27527476256830846	0.19442237832863896	0.030449263360874522	collision_frames,object_translation_m		99504d5894a9ca53351b8495c18e10896d8f2f08f5d79c9118af9e9dab37412b

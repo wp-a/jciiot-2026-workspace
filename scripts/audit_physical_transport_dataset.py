@@ -249,7 +249,6 @@ def write_tsv_atomic(path: str | Path, ledger: Mapping[str, Any]) -> None:
     temporary = path.with_name(f"{path.name}.tmp")
     fieldnames = (
         "source_path",
-        "source_sha256",
         "classification",
         "eligible",
         "object_translation_m",
@@ -257,9 +256,15 @@ def write_tsv_atomic(path: str | Path, ledger: Mapping[str, Any]) -> None:
         "max_object_gripper_drift_m",
         "failures",
         "duplicate_of",
+        "source_sha256",
     )
     with temporary.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames, delimiter="\t")
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=fieldnames,
+            delimiter="\t",
+            lineterminator="\n",
+        )
         writer.writeheader()
         for record in ledger["records"]:
             metrics = record.get("metrics", {})

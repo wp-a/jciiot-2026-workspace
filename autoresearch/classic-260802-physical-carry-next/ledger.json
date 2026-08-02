@@ -1,0 +1,32 @@
+{
+  "classification_counts": {
+    "recovery": 0,
+    "rejected": 1,
+    "transport_success": 0
+  },
+  "eligible_count": 0,
+  "record_count": 1,
+  "records": [
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "collision_frames",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.030449263360874522,
+        "minimum_object_lift_m": 0.19442237832863896,
+        "object_translation_m": 0.27527476256830846
+      },
+      "source_path": "/home/user/jciiot-2026/results/physical-carry-drift04-20260802/seed0-drift04-interface-match.json",
+      "source_sha256": "99504d5894a9ca53351b8495c18e10896d8f2f08f5d79c9118af9e9dab37412b",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    }
+  ],
+  "unique_content_count": 1
+}

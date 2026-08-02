@@ -207,6 +207,10 @@ class AuditBatchTests(unittest.TestCase):
             rows = tsv_output.read_text(encoding="utf-8").splitlines()
             self.assertEqual(len(rows), 2)
             self.assertIn("object_translation_m", rows[0])
+            self.assertNotIn(b"\r\n", tsv_output.read_bytes())
+            self.assertTrue(
+                all(not row.endswith(("\t", " ")) for row in rows)
+            )
             self.assertFalse((root / "ledger.json.tmp").exists())
             self.assertFalse((root / "results.tsv.tmp").exists())
 
