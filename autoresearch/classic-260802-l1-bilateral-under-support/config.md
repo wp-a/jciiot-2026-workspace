@@ -74,3 +74,35 @@ Keep only if all of the following are independently verified:
 Failure to enter the bottom region, finger-only contact, unsupported motion, or
 any safety/integrity violation rejects the route. A failed run is diagnostic
 evidence only and cannot enter successful transport training data.
+
+## Invalid Setup Reproduction
+
+The first server invocation did not reach the registered structural change.
+The joint seed and runtime orientation alignment succeeded, but the current
+runner reported `physical_grasp=false`, `hold_grasp_steps=0`, and no support
+transition. Safety and integrity counters were zero. This is invalid for the
+support hypothesis because the assumed frozen center grasp was not reproduced.
+
+The current runner did not expose its internal failure stage in the top-level
+record. Before changing any action parameter, read-only `probe_failure_stage`
+and `probe_stages` fields were added and the identical seed-0 invocation was
+repeated. The repeat remained setup diagnosis, not an additional support
+experiment.
+
+## Corrected Frozen Grasp Entry
+
+The diagnostic repeat identified `close_center_grasp` as the exact blocker:
+all positioning stages succeeded, but the later center-regrasp implementation
+completed 80 close steps with no object contact. Server records `c1` through
+`c15` show that this newer center-regrasp path has no successful grasp. It is
+therefore not a valid frozen setup for the structural experiment.
+
+The same current candidate repeatedly succeeds through the official raw
+scripted physical grasp used by `--full-physical-stage`, including the clean
+record `s0-actuator-g0p35-vertical-0p50-seed0.json` with physical grasp true,
+about `0.2045 m` lift, and zero collision. Route transport was not run in the
+corrected setup. Instead, the exact preregistered bilateral transition was
+entered immediately after that measured physical grasp. Candidate files,
+seed, support distances, keep/discard gates, and integrity constraints remained
+unchanged. This was the first invocation eligible to test the support
+hypothesis.
