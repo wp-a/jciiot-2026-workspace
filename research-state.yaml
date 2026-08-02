@@ -92,18 +92,24 @@ hypotheses:
     priority: high
   - id: H8
     statement: "A supported physical push or drag can satisfy L1 scoring without object attachment or object-pose writes, with any simulator-level navigation abstraction explicitly separated from pure dynamics."
-    status: active
-    motivation: "Side-grasp carry repeatedly slips, while the source support can carry the object weight; the remaining open variable is contact topology rather than model capacity."
+    status: confirmed
+    motivation: "Archived iter33 and iter34 physically pushed L1 to 0.748201 m from target with zero collision, attachment, or object-pose writes; the unmodified official scorer returned 10/10 for both."
     parent: H7
+    priority: high
+  - id: H9
+    statement: "The frozen H8 floor-push route can be integrated into the allowed official RobotAgent entrypoint without losing L1 score or integrity."
+    status: active
+    motivation: "H8 was produced by a research runner; submission readiness requires the same route through skills/workflows selected by app.py."
+    parent: H8
     priority: high
 
 experiments:
   proxy_metric: "Held-out full-score rate subject to zero scored collisions."
   baseline_value: 0.0
   best_value: 0.0
-  total_runs: 25
-  active_protocol: "autoresearch/classic-260802-l1-exposed-edge-setdown/config.md"
-  next_experiment: "Do not launch a new run until the supported-push, drag, cradle, inchworm, and direct-base evidence inventory identifies one untested contact topology and preregisters a single-seed gate."
+  total_runs: 27
+  active_protocol: "autoresearch/classic-260802-supported-transport-inventory/conclusion.md"
+  next_experiment: "Port the frozen iter33 route into allowed skills/workflows, then run exactly one official RobotAgent L1 entrypoint gate requiring 10/10 and zero collision/attachment/object-pose writes."
   trajectory:
     - experiment: H2_teacher_collection
       value: 1.0
@@ -117,11 +123,14 @@ experiments:
     - experiment: H7_pure_actuator_transport
       value: 0.0
       runs: 1
+    - experiment: H8_floor_push_official_score
+      value: 1.0
+      runs: 2
 
 outer_loop:
-  cycle: 4
-  last_direction: "Pause model scaling, reconcile physical-transport evidence, and test only a genuinely new supported contact topology."
-  last_reflection: "The latest probe repeated an archived wheel-controller limitation because that boundary was absent from the active state index. Direct base-qpos contact transport must no longer be reported as complete pure dynamics."
+  cycle: 5
+  last_direction: "Promote the recovered floor-push topology as the practical L1 incumbent and integrate it through the official Agent entrypoint."
+  last_reflection: "The missing result was organizational rather than physical: two archived floor-push runs already score 10/10, but their direct base-qpos boundary and research-runner origin were never consolidated into the active state."
 
 workspace:
   findings: "findings.md"

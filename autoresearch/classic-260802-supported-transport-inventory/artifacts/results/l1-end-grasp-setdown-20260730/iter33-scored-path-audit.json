@@ -1,0 +1,196 @@
+{
+  "root": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518",
+  "violation_count": 23,
+  "hard_violation_count": 0,
+  "warning_count": 23,
+  "by_rule": {
+    "private_backend_import": 11,
+    "direct_qpos_write": 12
+  },
+  "violations": [
+    {
+      "path": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518/JCIIOT/src/robot_agent/skills/competition_grasp.py",
+      "line": 688,
+      "column": 9,
+      "rule": "private_backend_import",
+      "severity": "warning",
+      "excerpt": "from robot_agent.environments.robosuite_backend import ("
+    },
+    {
+      "path": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518/JCIIOT/src/robot_agent/skills/competition_grasp.py",
+      "line": 699,
+      "column": 13,
+      "rule": "direct_qpos_write",
+      "severity": "warning",
+      "excerpt": "data.qpos[qpos_addrs] = values"
+    },
+    {
+      "path": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518/JCIIOT/src/robot_agent/skills/competition_grasp.py",
+      "line": 707,
+      "column": 17,
+      "rule": "direct_qpos_write",
+      "severity": "warning",
+      "excerpt": "data.qpos[qpos_addrs] = start"
+    },
+    {
+      "path": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518/JCIIOT/src/robot_agent/skills/competition_grasp.py",
+      "line": 801,
+      "column": 9,
+      "rule": "private_backend_import",
+      "severity": "warning",
+      "excerpt": "from robot_agent.environments.robosuite_backend import ("
+    },
+    {
+      "path": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518/JCIIOT/src/robot_agent/skills/competition_grasp.py",
+      "line": 806,
+      "column": 13,
+      "rule": "direct_qpos_write",
+      "severity": "warning",
+      "excerpt": "raw_env.sim.data.qpos[qpos_addr] = value"
+    },
+    {
+      "path": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518/JCIIOT/src/robot_agent/skills/competition_grasp.py",
+      "line": 814,
+      "column": 17,
+      "rule": "direct_qpos_write",
+      "severity": "warning",
+      "excerpt": "raw_env.sim.data.qpos[qpos_addr] = start"
+    },
+    {
+      "path": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518/JCIIOT/src/robot_agent/skills/competition_grasp.py",
+      "line": 963,
+      "column": 9,
+      "rule": "private_backend_import",
+      "severity": "warning",
+      "excerpt": "from robot_agent.environments.robosuite_backend import ("
+    },
+    {
+      "path": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518/JCIIOT/src/robot_agent/skills/competition_grasp.py",
+      "line": 969,
+      "column": 13,
+      "rule": "direct_qpos_write",
+      "severity": "warning",
+      "excerpt": "raw_env.sim.data.qpos[qpos_addr] = value"
+    },
+    {
+      "path": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518/JCIIOT/src/robot_agent/skills/competition_grasp.py",
+      "line": 977,
+      "column": 17,
+      "rule": "direct_qpos_write",
+      "severity": "warning",
+      "excerpt": "raw_env.sim.data.qpos[qpos_addr] = start"
+    },
+    {
+      "path": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518/JCIIOT/src/robot_agent/skills/competition_grasp.py",
+      "line": 1064,
+      "column": 13,
+      "rule": "direct_qpos_write",
+      "severity": "warning",
+      "excerpt": "data.qpos[qpos_addrs] = joints"
+    },
+    {
+      "path": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518/JCIIOT/src/robot_agent/skills/competition_grasp.py",
+      "line": 1086,
+      "column": 9,
+      "rule": "direct_qpos_write",
+      "severity": "warning",
+      "excerpt": "data.qpos[qpos_addrs] = start"
+    },
+    {
+      "path": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518/JCIIOT/src/robot_agent/skills/competition_grasp.py",
+      "line": 1092,
+      "column": 9,
+      "rule": "private_backend_import",
+      "severity": "warning",
+      "excerpt": "from robot_agent.environments.robosuite_backend import ("
+    },
+    {
+      "path": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518/JCIIOT/src/robot_agent/skills/competition_grasp.py",
+      "line": 1098,
+      "column": 13,
+      "rule": "direct_qpos_write",
+      "severity": "warning",
+      "excerpt": "data.qpos[qpos_addrs] = values"
+    },
+    {
+      "path": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518/JCIIOT/src/robot_agent/skills/competition_grasp.py",
+      "line": 1106,
+      "column": 17,
+      "rule": "direct_qpos_write",
+      "severity": "warning",
+      "excerpt": "data.qpos[qpos_addrs] = start"
+    },
+    {
+      "path": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518/JCIIOT/src/robot_agent/skills/competition_grasp.py",
+      "line": 1211,
+      "column": 13,
+      "rule": "direct_qpos_write",
+      "severity": "warning",
+      "excerpt": "raw_env.sim.data.qpos[qpos_addr] = target"
+    },
+    {
+      "path": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518/JCIIOT/src/robot_agent/skills/competition_grasp.py",
+      "line": 1256,
+      "column": 9,
+      "rule": "direct_qpos_write",
+      "severity": "warning",
+      "excerpt": "raw_env.sim.data.qpos[qpos_addr] = start"
+    },
+    {
+      "path": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518/JCIIOT/src/robot_agent/skills/competition_navigation.py",
+      "line": 220,
+      "column": 5,
+      "rule": "private_backend_import",
+      "severity": "warning",
+      "excerpt": "from robot_agent.environments.robosuite_backend import ("
+    },
+    {
+      "path": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518/JCIIOT/src/robot_agent/skills/competition_navigation.py",
+      "line": 220,
+      "column": 5,
+      "rule": "private_backend_import",
+      "severity": "warning",
+      "excerpt": "from robot_agent.environments.robosuite_backend import ("
+    },
+    {
+      "path": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518/JCIIOT/src/robot_agent/skills/competition_navigation.py",
+      "line": 220,
+      "column": 5,
+      "rule": "private_backend_import",
+      "severity": "warning",
+      "excerpt": "from robot_agent.environments.robosuite_backend import ("
+    },
+    {
+      "path": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518/JCIIOT/src/robot_agent/skills/competition_navigation.py",
+      "line": 220,
+      "column": 5,
+      "rule": "private_backend_import",
+      "severity": "warning",
+      "excerpt": "from robot_agent.environments.robosuite_backend import ("
+    },
+    {
+      "path": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518/JCIIOT/src/robot_agent/skills/competition_navigation.py",
+      "line": 220,
+      "column": 5,
+      "rule": "private_backend_import",
+      "severity": "warning",
+      "excerpt": "from robot_agent.environments.robosuite_backend import ("
+    },
+    {
+      "path": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518/JCIIOT/src/robot_agent/skills/competition_transport.py",
+      "line": 1354,
+      "column": 13,
+      "rule": "private_backend_import",
+      "severity": "warning",
+      "excerpt": "from robot_agent.environments.robosuite_backend import ("
+    },
+    {
+      "path": "/home/user/jciiot-2026/candidates/robust-floor-push-01ff518/JCIIOT/src/robot_agent/skills/competition_transport.py",
+      "line": 1354,
+      "column": 13,
+      "rule": "private_backend_import",
+      "severity": "warning",
+      "excerpt": "from robot_agent.environments.robosuite_backend import ("
+    }
+  ]
+}

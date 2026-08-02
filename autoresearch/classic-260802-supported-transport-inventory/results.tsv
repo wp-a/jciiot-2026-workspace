@@ -1,0 +1,12 @@
+route	best_run	classification	object_motion_m	target_distance_m	collision_frames	attachment_calls	object_pose_writes	robot_state_boundary	decision
+wheel-action-base	classic-260802-l1-exposed-edge-setdown/seed0-corrected	rejected	0.100386		0	0	0	pure composite action; base moved only 0.002161m	stop all action magnitude/time/seed sweeps
+same-side-direct-base-carry	classic-260802-physical-data-gate/s0-straight-0p25-raw-grasp	recovery	0.252172		0	0	0	direct base qpos	insufficient distance; not pure dynamics
+center-grasp-base-drag	classic-260729-center-grasp-transport/iteration3	rejected	0.027205		0	0	0	direct base qpos	stop base-drag/speed sweeps
+inchworm-away	classic-260729-inchworm-transport/iteration13	rejected	0.240537		2	0	0	direct base reset qpos	collision on fourth reset
+inchworm-current	classic-260802-l1-inchworm-reseat0/seed0	rejected	0.128768		0	0	0	direct base reset qpos	object rolled and dropped during reset
+table-edge-undercut	classic-260729-table-edge-undercut/iteration44	rejected	0.000002		0	0	0	direct posture navigation	fork penetrated static support; no movable-bottom support
+bilateral-bottom-transition	classic-260802-l1-bilateral-under-support/seed0	rejected			0	0	0	arm actions only	side contact dragged tote down; no bottom contact
+single-arm-bottom-insert	classic-260802-l1-single-arm-bottom-insert/seed0	rejected			0	0	0	arm actions only	stationary arm could not preserve pose; no bottom contact
+floor-push-short	iter25-floor-base-pusher-full-exit	objective_leave_only	1.108718		0	0	0	direct base qpos	proved physical floor contact and source exit
+floor-push-target	iter33-floor-base-route-safe-turn	practical_l1_full_score	11.975867	0.748201	0	0	0	direct base qpos	official scorer 10/10; integrate into app entrypoint
+floor-push-target-repeat	iter34-floor-base-route-seed1	practical_l1_full_score	11.975867	0.748201	0	0	0	direct base qpos	identical deterministic replay; not perturbation evidence

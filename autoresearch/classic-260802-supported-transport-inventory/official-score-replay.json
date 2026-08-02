@@ -1,0 +1,25 @@
+{
+  "evaluation": "unmodified official app._score_steps(0)",
+  "official_commit": "0dcdddf18a9e694569aa1433cdfc04eb097fed78",
+  "official_app_sha256": "4834b2ac4f6d97fe2c39462c6dabef3c4f52b8a357121f0a40507baaef9782eb",
+  "runtime": "/home/user/jciiot-2026/envs/official-pinned-eval/bin/python",
+  "session_state_harness": "A SimpleNamespace supplied only _last_trajectory because Streamlit session_state is unavailable in bare Python; the scorer function itself was unmodified.",
+  "runs": [
+    {
+      "name": "iter33-floor-base-route-safe-turn.jsonl",
+      "trajectory_sha256": "2813c14f86b94231c54278f8bd9c192322f1a0c502147df0e4fa990e696a8473",
+      "leave_source": {"ok": true, "score": 5, "dx_m": 7.37, "dy_m": 11.98},
+      "reach_target": {"ok": true, "score": 5, "distance_m": 0.75},
+      "collision_penalty": 0,
+      "total": 10
+    },
+    {
+      "name": "iter34-floor-base-route-seed1.jsonl",
+      "trajectory_sha256": "0422c60908f2f1fd10e5d8d747488c38a91fc6c6f95f0885c776c1619bdcd9ae",
+      "leave_source": {"ok": true, "score": 5, "dx_m": 7.37, "dy_m": 11.98},
+      "reach_target": {"ok": true, "score": 5, "distance_m": 0.75},
+      "collision_penalty": 0,
+      "total": 10
+    }
+  ]
+}

@@ -81,12 +81,17 @@ justify a policy. Model complexity is promoted only by held-out rollout evidence
   `classic-260728-1443` full-scale test. Do not spend runs on action magnitude,
   duration, or seed sweeps. Any future direct-base result must be labelled as an
   organizer-facing navigation abstraction, not pure dynamics.
+- Archived floor-push runs `iter33` and `iter34` each receive `10/10` from the
+  unmodified official scorer: verified source grasp, `11.975867 m` source-axis
+  displacement, `0.748201 m` target distance, and zero collision frames. They
+  use no object attachment or object-pose write, but do use direct base-qpos
+  navigation and therefore establish practical physical-object success only.
 
 ## Open Questions
 
-- Can a supported physical push/drag topology move L1 more than `1 m` while
-  preserving zero collision, attachment, object-pose writes, and an explicitly
-  declared navigation boundary?
+- Can the frozen `iter33` floor-push route be invoked through the official
+  `RobotAgent.run()` entry while preserving its 10/10 score and integrity
+  boundary?
 - Can supported controller actions reproduce L5 placement without private
   attachment mutation while retaining all three objects within 0.8 m?
 - If H5 passes L1, how much additional recovery coverage is required before the
@@ -97,6 +102,7 @@ justify a policy. Model complexity is promoted only by held-out rollout evidence
 The deterministic object-relative teacher passed 14/14 registered L1 grasp
 data runs. BC-RNN passed its offline gate but was rejected after 0/5 closed-loop
 successes; same-data Diffusion reached 2/5 and also failed promotion. Recovery
-training is paused because no strict full-transport teacher exists. The next
-step is a no-run inventory of supported-transport evidence, followed by one
-pre-registered L1 topology experiment only if it adds information.
+training remains paused. The supported-transport inventory recovered two
+official-score L1 floor-push trajectories, so contact-topology search is now
+closed. The next registered point is official-entrypoint integration, followed
+by level-by-level transfer rather than another L1 physics sweep.

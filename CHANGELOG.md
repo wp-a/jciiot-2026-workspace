@@ -4,6 +4,9 @@
 
 ## 2026-08-02
 
+- 追回 07-31 未合并的 L1 floor-push 证据：`iter33/34` 各 14,299 帧，真实抓取后在地面物理推运至目标 `0.748201 m`，零碰撞、零 attachment、零物体位姿写入；未修改官方 `app._score_steps(0)` 对两条均返回 `10/10`。
+- 明确该结果使用 direct base-qpos 导航，只能称“物体真实物理 + 仿真导航抽象”，不能称完整底盘动力学；H8 标记 confirmed，H9 转为官方 Agent 入口集成。
+- 下载并固定两条完整轨迹、300 帧可视化轨迹、第一视角 GIF、52 份 compact 结果/日志和冻结 allowed-code overlay；大文件移至 `/Users/wangpeng/jciiot-2026-assets/physical-floor-push-20260730/`，仓库保存哈希清单。
 - 纠正“纯物理运输”证据边界：先前最佳 `0.265401 m` 记录使用 direct base-qpos 步进，虽无 attachment / 物体位姿写入，但不是完整机器人动力学；不得再作为纯动力学训练成功标签。
 - 完成唯一一条纯 composite-action 纠错复现：真实抓取后底盘 635 步仅移动 `0.002161 m`，箱体跌回源支撑并向错误方向滑移；零碰撞、零状态捷径但严格 rejected。停止 wheel-action 幅值、时长和 seed 扫描。
 - 将 H5 同数据训练暂停，把 H6 恢复数据模型记为 rejected，并新增 H7 纯底盘动作 rejected / H8 supported transport active；下一步先形成 supported-push/drag/inchworm 单一证据索引，再决定唯一必要实验。
