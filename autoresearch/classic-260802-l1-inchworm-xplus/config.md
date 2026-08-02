@@ -120,3 +120,30 @@ attachment activation, or object-pose write. It does not clear an attachment,
 modify the candidate, or alter inchworm parameters. This is an interface
 correction, so the original physical hypothesis and keep/discard gate remain
 unchanged.
+
+## Observed Replacement Result
+
+The attachment-free replacement disproved the hypothesis and failed the keep
+gate:
+
+- physical grasp and lift succeeded with bilateral contact;
+- cycle 1 completed one arm stroke, a `0.060000 m` base reset, and all four
+  reseat steps;
+- cycle 2 completed one arm stroke and a `0.060001 m` base reset, but lost both
+  contacts on the first reseat step;
+- measured controller progress was `0.128528 m`, below both the historical
+  `0.149215 m` keep threshold and the `0.50 m` task threshold;
+- controller minimum object height was `1.351755 m`, while the post-failure
+  settled height was `1.178617 m`, so the run ended dropped;
+- collision frames, attachment activations, attachment-active flags, and
+  object-pose writes were all zero.
+
+The reset loop checks bilateral contact after every physical step. Because the
+second reset completed all 30 steps and only one of four reseat steps was
+recorded, the first center-directed reseat action is the isolated failure
+boundary. The next experiment changes only `reseat_steps` from 4 to 0.
+
+- replacement result SHA-256:
+  `7e2f5517914379b9dc9ef6494f1738fdbf9e421b673fca60da04975820f265ed`;
+- replacement trajectory SHA-256:
+  `01be51ed6796038867cbcabd4127a16ee2975eb00b2767dff235ac53d88aa1d8`.
