@@ -1,0 +1,50 @@
+{
+  "source_trajectory": "/home/user/jciiot-2026/results/l1-inchworm-reseat0-20260802/seed0-xplus-attachment-free-reseat0-0p50-trajectory.json",
+  "source_trajectory_sha256": "dbc913d67a1e0e30aef2ba5ae9d8025c07709b31c501bb9f3b582d83f46d4ac7",
+  "object_name": "line_5_container_h01_near",
+  "orientation_convention": "roll-pitch-yaw degrees derived from stored quaternion wxyz",
+  "boundaries": [
+    {
+      "label": "transport_start",
+      "frame": 742,
+      "base_x_m": 8.0,
+      "object_xyz_m": [7.049231, 4.619722, 1.329973],
+      "object_rpy_deg": [1.158, 14.942, -0.008]
+    },
+    {
+      "label": "stroke_1_end",
+      "frame": 773,
+      "base_x_m": 8.0,
+      "object_xyz_m": [7.124367, 4.622786, 1.31002],
+      "object_rpy_deg": [1.31, 8.575, -0.492]
+    },
+    {
+      "label": "reset_1_end",
+      "frame": 803,
+      "base_x_m": 8.06,
+      "object_xyz_m": [7.114369, 4.619574, 1.34658],
+      "object_rpy_deg": [1.297, 20.73, -0.068]
+    },
+    {
+      "label": "stroke_2_end",
+      "frame": 832,
+      "base_x_m": 8.06,
+      "object_xyz_m": [7.190847, 4.624491, 1.320868],
+      "object_rpy_deg": [1.603, 11.565, -0.802]
+    },
+    {
+      "label": "reset_2_end",
+      "frame": 862,
+      "base_x_m": 8.12,
+      "object_xyz_m": [7.225992, 4.625049, 1.179251],
+      "object_rpy_deg": [1.124, -10.012, -1.523]
+    },
+    {
+      "label": "stroke_3_first_step_and_contact_failure",
+      "frame": 863,
+      "base_x_m": 8.12,
+      "object_xyz_m": [7.227017, 4.625037, 1.179867],
+      "object_rpy_deg": [1.126, -10.083, -1.518]
+    }
+  ]
+}

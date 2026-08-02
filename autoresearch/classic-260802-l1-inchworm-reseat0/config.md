@@ -72,3 +72,21 @@ Keep only if all conditions hold:
 Full structural success additionally requires at least `0.50 m` measured
 object progress. Otherwise discard the intervention, record the exact failing
 macro, and do not add the run to successful transport training data.
+
+## Observed Result
+
+The hypothesis was rejected. The run completed two arm strokes and two base
+resets, then lost contact on the first action of cycle 3. Effective final
+progress was `0.128768 m`, terminal contact was false/false, and the object
+settled dropped. Collision and integrity counters remained zero.
+
+Boundary analysis of the stored trajectory shows reset 2 was the physical
+failure interval even though the coarse contact flags stayed true: object pitch
+changed from `+11.565°` to `-10.012°` and stored joint height fell by
+`0.141617 m` during that reset. Therefore reseat was only the first action to
+expose an already unstable grasp in the prior run.
+
+- result SHA-256:
+  `50e9571881f3b2a4bc75f2d81080e9081c317babdf7980e714ccd9579888ff39`;
+- trajectory SHA-256:
+  `dbc913d67a1e0e30aef2ba5ae9d8025c07709b31c501bb9f3b582d83f46d4ac7`.
