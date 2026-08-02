@@ -1,0 +1,1030 @@
+{
+  "classification_counts": {
+    "recovery": 13,
+    "rejected": 28,
+    "transport_success": 0
+  },
+  "eligible_count": 0,
+  "record_count": 41,
+  "records": [
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:continuous_bilateral_contact",
+        "missing:minimum_object_lift_m",
+        "missing:max_object_gripper_drift_m",
+        "missing:attachment_activations",
+        "missing:robot_state_writes",
+        "missing:legacy_teleport_activations",
+        "object_positions",
+        "physical_grasp",
+        "continuous_bilateral_contact",
+        "dropped",
+        "minimum_object_lift_m",
+        "max_object_gripper_drift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": null,
+        "minimum_object_lift_m": null,
+        "object_translation_m": null
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/c1-opposed-inchworm-yneg0p12-inward0p001-seed0.json",
+      "source_sha256": "ef9381d54b4bd93eecfb75460e600d96194fdc66308b9323eb746adfb55dc5eb",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:continuous_bilateral_contact",
+        "missing:minimum_object_lift_m",
+        "missing:max_object_gripper_drift_m",
+        "missing:attachment_activations",
+        "missing:robot_state_writes",
+        "missing:legacy_teleport_activations",
+        "object_positions",
+        "physical_grasp",
+        "continuous_bilateral_contact",
+        "dropped",
+        "minimum_object_lift_m",
+        "max_object_gripper_drift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": null,
+        "minimum_object_lift_m": null,
+        "object_translation_m": null
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/c10-bilateral-contact-base0p30-inward-close-inchworm-yneg0p12-seed0.json",
+      "source_sha256": "29a590401e9962a336d2254cb63f11ca4149c0263932d26a9e2942fbbd4db51e",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:continuous_bilateral_contact",
+        "missing:minimum_object_lift_m",
+        "missing:max_object_gripper_drift_m",
+        "missing:attachment_activations",
+        "missing:robot_state_writes",
+        "missing:legacy_teleport_activations",
+        "object_positions",
+        "collision_frames",
+        "physical_grasp",
+        "continuous_bilateral_contact",
+        "dropped",
+        "minimum_object_lift_m",
+        "max_object_gripper_drift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": null,
+        "minimum_object_lift_m": null,
+        "object_translation_m": null
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/c11-bilateral-contact-base0p40-inward-close-inchworm-yneg0p12-seed0.json",
+      "source_sha256": "e2fef10d73c5eda20df26d6228f54318cd9421af57f4c04b2b753c7565c83bb3",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:continuous_bilateral_contact",
+        "missing:minimum_object_lift_m",
+        "missing:max_object_gripper_drift_m",
+        "missing:attachment_activations",
+        "missing:robot_state_writes",
+        "missing:legacy_teleport_activations",
+        "object_positions",
+        "physical_grasp",
+        "continuous_bilateral_contact",
+        "dropped",
+        "minimum_object_lift_m",
+        "max_object_gripper_drift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": null,
+        "minimum_object_lift_m": null,
+        "object_translation_m": null
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/c12-base0p30-close-forward0p06-inchworm-yneg0p12-seed0.json",
+      "source_sha256": "1917cab7ed7407a0a3476feef455d41c4fa80a1f8a1a63019cb7c7b9deb09d3b",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:continuous_bilateral_contact",
+        "missing:minimum_object_lift_m",
+        "missing:max_object_gripper_drift_m",
+        "missing:attachment_activations",
+        "missing:robot_state_writes",
+        "missing:legacy_teleport_activations",
+        "object_positions",
+        "physical_grasp",
+        "continuous_bilateral_contact",
+        "dropped",
+        "minimum_object_lift_m",
+        "max_object_gripper_drift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": null,
+        "minimum_object_lift_m": null,
+        "object_translation_m": null
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/c13-base0p30-forward0p06-opposed-close-inchworm-yneg0p12-seed0.json",
+      "source_sha256": "8c8531d439d49283fb4ed7963009d08d85be6d202ec178abf709bd756a5ab394",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:continuous_bilateral_contact",
+        "missing:minimum_object_lift_m",
+        "missing:max_object_gripper_drift_m",
+        "missing:attachment_activations",
+        "missing:robot_state_writes",
+        "missing:legacy_teleport_activations",
+        "object_positions",
+        "physical_grasp",
+        "continuous_bilateral_contact",
+        "dropped",
+        "minimum_object_lift_m",
+        "max_object_gripper_drift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": null,
+        "minimum_object_lift_m": null,
+        "object_translation_m": null
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/c14-base0p30-forward0p06-squeeze0p065-inchworm-yneg0p12-seed0.json",
+      "source_sha256": "f45356a18571affdb39ff75813c7912ed2cd327e1996e55054fe4da6baee89f8",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:continuous_bilateral_contact",
+        "missing:minimum_object_lift_m",
+        "missing:max_object_gripper_drift_m",
+        "missing:attachment_activations",
+        "missing:robot_state_writes",
+        "missing:legacy_teleport_activations",
+        "object_positions",
+        "physical_grasp",
+        "continuous_bilateral_contact",
+        "dropped",
+        "minimum_object_lift_m",
+        "max_object_gripper_drift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": null,
+        "minimum_object_lift_m": null,
+        "object_translation_m": null
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/c15-depth-gated-close-squeeze0p065-inchworm-yneg0p12-seed0.json",
+      "source_sha256": "a0ebdc553320b9a327f6cc9d055d090a12726010f953044fc9b384657cac174a",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:continuous_bilateral_contact",
+        "missing:minimum_object_lift_m",
+        "missing:max_object_gripper_drift_m",
+        "missing:attachment_activations",
+        "missing:robot_state_writes",
+        "missing:legacy_teleport_activations",
+        "object_positions",
+        "physical_grasp",
+        "continuous_bilateral_contact",
+        "dropped",
+        "minimum_object_lift_m",
+        "max_object_gripper_drift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": null,
+        "minimum_object_lift_m": null,
+        "object_translation_m": null
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/c1b-opposed-inchworm-yneg0p12-inward0p001-pos0185-seed0.json",
+      "source_sha256": "76220a9c385adc3af51378e41eb13958d20b8249c126a7881f9e6af413ecb8e9",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:continuous_bilateral_contact",
+        "missing:minimum_object_lift_m",
+        "missing:max_object_gripper_drift_m",
+        "missing:attachment_activations",
+        "missing:robot_state_writes",
+        "missing:legacy_teleport_activations",
+        "object_positions",
+        "physical_grasp",
+        "continuous_bilateral_contact",
+        "dropped",
+        "minimum_object_lift_m",
+        "max_object_gripper_drift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": null,
+        "minimum_object_lift_m": null,
+        "object_translation_m": null
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/c2-direct-opposed-inchworm-yneg0p12-inward0p001-seed0.json",
+      "source_sha256": "c005efe7d768f5e1e03ed2216e2ea54aa2ffc60399c31e70bcb0c707435b8976",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:continuous_bilateral_contact",
+        "missing:minimum_object_lift_m",
+        "missing:max_object_gripper_drift_m",
+        "missing:attachment_activations",
+        "missing:robot_state_writes",
+        "missing:legacy_teleport_activations",
+        "object_positions",
+        "physical_grasp",
+        "continuous_bilateral_contact",
+        "dropped",
+        "minimum_object_lift_m",
+        "max_object_gripper_drift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": null,
+        "minimum_object_lift_m": null,
+        "object_translation_m": null
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/c3-direct-opposed-inchworm-yneg0p12-inward0p001-seed0.json",
+      "source_sha256": "a1bd2e9b1addc12f0746dbd560d6881b6644915f4d3e15c163c21837362f70b0",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:continuous_bilateral_contact",
+        "missing:minimum_object_lift_m",
+        "missing:max_object_gripper_drift_m",
+        "missing:attachment_activations",
+        "missing:robot_state_writes",
+        "missing:legacy_teleport_activations",
+        "object_positions",
+        "physical_grasp",
+        "continuous_bilateral_contact",
+        "dropped",
+        "minimum_object_lift_m",
+        "max_object_gripper_drift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": null,
+        "minimum_object_lift_m": null,
+        "object_translation_m": null
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/c4-direct-opposed-center0p28-inchworm-yneg0p12-inward0p001-seed0.json",
+      "source_sha256": "13b0eb83873d705ca90a8b2eb0bd77a465384ea10150535859c1dfffa66dbd3f",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:continuous_bilateral_contact",
+        "missing:minimum_object_lift_m",
+        "missing:max_object_gripper_drift_m",
+        "missing:attachment_activations",
+        "missing:robot_state_writes",
+        "missing:legacy_teleport_activations",
+        "object_positions",
+        "physical_grasp",
+        "continuous_bilateral_contact",
+        "dropped",
+        "minimum_object_lift_m",
+        "max_object_gripper_drift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": null,
+        "minimum_object_lift_m": null,
+        "object_translation_m": null
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/c5-direct-opposed-center0p18-inchworm-yneg0p12-inward0p001-seed0.json",
+      "source_sha256": "73c84fdf7a992d5997e2e6bb99b6cc762246b7b2878f6b328de6342b77e066e1",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:continuous_bilateral_contact",
+        "missing:minimum_object_lift_m",
+        "missing:max_object_gripper_drift_m",
+        "missing:attachment_activations",
+        "missing:robot_state_writes",
+        "missing:legacy_teleport_activations",
+        "object_positions",
+        "physical_grasp",
+        "continuous_bilateral_contact",
+        "dropped",
+        "minimum_object_lift_m",
+        "max_object_gripper_drift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": null,
+        "minimum_object_lift_m": null,
+        "object_translation_m": null
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/c6-direct-opposed-base0p30-inchworm-yneg0p12-inward0p001-seed0.json",
+      "source_sha256": "8e7bf662cbec4deb0406e400b68e8fedac8aaae51cf8f29636fcc9751cc4b5ae",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:continuous_bilateral_contact",
+        "missing:minimum_object_lift_m",
+        "missing:max_object_gripper_drift_m",
+        "missing:attachment_activations",
+        "missing:robot_state_writes",
+        "missing:legacy_teleport_activations",
+        "object_positions",
+        "physical_grasp",
+        "continuous_bilateral_contact",
+        "dropped",
+        "minimum_object_lift_m",
+        "max_object_gripper_drift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": null,
+        "minimum_object_lift_m": null,
+        "object_translation_m": null
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/c7-contact-bounded-base0p30-opposed-inchworm-yneg0p12-inward0p001-seed0.json",
+      "source_sha256": "d8adb643e08e2a230953ef625e68f967452c109e0b10e054c2def5969252cab4",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:continuous_bilateral_contact",
+        "missing:minimum_object_lift_m",
+        "missing:max_object_gripper_drift_m",
+        "missing:attachment_activations",
+        "missing:robot_state_writes",
+        "missing:legacy_teleport_activations",
+        "object_positions",
+        "physical_grasp",
+        "continuous_bilateral_contact",
+        "dropped",
+        "minimum_object_lift_m",
+        "max_object_gripper_drift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": null,
+        "minimum_object_lift_m": null,
+        "object_translation_m": null
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/c8-opposed-contact-close-inchworm-yneg0p12-inward0p001-seed0.json",
+      "source_sha256": "fc29974b2622fce8714f17c039942934395dcb3405638f0ee26ea7bbc08c017e",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:continuous_bilateral_contact",
+        "missing:minimum_object_lift_m",
+        "missing:max_object_gripper_drift_m",
+        "missing:attachment_activations",
+        "missing:robot_state_writes",
+        "missing:legacy_teleport_activations",
+        "object_positions",
+        "physical_grasp",
+        "continuous_bilateral_contact",
+        "dropped",
+        "minimum_object_lift_m",
+        "max_object_gripper_drift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": null,
+        "minimum_object_lift_m": null,
+        "object_translation_m": null
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/c9-opposed-contact-inward-close-inchworm-yneg0p12-inward0p001-seed0.json",
+      "source_sha256": "6cd851277035e2ae34781cc23e70f45cb84f5b111e17ce37e64ed6327c02b5de",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "recovery",
+      "eligible": false,
+      "failures": [
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.010121616171326148,
+        "minimum_object_lift_m": 0.20136679430548599,
+        "object_translation_m": 0.06194278716901936
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s0-actuator-face-insert0p05-vertical-0p10-seed0.json",
+      "source_sha256": "7c0315f47bf987667fba6333e08f2bdf86b1456b3b350792b48b5a9e0dc35b75",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "recovery",
+      "eligible": false,
+      "failures": [
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.030551776274752692,
+        "minimum_object_lift_m": 0.22781090635591106,
+        "object_translation_m": 0.15753112536985267
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s0-actuator-face-insert0p05-vertical-0p25-seed0.json",
+      "source_sha256": "647254fc16bd586bbfbd2b33839f1396c57a180d803781d58f4aa11fc884489b",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:continuous_bilateral_contact",
+        "missing:minimum_object_lift_m",
+        "missing:max_object_gripper_drift_m",
+        "object_positions",
+        "attachment_activations",
+        "continuous_bilateral_contact",
+        "minimum_object_lift_m",
+        "max_object_gripper_drift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": null,
+        "minimum_object_lift_m": null,
+        "object_translation_m": null
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s0-actuator-feedforward-g0p35-0p10-seed0.json",
+      "source_sha256": "cc98292cdcf6082f68e7028bb2023822e72450ca9b40636825fa0aececcf374e",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "recovery",
+      "eligible": false,
+      "failures": [
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.022267598163419708,
+        "minimum_object_lift_m": 0.1873452134287863,
+        "object_translation_m": 0.19630365916390904
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s0-actuator-g0p35-inward0p0005-vertical-0p25-seed0.json",
+      "source_sha256": "751300cc2011189784a44ce765b52764006941f44494a8c7eceb8c3af483fb0e",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "recovery",
+      "eligible": false,
+      "failures": [
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.03153650001699935,
+        "minimum_object_lift_m": 0.19783002518930526,
+        "object_translation_m": 0.26540101992172577
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s0-actuator-g0p35-vertical-0p50-seed0.json",
+      "source_sha256": "adbd03fb372a3a59cd93599b27006cc60bbaa6c9a525b95854a2fe2c08406689",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "recovery",
+      "eligible": false,
+      "failures": [
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.021846900579329767,
+        "minimum_object_lift_m": 0.18809906382480257,
+        "object_translation_m": 0.1968121352516187
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s0-actuator-g0p35-vertical-p0p0004-k0p8-max0p003-0p25-seed0.json",
+      "source_sha256": "1fcc4deb67ce23408ffb76fb622c829eefee562540aacda8ccda367a9ac5aeb9",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "collision_frames",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.025965612337922907,
+        "minimum_object_lift_m": 0.18187866070241854,
+        "object_translation_m": 0.25963130690200226
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s0-actuator-g0p35-vertical-v0p02-0p50-seed0.json",
+      "source_sha256": "8277af0669eae725bf9e04c52dc2c43b7a93d6e7b389349c79be28f210412070",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "recovery",
+      "eligible": false,
+      "failures": [
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.014065257436378995,
+        "minimum_object_lift_m": 0.22369208089383608,
+        "object_translation_m": 0.05900130577503586
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s0-actuator-open-reposition0p10-vertical-0p10-seed0.json",
+      "source_sha256": "0418062ccbb20ab763dabeeb484cd0a5ab0c62ec41f73116c9b634b633a28dfc",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:continuous_bilateral_contact",
+        "missing:minimum_object_lift_m",
+        "missing:max_object_gripper_drift_m",
+        "missing:attachment_activations",
+        "missing:robot_state_writes",
+        "missing:legacy_teleport_activations",
+        "object_positions",
+        "physical_grasp",
+        "continuous_bilateral_contact",
+        "dropped",
+        "minimum_object_lift_m",
+        "max_object_gripper_drift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": null,
+        "minimum_object_lift_m": null,
+        "object_translation_m": null
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s0-actuator-open-wall-reposition0p10-vertical-0p10-seed0.json",
+      "source_sha256": "7293a46278e6fc192eecc62367f57c8b0f332eeac02559da0f82e339d81afd26",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "recovery",
+      "eligible": false,
+      "failures": [
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.007181638740121425,
+        "minimum_object_lift_m": 0.1776779028660349,
+        "object_translation_m": 0.07550761584993822
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s0-full-physical-actuator-g0p35-0p10-seed0.json",
+      "source_sha256": "12adf33c2847237b378911487e745dca943d055329fc3ef67bc1f93b2718541e",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "recovery",
+      "eligible": false,
+      "failures": [
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.007361597975717557,
+        "minimum_object_lift_m": 0.14256867630849723,
+        "object_translation_m": 0.06508995932763996
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s0-full-physical-actuator-g0p35-no-recenter-0p10-seed0.json",
+      "source_sha256": "5a986bdae4505a44e7fa103c8794b7fb91401f570068822263b9311791e68247",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "recovery",
+      "eligible": false,
+      "failures": [
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.02131811742599345,
+        "minimum_object_lift_m": 0.15764221334306439,
+        "object_translation_m": 0.19920039051515692
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s0-full-physical-actuator-g0p35-no-recenter-0p25-seed0.json",
+      "source_sha256": "e81acedbc59992e1137a21020470fb9e4801e314a96c0f3d253ca14ecdfa5194",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:robot_state_writes",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.007473874527249094,
+        "minimum_object_lift_m": 0.1949292906327149,
+        "object_translation_m": 0.25217245582758535
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s0-straight-0p25-raw-grasp-seed0.json",
+      "source_sha256": "e268dedea7c33c04bd6645a0ddf9fa4eff99f3400486e375224d3328a0d3f5a0",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:robot_state_writes",
+        "attachment_calls",
+        "attachment_activations",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.0,
+        "minimum_object_lift_m": 0.20451662215511535,
+        "object_translation_m": 0.0
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s0-straight-0p25-seed0.json",
+      "source_sha256": "5735e1e9cee8c9324542cc905377ac019513c94a10eaaf5283e7f2bf906ada19",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:robot_state_writes",
+        "dropped",
+        "minimum_object_lift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.029778995874581618,
+        "minimum_object_lift_m": 0.06427813911748892,
+        "object_translation_m": 0.08654009297199407
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s0b-outward-x0p25-v0p04-seed0.json",
+      "source_sha256": "8744f972a1efcdf098d3f388c520d14bd399881068bf043b082864cf29893ca7",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:robot_state_writes",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.03122135892091573,
+        "minimum_object_lift_m": 0.17399934857376653,
+        "object_translation_m": 0.10191490659172409
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s1-fixed-yaw-0p10x2-seed0.json",
+      "source_sha256": "f32916816efddf6e3f98b31dde20dfe7f8afb43fe35179e59de1e3442ac7fc16",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:robot_state_writes",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.03208649798044928,
+        "minimum_object_lift_m": 0.16247117354159868,
+        "object_translation_m": 0.10019100722816388
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s1-fixed-yaw-recovery-v0p04-0p10x2-seed0.json",
+      "source_sha256": "c2d725254ae8d00715fb3d80e02e2a6cb6666ff50ad896aeb064c68a790bf506",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:robot_state_writes",
+        "dropped",
+        "minimum_object_lift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.030370006540092635,
+        "minimum_object_lift_m": 0.10333259372402082,
+        "object_translation_m": 0.08645782564739639
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s1-fixed-yaw-v0p02-0p10x2-seed0.json",
+      "source_sha256": "70532bbcce94c885d151499074b043f6c985a83c684c1abe0b0e89fc3afa0525",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:robot_state_writes",
+        "dropped",
+        "minimum_object_lift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.016517721263270644,
+        "minimum_object_lift_m": 0.060780172787213926,
+        "object_translation_m": 0.06096705186720896
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s1-segment-gated-recovery-v0p04-0p10x2-seed0.json",
+      "source_sha256": "995d2a185517ef8e337c8bcadec7ddb6c4aa845f0f649a73e9a885a4979b344c",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "missing:robot_state_writes",
+        "dropped",
+        "minimum_object_lift_m",
+        "max_object_gripper_drift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.05281465609431881,
+        "minimum_object_lift_m": 0.06180265826503484,
+        "object_translation_m": 0.071109056408878
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s1-turn-0p10x2-seed0.json",
+      "source_sha256": "2c79a0e0a4054059ceb7962ccaf227ac2d242cc0be7da345062b5736d5b2bb0d",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "recovery",
+      "eligible": false,
+      "failures": [
+        "dropped",
+        "minimum_object_lift_m",
+        "max_object_gripper_drift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.20093938514450996,
+        "minimum_object_lift_m": 0.004354862771476675,
+        "object_translation_m": 0.1473479771011122
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s1-turn-actuator-g0p35-heading-0p10x2-seed0.json",
+      "source_sha256": "da62cf3135655d2cb7494fe80d852e6d7d05fb873b6570681beb338e11d0787c",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "recovery",
+      "eligible": false,
+      "failures": [
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.03178420160068109,
+        "minimum_object_lift_m": 0.133638774735914,
+        "object_translation_m": 0.06317521803222788
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s1-turn-actuator-g0p35-inward0p0005-0p10x2-seed0.json",
+      "source_sha256": "148570cf73fd10721c4d4c2d603718a5972ea6cde32db7177e8848fc96b40c3f",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "recovery",
+      "eligible": false,
+      "failures": [
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.03162850201872277,
+        "minimum_object_lift_m": 0.1348794912476452,
+        "object_translation_m": 0.06242767511022801
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s1-turn-actuator-g0p35-no-recenter-0p10x2-seed0.json",
+      "source_sha256": "acf8832feefce03a0e583feb53d213d48c7af61edc13ca8226ef09a0fc21fece",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "rejected",
+      "eligible": false,
+      "failures": [
+        "infrastructure_error",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.01798381839273535,
+        "minimum_object_lift_m": 0.13805583451996717,
+        "object_translation_m": 0.0635448545381017
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s1-turn-actuator-g0p35-recovery-0p10x2-seed0.json",
+      "source_sha256": "e22176acbbbf3be55619a6516803de980aa363f4e6a73012830221b1749d72df",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    },
+    {
+      "classification": "recovery",
+      "eligible": false,
+      "failures": [
+        "dropped",
+        "minimum_object_lift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.0162557496338387,
+        "minimum_object_lift_m": 0.11131974175412296,
+        "object_translation_m": 0.05553155336505009
+      },
+      "source_path": "/home/user/jciiot-2026/results/full-physical-l1-20260802/s1-turn-actuator-g0p35-recovery-v2-0p10x2-seed0.json",
+      "source_sha256": "0bd7567899654fc0b425c6627fa245bef51f3bcc8d2194324d0446e225410d24",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    }
+  ],
+  "unique_content_count": 41
+}
