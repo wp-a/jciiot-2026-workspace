@@ -216,11 +216,15 @@ class OfficialCompetitionDriver:
         grid,
         path_spacing: float = 0.35,
         grasp_config=None,
+        transport_mode: str = "attachment",
     ) -> None:
         from robot_agent.skills.move import MoveSkill
         self.backend = backend
         self.scene_context = scene_context
         self.grasp_config = grasp_config
+        if transport_mode not in {"attachment", "l1_floor_push"}:
+            raise ValueError(f"unsupported transport mode: {transport_mode}")
+        self._transport_mode = transport_mode
         self._grasp_yaw: float | None = None
         self._swap_arm_targets = False
         self._clearance_prepared = False
@@ -230,6 +234,8 @@ class OfficialCompetitionDriver:
         self._last_transport: dict[str, Any] | None = None
         self._last_alignment: dict[str, Any] | None = None
         self._last_place: dict[str, Any] | None = None
+        self._floor_push_source: str | None = None
+        self._floor_push_table_object_z: float | None = None
         self.move_skill = MoveSkill(
             backend=backend,
             scene_context=scene_context,
@@ -457,6 +463,34 @@ class OfficialCompetitionDriver:
         object_name: str | None = None,
     ) -> bool:
         if carrying:
+            if getattr(self, "_transport_mode", "attachment") == "l1_floor_push":
+                station = self.scene_context.output_ports.get(target)
+                if (
+                    not object_name
+                    or not self._physical_hold
+                    or station is None
+                    or self._floor_push_source is None
+                    or self._floor_push_table_object_z is None
+                ):
+                    self._last_transport = {
+                        "success": False,
+                        "failure_stage": "floor_push_prerequisite",
+                        "method": "physical_floor_push",
+                    }
+                    return False
+                from robot_agent.skills.competition_transport import (
+                    run_physical_floor_route,
+                )
+
+                self._last_transport = run_physical_floor_route(
+                    self.backend,
+                    competition_driver=self,
+                    source=self._floor_push_source,
+                    object_name=object_name,
+                    target_xy=station.center[:2],
+                    table_object_z=self._floor_push_table_object_z,
+                )
+                return bool(self._last_transport.get("success", False))
             if (
                 not object_name
                 or not self._physical_hold
@@ -692,6 +726,12 @@ class OfficialCompetitionDriver:
         config.swap_arm_targets = self._swap_arm_targets
         config.clearance_prepared = self._clearance_prepared
 
+        pre_grasp_object_z = None
+        if getattr(self, "_transport_mode", "attachment") == "l1_floor_push":
+            body_id = self.backend.env.obj_body_id[object_name]
+            pre_grasp_object_z = float(
+                self.backend.env.sim.data.body_xpos[body_id][2]
+            )
         result = dict(run_scripted_grasp(
             self.backend,
             source=source,
@@ -709,6 +749,18 @@ class OfficialCompetitionDriver:
             result["error"] = "physical grasp gate was not satisfied"
             return result
 
+        if getattr(self, "_transport_mode", "attachment") == "l1_floor_push":
+            if pre_grasp_object_z is None:
+                result["success"] = False
+                result["failure_stage"] = "floor_push_source_height"
+                result["error"] = "source object height is unavailable"
+                return result
+            self._physical_hold = dict(result["hold"])
+            self._floor_push_source = str(source)
+            self._floor_push_table_object_z = pre_grasp_object_z
+            result["transport_attachment_active"] = False
+            return result
+
         attached, attachment_error = self._activate_transport_attachment(
             object_name=object_name,
             grasp_result=result,
@@ -724,6 +776,20 @@ class OfficialCompetitionDriver:
         return result
 
     def place(self, target: str, object_name: str) -> bool:
+        if getattr(self, "_transport_mode", "attachment") == "l1_floor_push":
+            success = bool(
+                isinstance(self._last_transport, Mapping)
+                and self._last_transport.get("success", False)
+                and self._last_transport.get("method") == "physical_floor_push"
+            )
+            self._last_place = {
+                "success": success,
+                "failure_stage": None if success else "floor_push_transport",
+                "method": "physical_floor_push_already_released",
+            }
+            if success:
+                self._physical_hold = None
+            return success
         station = self.scene_context.output_ports.get(target)
         if (
             station is None
@@ -878,6 +944,11 @@ def run_official_task(
         scene_context=scene_context,
         grid=grid,
         grasp_config=grasp_config,
+        transport_mode=(
+            "l1_floor_push"
+            if str(task.get("level")) == "L1"
+            else "attachment"
+        ),
     )
     ranked_candidates = driver.rank_objects(str(task["source"]), candidates)
     ranked_candidate_set = set(ranked_candidates)

@@ -86,6 +86,115 @@ class CompetitionFlowTests(unittest.TestCase):
         self.assertIn(("move", "input_5", False, "box_near"), driver.calls)
         self.assertIn(("move", "output_4", True, "box_near"), driver.calls)
 
+    def test_l1_floor_push_grasp_never_activates_attachment(self):
+        fake_grasp = types.ModuleType("robot_agent.skills.competition_grasp")
+        fake_grasp.ScriptedGraspConfig = SimpleNamespace
+        fake_grasp.run_scripted_grasp = lambda *_args, **_kwargs: {
+            "success": True,
+            "lift_success": True,
+            "contacts": {"right": True, "left": True},
+            "hold": {
+                "base_yaw": 0.0,
+                "object_z": 1.32,
+                "object_pos": [7.0, 4.6, 1.32],
+            },
+        }
+        driver = object.__new__(self.module.OfficialCompetitionDriver)
+        driver.backend = SimpleNamespace(
+            env=SimpleNamespace(
+                obj_body_id={"box_near": 3},
+                sim=SimpleNamespace(
+                    data=SimpleNamespace(
+                        body_xpos={3: np.array([7.0, 4.6, 1.125])}
+                    )
+                ),
+            )
+        )
+        driver.grasp_config = None
+        driver._swap_arm_targets = False
+        driver._clearance_prepared = False
+        driver._transport_mode = "l1_floor_push"
+        driver._transport_attached = False
+        driver._transport_attachment = None
+        driver._physical_hold = None
+        driver._activate_transport_attachment = lambda **_kwargs: self.fail(
+            "L1 physical floor push must not activate attachment"
+        )
+
+        with patch.dict(
+            sys.modules,
+            {"robot_agent.skills.competition_grasp": fake_grasp},
+        ):
+            result = driver.grasp("input_5", "box_near")
+
+        self.assertTrue(result["success"])
+        self.assertFalse(result["transport_attachment_active"])
+        self.assertEqual(driver._physical_hold["object_z"], 1.32)
+        self.assertAlmostEqual(driver._floor_push_table_object_z, 1.125)
+
+    def test_l1_carrying_move_runs_floor_route_with_physical_target(self):
+        calls = []
+        transport = types.ModuleType("robot_agent.skills.competition_transport")
+
+        def run_floor_route(*args, **kwargs):
+            calls.append((args, kwargs))
+            return {
+                "success": True,
+                "failure_stage": None,
+                "method": "physical_floor_push",
+                "final_target_distance_m": 0.74,
+            }
+
+        transport.run_physical_floor_route = run_floor_route
+        driver = object.__new__(self.module.OfficialCompetitionDriver)
+        driver.backend = object()
+        driver.scene_context = SimpleNamespace(
+            output_ports={
+                "output_4": SimpleNamespace(center=np.array([-0.166, -7.29]))
+            }
+        )
+        driver._transport_mode = "l1_floor_push"
+        driver._physical_hold = {"object_z": 1.32}
+        driver._floor_push_source = "input_5"
+        driver._floor_push_table_object_z = 1.125
+        driver._last_transport = None
+
+        with patch.dict(
+            sys.modules,
+            {"robot_agent.skills.competition_transport": transport},
+        ):
+            success = driver.move(
+                "output_4",
+                carrying=True,
+                object_name="box_near",
+            )
+
+        self.assertTrue(success)
+        self.assertEqual(len(calls), 1)
+        self.assertIs(calls[0][0][0], driver.backend)
+        self.assertIs(calls[0][1]["competition_driver"], driver)
+        self.assertEqual(calls[0][1]["source"], "input_5")
+        self.assertEqual(calls[0][1]["object_name"], "box_near")
+        np.testing.assert_allclose(
+            calls[0][1]["target_xy"],
+            [-0.166, -7.29],
+        )
+
+    def test_l1_place_accepts_only_successful_completed_floor_route(self):
+        driver = object.__new__(self.module.OfficialCompetitionDriver)
+        driver._transport_mode = "l1_floor_push"
+        driver._last_transport = {
+            "success": True,
+            "method": "physical_floor_push",
+            "final_target_distance_m": 0.74,
+        }
+        driver._physical_hold = {"object_z": 1.32}
+
+        success = driver.place("output_4", "box_near")
+
+        self.assertTrue(success)
+        self.assertIsNone(driver._physical_hold)
+
     def test_failed_grasp_never_moves_to_target(self):
         driver = FlowDriver(failed_grasps={"box_near": 2})
         flow = self.module.CompetitionFlow(driver, max_attempts=2)
@@ -287,6 +396,43 @@ class CompetitionFlowTests(unittest.TestCase):
             )
 
         self.assertEqual(captured["object_names"], ["tote_upper"])
+
+    def test_official_l1_selects_physical_floor_push_transport_mode(self):
+        captured = {}
+
+        class Driver:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+            def rank_objects(self, _source, object_names):
+                return list(object_names)
+
+        class Flow:
+            def __init__(self, _driver, *, max_attempts):
+                captured["max_attempts"] = max_attempts
+
+            def run(self, **kwargs):
+                return {"success": True, **kwargs}
+
+        task = {
+            "level": "L1",
+            "source": "input_5",
+            "target": "output_4",
+            "object": ["box_near"],
+        }
+        with (
+            patch.object(self.module, "OfficialCompetitionDriver", Driver),
+            patch.object(self.module, "CompetitionFlow", Flow),
+        ):
+            result = self.module.run_official_task(
+                backend=object(),
+                scene_context=object(),
+                grid=object(),
+                task=task,
+            )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(captured["transport_mode"], "l1_floor_push")
 
     def test_auxiliary_source_uses_verified_upper_crossing_corridor(self):
         detour = self.module.auxiliary_source_detour(

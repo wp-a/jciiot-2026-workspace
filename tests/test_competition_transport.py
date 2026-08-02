@@ -42,6 +42,145 @@ class PhysicalTransportGeometryTests(unittest.TestCase):
 
         np.testing.assert_allclose(actual, [0.0, -1.0], atol=1e-9)
 
+    def test_floor_target_route_uses_lower_aisle_and_scored_arrival_margin(self):
+        module = load_module()
+
+        route = module.floor_base_target_route(
+            start_object_xy=np.array([7.978916345, 4.560339024]),
+            target_xy=np.array([-0.166, -7.29]),
+            corridor_y=-8.40,
+            arrival_radius_m=0.80,
+            arrival_margin_m=0.05,
+        )
+
+        self.assertEqual(len(route["segments"]), 3)
+        np.testing.assert_allclose(
+            route["segments"][0]["direction"],
+            [0.0, -1.0],
+        )
+        np.testing.assert_allclose(
+            route["segments"][1]["direction"],
+            [-1.0, 0.0],
+        )
+        np.testing.assert_allclose(
+            route["segments"][2]["direction"],
+            [0.0, 1.0],
+        )
+        self.assertAlmostEqual(route["final_target_distance_m"], 0.75)
+
+    def test_floor_tracking_velocity_corrects_contact_offset_with_bound(self):
+        module = load_module()
+
+        velocity = module.floor_base_tracking_velocity(
+            push_direction_xy=np.array([0.0, -1.0]),
+            lateral_error_m=0.10,
+            base_object_lateral_offset_m=0.08,
+            forward_speed_m_s=0.025,
+            lateral_gain=0.50,
+            alignment_gain=0.50,
+            lateral_deadband_m=0.05,
+            maximum_base_object_offset_m=0.08,
+            maximum_lateral_speed_m_s=0.02,
+        )
+
+        np.testing.assert_allclose(velocity, [-0.02, -0.025])
+
+    def test_floor_route_composes_extraction_retract_and_contact_push(self):
+        module = load_module()
+        calls = []
+        body_xpos = {3: np.array([7.0, 4.6, 1.32], dtype=float)}
+        backend = SimpleNamespace(
+            env=SimpleNamespace(
+                obj_body_id={"box": 3},
+                sim=SimpleNamespace(data=SimpleNamespace(body_xpos=body_xpos)),
+            )
+        )
+
+        def extract(*args, **kwargs):
+            calls.append(("extract", args, kwargs))
+            body_xpos[3] = np.array([7.8, 4.5, 0.31], dtype=float)
+            return {
+                "success": True,
+                "completed_macro_count": 2,
+                "attachment_activations": 0,
+                "object_pose_writes": 0,
+            }
+
+        def retract(*args, **kwargs):
+            calls.append(("retract", args, kwargs))
+            return {"success": True, "collision": False}
+
+        def push(*args, **kwargs):
+            calls.append(("push", args, kwargs))
+            body_xpos[3] = np.array([-0.18, -8.04, 0.125], dtype=float)
+            return {
+                "success": True,
+                "failure_stage": None,
+                "collision": False,
+                "physical_contact_steps": 6985,
+                "final_target_distance_m": 0.75,
+            }
+
+        result = module.run_physical_floor_route(
+            backend,
+            competition_driver=object(),
+            source="input_5",
+            object_name="box",
+            target_xy=np.array([-0.166, -7.29]),
+            table_object_z=1.125,
+            _extract_and_setdown=extract,
+            _navigation_retract=retract,
+            _floor_push=push,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["method"], "physical_floor_push")
+        self.assertEqual([call[0] for call in calls], ["extract", "retract", "push"])
+        self.assertEqual(calls[0][2]["macro_count"], 2)
+        self.assertEqual(calls[2][2]["max_steps"], 15000)
+        self.assertTrue(calls[2][2]["base_pusher"])
+        self.assertAlmostEqual(calls[2][2]["base_speed_m_s"], 0.04)
+        self.assertLess(result["final_target_distance_m"], 0.80)
+        self.assertAlmostEqual(
+            result["final_target_distance_m"],
+            float(np.linalg.norm(np.array([-0.18, -8.04]) - np.array([-0.166, -7.29]))),
+        )
+
+    def test_floor_route_stops_before_navigation_when_extraction_fails(self):
+        module = load_module()
+        backend = SimpleNamespace(
+            env=SimpleNamespace(
+                obj_body_id={"box": 3},
+                sim=SimpleNamespace(
+                    data=SimpleNamespace(
+                        body_xpos={3: np.array([7.0, 4.6, 1.32])}
+                    )
+                ),
+            )
+        )
+
+        result = module.run_physical_floor_route(
+            backend,
+            competition_driver=object(),
+            source="input_5",
+            object_name="box",
+            target_xy=np.array([-0.166, -7.29]),
+            table_object_z=1.125,
+            _extract_and_setdown=lambda *_args, **_kwargs: {
+                "success": False,
+                "failure_stage": "macro_1:contact",
+            },
+            _navigation_retract=lambda *_args, **_kwargs: self.fail(
+                "retract must not run after failed extraction"
+            ),
+            _floor_push=lambda *_args, **_kwargs: self.fail(
+                "push must not run after failed extraction"
+            ),
+        )
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["failure_stage"], "extraction")
+
     def test_slew_limited_command_bounds_each_control_dimension(self):
         module = load_module()
 
