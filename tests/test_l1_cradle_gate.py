@@ -180,6 +180,48 @@ class AttachmentFreeProbeGuardTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "transport attachment"):
             runner._end_grasp_inchworm_probe(object(), "box")
 
+    def test_guard_scopes_reseat_override_to_one_probe(self):
+        module = self.load_guard_module()
+        observed_reseat_steps = []
+
+        class FakeInchwormCarryConfig:
+            def __init__(self, *, reseat_steps=4):
+                self.reseat_steps = reseat_steps
+
+        transport_module = SimpleNamespace(
+            InchwormCarryConfig=FakeInchwormCarryConfig,
+        )
+
+        def inchworm_probe(*args, **kwargs):
+            del args, kwargs
+            config = transport_module.InchwormCarryConfig()
+            observed_reseat_steps.append(config.reseat_steps)
+            return {
+                "success": False,
+                "attachment_activations": 0,
+                "transport_attachment_active_before": False,
+                "transport_attachment_active_after": False,
+                "object_pose_writes": 0,
+            }
+
+        runner = SimpleNamespace(
+            _execute_probe_grasp=lambda *args, **kwargs: {"success": True},
+            _end_grasp_inchworm_probe=inchworm_probe,
+        )
+
+        module.install_attachment_free_guards(
+            runner,
+            inchworm_reseat_steps=0,
+            transport_module_loader=lambda: transport_module,
+        )
+        runner._end_grasp_inchworm_probe(object(), "box")
+
+        self.assertEqual(observed_reseat_steps, [0])
+        self.assertIs(
+            transport_module.InchwormCarryConfig,
+            FakeInchwormCarryConfig,
+        )
+
 VALID_JOINT_SEED_RECORD = {
     "joint_seed_success": True,
     "joint_seed_right_error_deg": 9.9,

@@ -33,6 +33,8 @@ attachment, teleport, or object-pose writes.
   `/home/user/jciiot-2026/tools/full-physical-l1-c8a6bf2/run_l1_cradle_gate.py`;
 - frozen runner SHA-256:
   `50ade2e8609a6c7ea1dac7fbb59ae6a2e6b99b3de240e10d19d8cdce6e405732`;
+- attachment-free parameter wrapper SHA-256:
+  `226e5c5cef40541b1b06846c7f287b9aca66839cb431c83c7653d03e98adf3fa`;
 - public L1, seed `0`, near container;
 - travel direction: world `+x`;
 - requested controller progress: `0.50 m`;
