@@ -1,0 +1,2 @@
+run	classification	physical_grasp	clearance_success	insertion_target_reached	stationary_contact_all	bottom_contact_any	max_bottom_steps	raise_success	insert_dx_m	insert_dy_m	insert_dz_m	final_lift_m	collision_frames	attachment_calls	object_pose_writes	failure_stage	elapsed_s	result_sha256	trajectory_sha256
+seed0	rejected	true	true	true	true	false	0	false	0.031218	-0.180955	-0.218811	0.107540	0	0	0	insert_moving_arm_below_bottom	41.937636	52edc78be87365af2b06275101cfbf08980f1fb3e7679e094a0320f1e4fec39d	3bb78e88eadffc4f9694106f166da49a29a4e7a1c78eeeb4979cc11c8bff5208
