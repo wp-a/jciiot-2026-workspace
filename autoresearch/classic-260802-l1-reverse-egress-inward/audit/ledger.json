@@ -1,0 +1,33 @@
+{
+  "classification_counts": {
+    "recovery": 1,
+    "rejected": 0,
+    "transport_success": 0
+  },
+  "eligible_count": 0,
+  "record_count": 1,
+  "records": [
+    {
+      "classification": "recovery",
+      "eligible": false,
+      "failures": [
+        "dropped",
+        "minimum_object_lift_m",
+        "object_translation_m"
+      ],
+      "metrics": {
+        "max_object_gripper_drift_m": 0.0281353058683195,
+        "minimum_object_lift_m": 0.028646401283812795,
+        "object_translation_m": 0.11692233164695394
+      },
+      "source_path": "/home/user/jciiot-2026/results/l1-reverse-egress-inward-20260802/seed0-xplus-inward0p0005-0p50.json",
+      "source_sha256": "fc12ac28603fe3a5d69aee6f7f71411494cfdbfcac7112b56dc647e725673488",
+      "thresholds": {
+        "maximum_object_gripper_drift_m": 0.05,
+        "minimum_object_lift_m": 0.13,
+        "minimum_object_translation_m": 0.5
+      }
+    }
+  ],
+  "unique_content_count": 1
+}
