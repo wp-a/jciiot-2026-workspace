@@ -1,0 +1,2 @@
+source_path	classification	eligible	object_translation_m	minimum_object_lift_m	max_object_gripper_drift_m	failures	duplicate_of	source_sha256
+/home/user/jciiot-2026/results/l1-reverse-egress-vertical-20260802/seed0-xplus-vertical-p0p0004-k0p8-max0p003-0p50.json	recovery	false	0.1242823835325652	0.03615180894453629	0.030096298069455695	dropped,minimum_object_lift_m,object_translation_m		a2bc9589b9531a54a8157e71112760ac7b7a91779fccbca0d37aa3e6f6c6214f
