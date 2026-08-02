@@ -68,3 +68,20 @@ Keep only if the independent physical-data auditor verifies:
 Full structural success requires at least `0.50 m` true object translation.
 Any failure remains recovery or rejected evidence and cannot enter successful
 transport training data.
+
+## Observed Result
+
+The hypothesis was rejected. The controller stopped after 19 steps on
+`planar_grasp_drift`, with `0.031000 m` base translation but only `0.003423 m`
+true object translation. Minimum lift was `0.195191 m`; bilateral contact was
+retained and all collision/integrity counters were zero. The independent
+auditor classified the run as recovery, not transport success.
+
+- result SHA-256:
+  `5f4318184fa79f4b0d0d00feb141e978349151cc953d20e75b68ccf4d839bfad`;
+- trajectory SHA-256:
+  `9f61f58d0ca0bab0df4c30e3b93ed52054b274914f9b1e8721243ebfea445fb0`;
+- audit ledger SHA-256:
+  `44ab265ec08c136f7e7aa2bed29d8b6d277d81d26821114d767c3face58db5f5`;
+- audit TSV SHA-256:
+  `a5369b047e83ba99eaf37827d716c0cba52a15254ab05e091f3669364d09fb52`.

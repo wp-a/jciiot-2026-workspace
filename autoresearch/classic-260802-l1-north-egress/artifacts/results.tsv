@@ -1,0 +1,2 @@
+source_path	classification	eligible	object_translation_m	minimum_object_lift_m	max_object_gripper_drift_m	failures	duplicate_of	source_sha256
+/Users/wangpeng/jciiot-2026-workspace/.worktrees/l1-north-egress-20260802/autoresearch/classic-260802-l1-north-egress/artifacts/result.json	recovery	false	0.0034230193540744987	0.19519087825519166	0.031484271287209244	object_translation_m		5f4318184fa79f4b0d0d00feb141e978349151cc953d20e75b68ccf4d839bfad
