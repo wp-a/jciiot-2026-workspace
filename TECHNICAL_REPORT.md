@@ -293,6 +293,14 @@ stores the official/workspace commits, seed, runtime, trajectory path, score,
 grasp count, collision count, target distances, workflow payload and timestamps
 in a machine-readable manifest.
 
+The current workspace candidate is main commit `fd4788a`. Its focused test
+suite passes `439` tests. A fresh materialization from the locked upstream
+commit succeeds, and the scored-path audit reports `0` hard violations (the
+28 remaining warnings are existing allowed-directory backend/qpos boundary
+uses and are recorded rather than suppressed). The corresponding reproducible
+archive is `JCIIOT2026_code_and_report_20260805_hybrid_r1.zip`; its SHA-256 is
+`401319413e8c467bd848c2198fd5e53858e11fe230178c0bf69f0d30060cbb35`.
+
 The current server validation used Ubuntu 24.04.3, Python 3.11.15, MuJoCo 3.9.0
 and robosuite 1.5.2. The five JSON files in the separate baseline prediction ZIP
 are the exact trajectories from the clean published Agent entry validation;
