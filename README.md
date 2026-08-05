@@ -23,14 +23,15 @@
 6. [同类项目调研](docs/07-similar-projects.md)：公开仓库、可复用内容、成本和许可证风险。
 7. [模块路线图](docs/08-module-roadmap.md)：SOP、编排、导航、抓放、恢复、数据与评测的优化顺序。
 8. [当前技术路线与优化计划](docs/09-current-route-and-optimization-plan.md)：已实现架构、竞争优势、创新边界和下一阶段门槛。
-9. [五关性能基线](experiments/2026-07-28-five-level-performance-baseline.md)：固定种子 100/100、零碰撞和 L5 收敛证据。
-10. [多种子稳定性](experiments/2026-07-28-multiseed-stability.md)：L2-L5 各 20 次，80/80 满分和置信区间。
-11. [官方 Agent 入口验收](experiments/2026-07-28-official-agent-entrypoint.md)：干净候选通过 `RobotAgent.run()` 五关 100/100。
-12. [原创 SOP 知识生成](experiments/2026-07-28-sop-qwen3vl-generation.md)：五份 DOCX、25 张图片、冲突处理和模型证据边界。
-13. [技术报告](TECHNICAL_REPORT.md)：最终方法、定量结果、新颖性、限制和复现说明。
-14. [资料索引](docs/04-source-index.md)和[来源台账](research/source-ledger.csv)：网页、代码、论文、固定版本和采用状态。
-15. [架构决策](decisions/README.md)：路线选择和第三方代码隔离政策。
-16. [提交合规清单](docs/06-submission-compliance.md)：组队、依赖、复现、报告和发布要求。
+9. [路线注册表与证据索引](docs/11-route-registry-and-evidence-index.md)：任务一无 attachment 满分 incumbent、attachment 对照和纯物理研究路线的唯一分类入口。
+10. [五关性能基线](experiments/2026-07-28-five-level-performance-baseline.md)：固定种子 100/100、零碰撞和 L5 收敛证据。
+11. [多种子稳定性](experiments/2026-07-28-multiseed-stability.md)：L2-L5 各 20 次，80/80 满分和置信区间。
+12. [官方 Agent 入口验收](experiments/2026-07-28-official-agent-entrypoint.md)：干净候选通过 `RobotAgent.run()` 五关 100/100。
+13. [原创 SOP 知识生成](experiments/2026-07-28-sop-qwen3vl-generation.md)：五份 DOCX、25 张图片、冲突处理和模型证据边界。
+14. [技术报告](TECHNICAL_REPORT.md)：最终方法、定量结果、新颖性、限制和复现说明。
+15. [资料索引](docs/04-source-index.md)和[来源台账](research/source-ledger.csv)：网页、代码、论文、固定版本和采用状态。
+16. [架构决策](decisions/README.md)：路线选择和第三方代码隔离政策。
+17. [提交合规清单](docs/06-submission-compliance.md)：组队、依赖、复现、报告和发布要求。
 
 ## 工作区结构
 

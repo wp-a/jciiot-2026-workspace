@@ -1,10 +1,10 @@
 # 当前状态
 
-更新时间：2026-08-02（Asia/Shanghai）
+更新时间：2026-08-05（Asia/Shanghai）
 
 ## 当前阶段
 
-报名已完成。五个公开固定场景的旧本地 100/100 基线仍依赖官方 `transport_attachment`，不是纯动力学满分。L1 已追回两条 attachment-free 地面物理推运轨迹：未修改官方 `app._score_steps(0)` 对两条均返回 `10/10`，零碰撞、零物体位姿写入；但机器人使用 direct base-qpos 导航抽象，因此这是“物体真实物理 + 仿真导航”结果，不是完整底盘动力学。下一步把该路线接入官方 `RobotAgent.run()`，再迁移 L2-L5。
+报名已完成。五个公开固定场景的旧本地 100/100 基线仍依赖官方 `transport_attachment`。任务一另有已核验的正式无 attachment incumbent：`L1-PD-FLOOR-64797D3`（工作区提交 `64797d3-compliant`），两条完整轨迹均经未修改官方 `app._score_steps(0)` 得到 `10/10`，零碰撞、零物体位姿写入；完整路线和资产入口见 `docs/11-route-registry-and-evidence-index.md`。它使用 direct base-qpos 导航抽象，所以是“物体真实物理 + 仿真导航”的无 attachment 满分结果，不是完整底盘动力学证明。后续任务一默认以它为 incumbent，不再被 attachment 或未达标的悬空研究结果覆盖。
 
 ## 已完成
 

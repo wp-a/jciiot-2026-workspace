@@ -2,6 +2,12 @@
 
 本文件记录资料体系、规则认知、技术路线和实验协议的实质变化。代码级细节由 Git commit 记录。
 
+## 2026-08-05
+
+- 建立 `docs/11-route-registry-and-evidence-index.md` 作为路线唯一索引，恢复 `L1-PD-FLOOR-64797D3` 为任务一正式无 attachment 满分 incumbent。
+- 明确区分三类结果：无 attachment 物理接触推运 `10/10`、官方 attachment 对照 `10/10`、悬空纯物理研究 `0/10`；不再把它们混称为“纯物理满分”。
+- 将 `README.md`、`STATUS.md` 和 `docs/09-current-route-and-optimization-plan.md` 指向同一证据链，并保留 direct base-qpos 导航边界说明。
+
 ## 2026-08-02
 
 - 追回 07-31 未合并的 L1 floor-push 证据：`iter33/34` 各 14,299 帧，真实抓取后在地面物理推运至目标 `0.748201 m`，零碰撞、零 attachment、零物体位姿写入；未修改官方 `app._score_steps(0)` 对两条均返回 `10/10`。
