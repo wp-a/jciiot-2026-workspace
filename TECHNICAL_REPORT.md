@@ -299,7 +299,7 @@ commits are verification/report follow-ups only. Its focused test suite passes
 upstream commit succeeds, and the scored-path audit reports `0` hard violations (the
 28 remaining warnings are existing allowed-directory backend/qpos boundary
 uses and are recorded rather than suppressed). The corresponding reproducible
-archive is `JCIIOT2026_code_and_report_20260805_hybrid_r2.zip`; the archive
+archive is `JCIIOT2026_code_and_report_20260805_hybrid_r3.zip`; the archive
 SHA-256 is reported alongside the delivered file rather than embedded here,
 avoiding a self-referential checksum.
 
