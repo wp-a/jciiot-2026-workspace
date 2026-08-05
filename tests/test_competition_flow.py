@@ -434,6 +434,43 @@ class CompetitionFlowTests(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertEqual(captured["transport_mode"], "l1_floor_push")
 
+    def test_official_l2_keeps_verified_attachment_transport_mode(self):
+        captured = {}
+
+        class Driver:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+            def rank_objects(self, _source, object_names):
+                return list(object_names)
+
+        class Flow:
+            def __init__(self, _driver, *, max_attempts):
+                captured["max_attempts"] = max_attempts
+
+            def run(self, **kwargs):
+                return {"success": True, **kwargs}
+
+        task = {
+            "level": "L2",
+            "source": "input_6",
+            "target": "output_4",
+            "object": ["green_tote_b01_upper"],
+        }
+        with (
+            patch.object(self.module, "OfficialCompetitionDriver", Driver),
+            patch.object(self.module, "CompetitionFlow", Flow),
+        ):
+            result = self.module.run_official_task(
+                backend=object(),
+                scene_context=object(),
+                grid=object(),
+                task=task,
+            )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(captured["transport_mode"], "attachment")
+
     def test_auxiliary_source_uses_verified_upper_crossing_corridor(self):
         detour = self.module.auxiliary_source_detour(
             target="aux_input_1",
