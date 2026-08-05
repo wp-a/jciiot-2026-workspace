@@ -10,15 +10,19 @@ stable multi-object placement. A language model is not allowed to issue base
 or joint commands on the scored path.
 
 On the published baseline commit
-`0dcdddf18a9e694569aa1433cdfc04eb097fed78`, the current fixed-scene candidate
-scores with the unmodified public scorer
+`0dcdddf18a9e694569aa1433cdfc04eb097fed78`, the attachment-based fixed-scene
+candidate scores with the unmodified public scorer
 `10/10`, `15/15`, `20/20`, `25/25` and `30/30`, for `100/100` total, with
 seven required successful grasp events and zero collision frames. An additional
 80-process repeatability batch on L2-L5 produced 80/80 full-score runs,
-120/120 required grasp events and zero collision frames. These repetitions do
-not perturb scene geometry, so they establish execution repeatability rather
-than pose-distribution robustness. No result in this report is a BienData score
-or an organizer-reproduced result.
+120/120 required grasp events and zero collision frames. Separately, the L1
+no-attachment incumbent `L1-PD-FLOOR-64797D3` scores `10/10` twice with zero
+collisions, zero attachment calls and zero object-pose writes. The two result
+families are deliberately kept separate: the five-level result is the verified
+attachment baseline, while the no-attachment result is currently verified only
+for L1. These repetitions do not perturb scene geometry, so they establish
+execution repeatability rather than pose-distribution robustness. No result in
+this report is a BienData score or an organizer-reproduced result.
 
 ## 2. Task and scoring constraints
 
@@ -44,7 +48,7 @@ Official task metadata and semantic map
   -> safe-corridor base navigation and heading alignment
   -> object-family two-arm geometric grasp
   -> bilateral contact and physical lift verification
-  -> stowed transport with official attachment semantics
+  -> L1: physical setdown and floor contact push; L2-L5 baseline: official attachment transport
   -> target-table release and multi-object slot assignment
   -> final state, collision and event verification
   -> published trajectory recorder and unmodified public scorer
@@ -88,9 +92,13 @@ extension is bounded by the remaining target distance.
 
 The controller preserves the upper-body posture while rotating the base,
 records every simulation frame and aborts immediately if the official backend
-reports a judged collision. Carrying motion uses a stowed arm posture and the
-official attachment mechanism so the payload remains synchronized with the
-base without writing final object poses directly.
+reports a judged collision. The L2-L5 baseline uses a stowed arm posture and
+the official attachment mechanism so the payload remains synchronized with the
+base without writing final object poses directly. The separate L1 incumbent
+sets the object down and uses measured base-object contact to push it through
+the floor corridor; it does not activate transport attachment or write the
+object pose. Its navigation boundary is direct base-qpos, so it is not claimed
+as complete mobile-base actuator dynamics.
 
 ## 6. Geometric grasp controller
 
@@ -187,6 +195,25 @@ Every manifest reports `runner.execution_mode=agent`, selected skill
 `competition_task`, no planner output and every task object in `verified`
 state. The protected `app.py`, `task_subprocess_runner.py` and
 `knowledge/task_config.json` hashes match the official baseline.
+
+### L1 no-attachment physical incumbent
+
+| Evidence | Result |
+|---|---:|
+| Official scorer (`app._score_steps(0)`) | 10/10 |
+| Independent complete trajectories | 2 |
+| Frames per trajectory | 14,299 |
+| Collision frames | 0 |
+| Attachment calls / object-pose writes | 0 / 0 |
+| Physical contact-push steps | 6,985 |
+| Final target distance | 0.748201 m |
+
+The trajectory contains bilateral physical grasp/lift events, physical
+setdown, and three floor-push segments. This is a genuine no-attachment
+object-motion result under MuJoCo contacts, but its direct base-qpos navigation
+must be stated explicitly in any submission or paper. The complete route
+registry, event audit and hashes are in
+`docs/11-route-registry-and-evidence-index.md`.
 
 ### L2-L5 repeatability batch
 
@@ -286,10 +313,14 @@ checksums are included under `sop_generated/`.
   resets in a requirements-pinned inference environment. The supplied 591 MB
   HDF5 is a 10-action Fetch/iGibson format example, not JCIIOT Tiago training
   data.
-- The current L5 implementation changes private transport-attachment relative
-  state for final reach. Although it does not directly write object qpos, this
-  is a compliance and reviewer-perception risk and must be replaced with
-  physical base/arm action before the candidate is called final.
+- The five-level attachment baseline and the L1 no-attachment incumbent are
+  different evidence families. The current worktree has not yet produced a
+  single five-level no-attachment candidate; L2-L5 physical transport remains
+  research work and must not be inferred from the L1 result.
+- The current L5 baseline changes private transport-attachment relative state
+  for final reach. Although it does not directly write object qpos, this is a
+  compliance and reviewer-perception risk and must be replaced with physical
+  base/arm action before that baseline is called final.
 - Disabling the planner and first-matching every task with one aggregate skill
   diverges from the training deck's standard atomic-skill story. The final
   package needs either organizer clarification or a validated atomic-skill
@@ -312,5 +343,6 @@ checksums are included under `sop_generated/`.
 - `sop_generated/generated_sop_manifest.json`
 - `config/sop-vlm-lock.json`
 - `docs/09-current-route-and-optimization-plan.md`
+- `docs/11-route-registry-and-evidence-index.md`
 - `THIRD_PARTY_NOTICES.md`
 - `config/upstream-lock.json`
