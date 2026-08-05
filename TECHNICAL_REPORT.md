@@ -293,9 +293,9 @@ stores the official/workspace commits, seed, runtime, trajectory path, score,
 grasp count, collision count, target distances, workflow payload and timestamps
 in a machine-readable manifest.
 
-The current route candidate is code commit `fd4788a`; the current workspace
-HEAD adds only the verification/report commits `b088d1c` and `86c04de`. Its
-focused test suite passes `439` tests. A fresh materialization from the locked
+The current route candidate is code commit `fd4788a`; subsequent workspace
+commits are verification/report follow-ups only. Its focused test suite passes
+`439` tests. A fresh materialization from the locked
 upstream commit succeeds, and the scored-path audit reports `0` hard violations (the
 28 remaining warnings are existing allowed-directory backend/qpos boundary
 uses and are recorded rather than suppressed). The corresponding reproducible
