@@ -1,6 +1,6 @@
 # 路线注册表与证据索引
 
-更新时间：2026-08-05（Asia/Shanghai）
+更新时间：2026-08-06（Asia/Shanghai）
 
 这份文档是当前工作区关于“任务一是否满分、是否使用 attachment、结果能否复核”的唯一索引。其他实验目录保留历史过程，但不能覆盖这里的路线分类和证据状态。
 
@@ -88,3 +88,41 @@ iter33 完整轨迹的事件账本包含：
 2. 以同样的硬门禁取得真正的悬空物理运输，并且官方评分仍为 10/10 后再替换 incumbent。
 
 在这两个条件都没有发生前，不再用 attachment 路线覆盖任务一的无 attachment 满分记录，也不把 `L1-PHYS-AERIAL-V16` 的 0/10 研究结果当成回归。
+
+## 2026-08-06 当前混合候选服务器验收
+
+当前工作区提交 `5dfb364-l1-profile` 已物化为服务器候选
+`/home/user/jciiot-2026/candidates/hybrid-r3-l1-profile-5dfb364`，在官方上游
+`0dcdddf18a9e694569aa1433cdfc04eb097fed78` 上用 `runner=agent`、seed 0
+顺序运行五关。以下是未修改公开评分器的最新机器结果：
+
+| 关卡 | 得分 | 碰撞帧 | 成功抓取/要求 | 轨迹帧 | 用时（秒） | 到目标中心距离（米） |
+|---|---:|---:|---:|---:|---:|---:|
+| 任务一 | 10/10 | 0 | 2/1 | 14,300 | 622.193 | 0.748171 |
+| 任务二 | 15/15 | 0 | 1/1 | 1,646 | 72.088 | 0.420097 |
+| 任务三 | 20/20 | 0 | 1/1 | 1,744 | 75.757 | 0.139142 |
+| 任务四 | 25/25 | 0 | 1/1 | 2,190 | 108.217 | 0.302334 |
+| 任务五 | 30/30 | 0 | 3/3 | 6,639 | 294.743 | 0.303742 |
+
+合计为 `100/100`、`7/7` 要求抓取、零碰撞。机制边界必须保留：任务一是
+`L1-PD-FLOOR-64797D3` 的无 attachment 物理抓取/放置/地面接触推运；任务二至五
+仍使用官方 attachment 运输基线。这是本地公开评分器验收，不是 BienData 或主办方
+隐藏复核结果。
+
+证据归档目录：
+`artifacts/remote-hybrid-r3-l1-profile-20260806/`。其中五条轨迹的 SHA-256 为：
+
+```text
+task1 fd7f01c24e18ba2d62fc04fe236522ecf5ca7c05a7343cd7a5e6924e05664748
+task2 2df8f6186d863ecf25055cba5f8d6857dccaa7baa5e2f70994e7a38fca515d62
+task3 f7c4314b9b793a6c319a51e6573fa5ef3324b57c87af5c8de681b4f84e18db1d
+task4 32add87c797253132a90d728b56925fb2d10eb140ac5225e731061aa4b96dbca
+task5 b83f3f9031f6fdcebe85bdb0e0be23cb24cc1a193e5d7e989ecbbf6a78b4da96
+```
+
+本次迭代还记录了一次真实回归：参数收紧后任务一在运输前失败。通过
+`test_l1_floor_extraction_uses_verified_inchworm_profile` 和
+`test_l1_floor_push_uses_verified_contact_staging_profile` 恢复并锁定了已验证的
+`reset_max_gripper_drift=0.03`、`reset_arm_compensation_gain=1.0`、
+`reseat_steps=0`、`minimum_macro_progress=0.02`、`base_standoff_m=0.65` 和
+`lateral_offset_m=0.0` 配置；随后五关重新跑通。这样可以追溯“为什么不能随意改默认参数”。

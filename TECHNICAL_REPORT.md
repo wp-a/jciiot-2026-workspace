@@ -191,6 +191,51 @@ scorer. Asterisks mark tasks run concurrently; those wall times are not used
 for ranking claims. These results were not uploaded to BienData and do not
 establish performance under hidden perturbations.
 
+### 2026-08-06 current hybrid candidate, server validation
+
+After restoring the previously verified L1 floor-route profile, the current
+candidate was materialized from the locked upstream commit and run sequentially
+through all five official tasks on the server with `runner=agent`, `seed=0` and
+the unmodified public scorer:
+
+| Level | Score | Collision frames | Successful grasps | Required grasps | Frames | Wall time | Final target distance |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| L1 | 10/10 | 0 | 2 | 1 | 14,300 | 622.193 s | 0.748171 m |
+| L2 | 15/15 | 0 | 1 | 1 | 1,646 | 72.088 s | 0.420097 m |
+| L3 | 20/20 | 0 | 1 | 1 | 1,744 | 75.757 s | 0.139142 m |
+| L4 | 25/25 | 0 | 1 | 1 | 2,190 | 108.217 s | 0.302334 m |
+| L5 | 30/30 | 0 | 3 | 3 | 6,639 | 294.743 s | 0.303742 m |
+
+This is a fresh local acceptance result of `100/100`, `7/7` required grasps
+and zero collision frames. It is a **hybrid** result: L1 uses the verified
+no-attachment physical floor-contact route; L2-L5 use the official attachment
+transport baseline. The result is not an organizer/Biendata score and has not
+been tested under hidden perturbations.
+
+The candidate is
+`/home/user/jciiot-2026/candidates/hybrid-r3-l1-profile-5dfb364` on the
+server, based on workspace commit `5dfb364-l1-profile` and official commit
+`0dcdddf18a9e694569aa1433cdfc04eb097fed78`. Machine-readable evidence is
+archived under
+`artifacts/remote-hybrid-r3-l1-profile-20260806/`, including one manifest and
+one JSONL trajectory per level. The trajectory SHA-256 values are:
+
+```text
+L1 fd7f01c24e18ba2d62fc04fe236522ecf5ca7c05a7343cd7a5e6924e05664748
+L2 2df8f6186d863ecf25055cba5f8d6857dccaa7baa5e2f70994e7a38fca515d62
+L3 f7c4314b9b793a6c319a51e6573fa5ef3324b57c87af5c8de681b4f84e18db1d
+L4 32add87c797253132a90d728b56925fb2d10eb140ac5225e731061aa4b96dbca
+L5 b83f3f9031f6fdcebe85bdb0e0be23cb24cc1a193e5d7e989ecbbf6a78b4da96
+```
+
+For L1 specifically, the fresh trajectory has zero occurrences of
+`attachment`, `object_pose_write`, `object qpos` or `teleport` in its runtime
+event/step records. Its event ledger contains bilateral grasp/lift, physical
+setdown, two inchworm transports, and three floor-base contact-push segments.
+The extracted physical-contact count is 6,985 steps. This is the current
+evidence for the remembered pure-physical 10/10 route; it does not make the
+other four levels no-attachment.
+
 Every manifest reports `runner.execution_mode=agent`, selected skill
 `competition_task`, no planner output and every task object in `verified`
 state. The protected `app.py`, `task_subprocess_runner.py` and
@@ -293,13 +338,14 @@ stores the official/workspace commits, seed, runtime, trajectory path, score,
 grasp count, collision count, target distances, workflow payload and timestamps
 in a machine-readable manifest.
 
-The current route candidate is code commit `fd4788a`; subsequent workspace
-commits are verification/report follow-ups only. Its focused test suite passes
-`439` tests. A fresh materialization from the locked
+The current route candidate is workspace commit `5dfb364-l1-profile`; the
+explicit L1 extraction and floor-contact staging parameters are covered by
+regression tests. A fresh materialization from the locked
 upstream commit succeeds, and the scored-path audit reports `0` hard violations (the
-28 remaining warnings are existing allowed-directory backend/qpos boundary
-uses and are recorded rather than suppressed). The corresponding reproducible
-archive is `JCIIOT2026_code_and_report_20260805_hybrid_r3.zip`; the archive
+and `0` warnings for the current submission overlay. A separate historical
+whole-workspace audit recorded 28 allowed-directory backend/qpos boundary
+warnings; those are retained in the evidence history and are not hidden. The corresponding reproducible
+archive is `JCIIOT2026_code_and_report_20260806_hybrid_r5.zip`; the archive
 SHA-256 is reported alongside the delivered file rather than embedded here,
 avoiding a self-referential checksum.
 

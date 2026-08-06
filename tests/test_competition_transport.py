@@ -181,6 +181,82 @@ class PhysicalTransportGeometryTests(unittest.TestCase):
         self.assertFalse(result["success"])
         self.assertEqual(result["failure_stage"], "extraction")
 
+    def test_l1_floor_extraction_uses_verified_inchworm_profile(self):
+        module = load_module()
+        observed = {}
+        body_xpos = {3: np.array([7.0, 4.6, 1.32], dtype=float)}
+        backend = SimpleNamespace(
+            env=SimpleNamespace(
+                obj_body_id={"box": 3},
+                sim=SimpleNamespace(data=SimpleNamespace(body_xpos=body_xpos)),
+            )
+        )
+
+        def inchworm(*_args, **kwargs):
+            observed["config"] = kwargs["config"]
+            return {"success": False, "failure_stage": "probe"}
+
+        module.run_inchworm_transport = inchworm
+        result = module._extract_floor_push_object(
+            backend,
+            competition_driver=object(),
+            source="input_5",
+            object_name="box",
+            macro_count=1,
+            distance_m=0.14,
+            world_direction=np.array([1.0, 0.0]),
+            table_object_z=1.125,
+            stroke_m=0.08,
+            reset_m=0.06,
+            minimum_lift_m=0.10,
+            place_max_descent_m=0.45,
+        )
+
+        self.assertFalse(result["success"])
+        config = observed["config"]
+        self.assertAlmostEqual(config.reset_max_gripper_drift, 0.03)
+        self.assertAlmostEqual(config.reset_arm_compensation_gain, 1.0)
+        self.assertEqual(config.reseat_steps, 0)
+        self.assertAlmostEqual(config.minimum_macro_progress, 0.02)
+
+    def test_l1_floor_push_uses_verified_contact_staging_profile(self):
+        module = load_module()
+        observed = {}
+        body_xpos = {3: np.array([7.8, 4.5, 0.31], dtype=float)}
+        backend = SimpleNamespace(
+            env=SimpleNamespace(
+                obj_body_id={"box": 3},
+                sim=SimpleNamespace(data=SimpleNamespace(body_xpos=body_xpos)),
+            )
+        )
+
+        def extract(*_args, **_kwargs):
+            return {"success": True}
+
+        def retract(*_args, **_kwargs):
+            return {"success": True, "collision": False}
+
+        def floor_push(*_args, **kwargs):
+            observed.update(kwargs)
+            body_xpos[3] = np.array([-0.18, -8.04, 0.125], dtype=float)
+            return {"success": True, "collision": False, "physical_contact_steps": 1}
+
+        module._run_floor_corridor_push = floor_push
+        result = module.run_physical_floor_route(
+            backend,
+            competition_driver=object(),
+            source="input_5",
+            object_name="box",
+            target_xy=np.array([-0.166, -7.29]),
+            table_object_z=1.125,
+            _extract_and_setdown=extract,
+            _navigation_retract=retract,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertAlmostEqual(observed["base_standoff_m"], 0.65)
+        self.assertAlmostEqual(observed["lateral_offset_m"], 0.0)
+
     def test_slew_limited_command_bounds_each_control_dimension(self):
         module = load_module()
 
