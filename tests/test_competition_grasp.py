@@ -633,6 +633,19 @@ class CompetitionGraspTests(unittest.TestCase):
         self.assertEqual(config.lift_hold_steps, 20)
         self.assertEqual(config.lift_tolerance, 0.02)
 
+    def test_lower_l4_container_accepts_measured_seventeen_mm_approach_residual(self):
+        lower = self.module.apply_object_grasp_profile(
+            self.module.ScriptedGraspConfig(),
+            "blue_container_h01_back_lower",
+        )
+        upper = self.module.apply_object_grasp_profile(
+            self.module.ScriptedGraspConfig(),
+            "blue_container_h01_back_upper",
+        )
+
+        self.assertEqual(lower.approach_tolerance, 0.02)
+        self.assertEqual(upper.approach_tolerance, 0.012)
+
     def test_container_profile_respects_explicit_research_lift_override(self):
         config = self.module.ScriptedGraspConfig(
             container_lift_height_override=0.04

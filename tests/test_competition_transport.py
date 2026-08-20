@@ -4,6 +4,7 @@ import sys
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import numpy as np
 
@@ -85,6 +86,130 @@ class PhysicalTransportGeometryTests(unittest.TestCase):
 
         np.testing.assert_allclose(velocity, [-0.02, -0.025])
 
+    def test_floor_reposition_orients_before_final_contact_stage(self):
+        module = load_module()
+        base_pose = [np.array([12.4, 5.7], dtype=float), 0.0]
+        path_calls = []
+        orient_poses = []
+
+        def follow_path(points, **_kwargs):
+            copied = [np.asarray(point, dtype=float).copy() for point in points]
+            path_calls.append(copied)
+            base_pose[0] = copied[-1]
+            return True
+
+        def orient_base(_backend, yaw):
+            orient_poses.append((base_pose[0].copy(), float(yaw)))
+            base_pose[1] = float(yaw)
+            return True
+
+        backend = SimpleNamespace(
+            env=SimpleNamespace(
+                obj_body_id={"box": 3},
+                sim=SimpleNamespace(
+                    data=SimpleNamespace(
+                        body_xpos={3: np.array([12.2, 6.2, 0.2], dtype=float)}
+                    )
+                ),
+                has_judge_collision=False,
+            ),
+            get_base_pose=lambda: (base_pose[0].copy(), base_pose[1]),
+            follow_path=follow_path,
+        )
+        navigation = SimpleNamespace(orient_base=orient_base)
+
+        with patch.dict(
+            sys.modules,
+            {"robot_agent.skills.competition_navigation": navigation},
+        ):
+            result = module._reposition_base_for_floor_push(
+                backend,
+                "box",
+                direction_xy=np.array([0.0, -1.0]),
+                retreat_clearance_m=1.30,
+                base_standoff_m=0.35,
+                lateral_offset_m=0.10,
+                retract_forward_m=0.20,
+                retract_lateral_m=0.08,
+                retract_target_z=1.45,
+                minimum_retract_z_m=0.80,
+                skip_retract=True,
+            )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(len(path_calls), 2)
+        self.assertEqual(len(orient_poses), 1)
+        self.assertGreaterEqual(orient_poses[0][0][1], 6.95 - 1e-9)
+        np.testing.assert_allclose(path_calls[1][0], [12.3, 6.55])
+
+    def test_floor_reposition_can_reverse_heading_for_rear_base_push(self):
+        module = load_module()
+
+        targets = module._floor_base_reposition_targets(
+            object_xy=np.array([4.87, -8.87]),
+            current_base_xy=np.array([4.87, -8.20]),
+            next_push_direction_xy=np.array([0.0, 1.0]),
+            retreat_clearance_m=0.90,
+            base_standoff_m=0.65,
+            reverse_heading=True,
+        )
+
+        self.assertAlmostEqual(targets["target_yaw"], -math.pi / 2.0)
+
+    def test_northbound_floor_reposition_orients_south_of_object(self):
+        module = load_module()
+        base_pose = [np.array([-1.0, -8.8], dtype=float), 0.0]
+        orient_poses = []
+
+        def follow_path(points, **_kwargs):
+            base_pose[0] = np.asarray(points[-1], dtype=float).copy()
+            return True
+
+        def orient_base(_backend, yaw):
+            orient_poses.append(base_pose[0].copy())
+            base_pose[1] = float(yaw)
+            return True
+
+        backend = SimpleNamespace(
+            env=SimpleNamespace(
+                obj_body_id={"box": 3},
+                sim=SimpleNamespace(
+                    data=SimpleNamespace(
+                        body_xpos={3: np.array([0.0, -8.88, 0.2], dtype=float)}
+                    )
+                ),
+                has_judge_collision=False,
+            ),
+            get_base_pose=lambda: (base_pose[0].copy(), base_pose[1]),
+            follow_path=follow_path,
+        )
+
+        with patch.dict(
+            sys.modules,
+            {
+                "robot_agent.skills.competition_navigation": SimpleNamespace(
+                    orient_base=orient_base
+                )
+            },
+        ):
+            result = module._reposition_base_for_floor_push(
+                backend,
+                "box",
+                direction_xy=np.array([0.0, 1.0]),
+                retreat_clearance_m=1.30,
+                base_standoff_m=0.35,
+                lateral_offset_m=0.10,
+                retract_forward_m=0.20,
+                retract_lateral_m=0.08,
+                retract_target_z=1.45,
+                minimum_retract_z_m=0.80,
+                skip_retract=True,
+            )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(len(orient_poses), 1)
+        self.assertLessEqual(orient_poses[0][1], -9.63 + 1e-9)
+
     def test_floor_route_composes_extraction_retract_and_contact_push(self):
         module = load_module()
         calls = []
@@ -140,11 +265,90 @@ class PhysicalTransportGeometryTests(unittest.TestCase):
         self.assertEqual(calls[2][2]["max_steps"], 15000)
         self.assertTrue(calls[2][2]["base_pusher"])
         self.assertAlmostEqual(calls[2][2]["base_speed_m_s"], 0.04)
+        self.assertAlmostEqual(
+            calls[2][2]["route_reposition_lateral_offset_m"],
+            0.0,
+        )
         self.assertLess(result["final_target_distance_m"], 0.80)
         self.assertAlmostEqual(
             result["final_target_distance_m"],
             float(np.linalg.norm(np.array([-0.18, -8.04]) - np.array([-0.166, -7.29]))),
         )
+
+    def test_floor_route_can_clear_source_station_before_lower_aisle(self):
+        module = load_module()
+
+        route = module.floor_base_target_route(
+            start_object_xy=np.array([12.40, 5.14]),
+            target_xy=np.array([-0.166, -7.29]),
+            corridor_y=-8.40,
+            arrival_radius_m=0.80,
+            arrival_margin_m=0.05,
+            initial_clearance_m=0.75,
+        )
+
+        self.assertEqual(len(route["segments"]), 4)
+        np.testing.assert_allclose(route["segments"][0]["direction"], [1.0, 0.0])
+        np.testing.assert_allclose(route["segments"][1]["direction"], [0.0, -1.0])
+        self.assertAlmostEqual(route["segments"][0]["distance_m"], 0.75)
+
+    def test_floor_route_can_approach_target_from_clear_side(self):
+        module = load_module()
+
+        route = module.floor_base_target_route(
+            start_object_xy=np.array([0.26, 7.68]),
+            target_xy=np.array([4.872, -7.261]),
+            corridor_y=-8.40,
+            arrival_radius_m=0.80,
+            arrival_margin_m=0.05,
+            initial_clearance_m=2.00,
+            initial_push_direction_xy=np.array([1.0, 0.0]),
+            final_side_approach_x=3.80,
+        )
+
+        np.testing.assert_allclose(route["segments"][-2]["direction"], [0.0, 1.0])
+        np.testing.assert_allclose(route["segments"][-1]["direction"], [1.0, 0.0])
+        self.assertAlmostEqual(route["final_target_distance_m"], 0.75)
+
+    def test_floor_route_can_raise_then_reverse_into_lower_aisle(self):
+        module = load_module()
+
+        route = module.floor_base_target_route(
+            start_object_xy=np.array([12.40, 5.14]),
+            target_xy=np.array([-0.166, -7.29]),
+            corridor_y=-8.40,
+            arrival_radius_m=0.80,
+            arrival_margin_m=0.05,
+            initial_clearance_m=0.90,
+            initial_push_direction_xy=np.array([0.0, 1.0]),
+            reverse_switch_y=5.10,
+        )
+
+        self.assertEqual(len(route["segments"]), 5)
+        np.testing.assert_allclose(route["segments"][0]["direction"], [0.0, 1.0])
+        np.testing.assert_allclose(route["segments"][1]["direction"], [0.0, -1.0])
+        self.assertAlmostEqual(route["segments"][0]["distance_m"], 0.90)
+        self.assertAlmostEqual(route["segments"][1]["end_object_xy"][1], 5.10)
+
+    def test_floor_route_can_shift_away_from_line_before_southbound_push(self):
+        module = load_module()
+
+        route = module.floor_base_target_route(
+            start_object_xy=np.array([12.40, 5.14]),
+            target_xy=np.array([-0.166, -7.29]),
+            corridor_y=-8.40,
+            arrival_radius_m=0.80,
+            arrival_margin_m=0.05,
+            initial_clearance_m=0.90,
+            initial_push_direction_xy=np.array([0.0, 1.0]),
+            lateral_clearance_m=0.70,
+        )
+
+        self.assertEqual(len(route["segments"]), 5)
+        np.testing.assert_allclose(route["segments"][0]["direction"], [0.0, 1.0])
+        np.testing.assert_allclose(route["segments"][1]["direction"], [1.0, 0.0])
+        np.testing.assert_allclose(route["segments"][2]["direction"], [0.0, -1.0])
+        self.assertAlmostEqual(route["segments"][1]["distance_m"], 0.70)
 
     def test_floor_route_stops_before_navigation_when_extraction_fails(self):
         module = load_module()
@@ -256,6 +460,427 @@ class PhysicalTransportGeometryTests(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertAlmostEqual(observed["base_standoff_m"], 0.65)
         self.assertAlmostEqual(observed["lateral_offset_m"], 0.0)
+
+    def test_green_tote_floor_route_extracts_toward_upper_table_edge(self):
+        module = load_module()
+        observed = {}
+        body_xpos = {3: np.array([11.87, 4.62, 1.20], dtype=float)}
+        backend = SimpleNamespace(
+            env=SimpleNamespace(
+                obj_body_id={"green_tote_b01_upper": 3},
+                sim=SimpleNamespace(data=SimpleNamespace(body_xpos=body_xpos)),
+            )
+        )
+
+        def extract(*_args, **kwargs):
+            observed["world_direction"] = np.asarray(
+                kwargs["world_direction"], dtype=float
+            )
+            observed["stroke_m"] = float(kwargs["stroke_m"])
+            body_xpos[3] = np.array([11.87, 4.90, 0.20], dtype=float)
+            return {"success": True}
+
+        def retract(*_args, **_kwargs):
+            return {"success": True, "collision": False}
+
+        def floor_push(*_args, **kwargs):
+            observed["floor_push"] = kwargs
+            body_xpos[3] = np.array([-0.18, -8.04, 0.20], dtype=float)
+            return {"success": True, "collision": False, "physical_contact_steps": 1}
+
+        result = module.run_physical_floor_route(
+            backend,
+            competition_driver=object(),
+            source="input_6",
+            object_name="green_tote_b01_upper",
+            target_xy=np.array([-0.166, -7.29]),
+            table_object_z=1.20,
+            _extract_and_setdown=extract,
+            _navigation_retract=retract,
+            _floor_push=floor_push,
+        )
+
+        self.assertTrue(result["success"])
+        np.testing.assert_allclose(observed["world_direction"], [0.0, 1.0])
+        self.assertAlmostEqual(observed["stroke_m"], 0.02)
+        self.assertAlmostEqual(
+            observed["floor_push"]["route_reposition_lateral_offset_m"],
+            0.10,
+        )
+        self.assertAlmostEqual(
+            observed["floor_push"]["route_minimum_base_x_m"],
+            12.18,
+        )
+        self.assertAlmostEqual(
+            observed["floor_push"]["route_lateral_clearance_m"],
+            0.15,
+        )
+        self.assertAlmostEqual(observed["floor_push"]["alignment_gain"], 0.05)
+        self.assertAlmostEqual(
+            observed["floor_push"]["maximum_lateral_speed_m_s"],
+            0.005,
+        )
+
+    def test_green_floor_route_defaults_to_table_edge_extractor(self):
+        module = load_module()
+        observed = {}
+        body_xpos = {3: np.array([11.87, 4.62, 1.20], dtype=float)}
+        backend = SimpleNamespace(
+            env=SimpleNamespace(
+                obj_body_id={"green_tote_b01_upper": 3},
+                sim=SimpleNamespace(data=SimpleNamespace(body_xpos=body_xpos)),
+            )
+        )
+
+        def extractor(*_args, **kwargs):
+            observed.update(kwargs)
+            body_xpos[3] = np.array([11.87, 4.90, 0.20], dtype=float)
+            return {"success": True}
+
+        def retract(*_args, **_kwargs):
+            return {"success": True, "collision": False}
+
+        def floor_push(*_args, **_kwargs):
+            body_xpos[3] = np.array([-0.18, -8.04, 0.20], dtype=float)
+            return {"success": True, "collision": False, "physical_contact_steps": 1}
+
+        module._extract_green_tote_to_floor = extractor
+        result = module.run_physical_floor_route(
+            backend,
+            competition_driver=object(),
+            source="input_6",
+            object_name="green_tote_b01_upper",
+            target_xy=np.array([-0.166, -7.29]),
+            table_object_z=1.20,
+            _navigation_retract=retract,
+            _floor_push=floor_push,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(observed["source"], "input_6")
+
+    def test_blue_tote_floor_route_defaults_to_open_gripper_edge_extractor(self):
+        module = load_module()
+        observed = {}
+        body_xpos = {3: np.array([-0.20, 8.47, 1.50], dtype=float)}
+        backend = SimpleNamespace(
+            env=SimpleNamespace(
+                obj_body_id={"blue_tote_b01_far_right": 3},
+                sim=SimpleNamespace(data=SimpleNamespace(body_xpos=body_xpos)),
+            )
+        )
+
+        def extractor(*_args, **kwargs):
+            observed.update(kwargs)
+            body_xpos[3] = np.array([-0.20, 9.00, 0.20], dtype=float)
+            return {"success": True}
+
+        def floor_push(*_args, **kwargs):
+            observed["floor_push"] = kwargs
+            body_xpos[3] = np.array([4.87, -8.01, 0.20], dtype=float)
+            return {"success": True, "collision": False, "physical_contact_steps": 1}
+
+        module._extract_blue_tote_to_floor = extractor
+        result = module.run_physical_floor_route(
+            backend,
+            competition_driver=object(),
+            source="aux_input_1",
+            object_name="blue_tote_b01_far_right",
+            target_xy=np.array([4.872, -7.261]),
+            table_object_z=1.50,
+            _navigation_retract=lambda *_args, **_kwargs: {"success": True},
+            _floor_push=floor_push,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(observed["source"], "aux_input_1")
+        self.assertAlmostEqual(
+            observed["floor_push"]["route_south_reposition_lateral_offset_m"],
+            0.025,
+        )
+        self.assertAlmostEqual(
+            observed["floor_push"]["initial_clearance_m"],
+            2.00,
+        )
+        self.assertAlmostEqual(
+            observed["floor_push"]["route_south_tracking_gain"],
+            0.50,
+        )
+        self.assertTrue(
+            observed["floor_push"]["route_final_approach_reverse_pusher"]
+        )
+        self.assertAlmostEqual(
+            observed["floor_push"]["route_final_side_approach_x"],
+            3.80,
+        )
+
+    def test_l4_container_floor_route_clears_line_and_uses_west_target_approach(self):
+        module = load_module()
+        observed = {}
+        body_xpos = {3: np.array([-9.848, 5.343, 1.224], dtype=float)}
+        backend = SimpleNamespace(
+            env=SimpleNamespace(
+                obj_body_id={"blue_container_h01_back_upper": 3},
+                sim=SimpleNamespace(data=SimpleNamespace(body_xpos=body_xpos)),
+            )
+        )
+
+        def extractor(*_args, **kwargs):
+            observed["extractor"] = kwargs
+            body_xpos[3] = np.array([-9.20, 5.34, 0.20], dtype=float)
+            return {"success": True}
+
+        def floor_push(*_args, **kwargs):
+            observed["floor_push"] = kwargs
+            body_xpos[3] = np.array([4.122, -7.261, 0.20], dtype=float)
+            return {"success": True, "collision": False, "physical_contact_steps": 1}
+
+        result = module.run_physical_floor_route(
+            backend,
+            competition_driver=object(),
+            source="input_2",
+            object_name="blue_container_h01_back_upper",
+            target_xy=np.array([4.872, -7.261]),
+            table_object_z=1.224,
+            _extract_and_setdown=extractor,
+            _navigation_retract=lambda *_args, **_kwargs: {"success": True},
+            _floor_push=floor_push,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertAlmostEqual(observed["extractor"]["distance_m"], 0.30)
+        self.assertAlmostEqual(observed["extractor"]["stroke_m"], 0.02)
+        self.assertAlmostEqual(observed["extractor"]["reset_m"], 0.02)
+        self.assertAlmostEqual(
+            observed["extractor"]["minimum_macro_progress_m"],
+            0.005,
+        )
+        np.testing.assert_allclose(observed["floor_push"]["push_direction"], [1.0, 0.0])
+        self.assertAlmostEqual(observed["floor_push"]["initial_clearance_m"], 1.20)
+        self.assertAlmostEqual(
+            observed["floor_push"]["route_final_side_approach_x"],
+            3.80,
+        )
+        self.assertTrue(
+            observed["floor_push"]["route_final_approach_reverse_pusher"]
+        )
+
+    def test_l4_container_floor_route_defaults_to_open_gripper_edge_extractor(self):
+        module = load_module()
+        observed = {}
+        body_xpos = {3: np.array([-9.848, 5.343, 1.224], dtype=float)}
+        backend = SimpleNamespace(
+            env=SimpleNamespace(
+                obj_body_id={"blue_container_h01_back_upper": 3},
+                sim=SimpleNamespace(data=SimpleNamespace(body_xpos=body_xpos)),
+            )
+        )
+
+        def extractor(*_args, **kwargs):
+            observed.update(kwargs)
+            body_xpos[3] = np.array([-9.15, 5.34, 0.20], dtype=float)
+            return {"success": True}
+
+        def floor_push(*_args, **_kwargs):
+            body_xpos[3] = np.array([4.122, -7.261, 0.20], dtype=float)
+            return {"success": True, "collision": False, "physical_contact_steps": 1}
+
+        module._extract_l4_container_to_floor = extractor
+        result = module.run_physical_floor_route(
+            backend,
+            competition_driver=object(),
+            source="input_2",
+            object_name="blue_container_h01_back_upper",
+            target_xy=np.array([4.872, -7.261]),
+            table_object_z=1.224,
+            _navigation_retract=lambda *_args, **_kwargs: {"success": True},
+            _floor_push=floor_push,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(observed["source"], "input_2")
+
+    def test_l4_open_arm_sweep_keeps_base_fixed_and_pushes_west(self):
+        module = load_module()
+        home = {
+            "right": np.array([-9.61, 5.51, 1.37]),
+            "left": np.array([-9.63, 5.16, 1.37]),
+        }
+
+        plan = module._l4_open_arm_sweep_plan(
+            home_gripper_positions=home,
+            stroke_distance_m=0.30,
+        )
+
+        np.testing.assert_allclose(plan["base_command"], [0.0, 0.0, 0.0])
+        self.assertEqual(
+            [phase["name"] for phase in plan["phases"]],
+            ["push", "retract", "settle"],
+        )
+        self.assertNotIn("right", plan["phases"][0]["targets"])
+        np.testing.assert_allclose(
+            plan["phases"][0]["targets"]["left"],
+            [-9.93, 5.16, 1.37],
+            atol=1e-9,
+        )
+        np.testing.assert_allclose(
+            plan["phases"][1]["targets"]["left"], home["left"], atol=1e-9
+        )
+        self.assertEqual(plan["phases"][2]["targets"], {})
+
+        tip_plan = module._l4_open_arm_sweep_plan(
+            home_gripper_positions=home,
+            stroke_distance_m=0.30,
+            tip_after_push=True,
+        )
+        self.assertEqual(
+            [phase["name"] for phase in tip_plan["phases"]],
+            ["push", "close", "tip_lift", "release", "settle"],
+        )
+        self.assertEqual(tip_plan["phases"][1]["gripper_value"], 1.0)
+        np.testing.assert_allclose(
+            tip_plan["phases"][2]["relative_targets"]["left"],
+            [0.0, 0.0, 0.15],
+            atol=1e-9,
+        )
+        self.assertEqual(tip_plan["phases"][3]["gripper_value"], -1.0)
+
+    def test_l4_second_sweep_realigns_base_with_container_y(self):
+        module = load_module()
+
+        target = module._l4_left_arm_realign_base_target(
+            current_base_xy=np.array([-8.9898, 5.1500]),
+            object_xy=np.array([-10.1711, 5.3357]),
+        )
+
+        np.testing.assert_allclose(target, [-8.9898, 5.3357], atol=1e-9)
+
+    def test_l4_initial_base_prepush_uses_safe_seventeen_centimeter_shift(self):
+        module = load_module()
+
+        profile = module._l4_initial_base_prepush_profile(
+            current_base_xy=np.array([-8.8499, 5.1500]),
+        )
+
+        np.testing.assert_allclose(
+            profile["target_base_xy"], [-9.0199, 5.1500], atol=1e-9
+        )
+        self.assertAlmostEqual(profile["waypoint_tolerance_m"], 0.005)
+
+    def test_l4_lower_release_stages_both_arms_outside_east_wall(self):
+        module = load_module()
+        homes = {
+            "right": np.array([-9.64, 4.71, 1.32]),
+            "left": np.array([-9.63, 4.37, 1.32]),
+        }
+
+        phases = module._l4_lower_bilateral_west_push_plan(
+            home_gripper_positions=homes,
+            object_position=np.array([-9.8566, 4.5620, 1.2140]),
+            east_standoff_m=0.42,
+            west_overshoot_m=0.35,
+            clearance_height_m=0.12,
+            contact_height_m=0.09,
+        )
+
+        self.assertEqual(
+            [phase["name"] for phase in phases],
+            [
+                "raise_both",
+                "stage_east",
+                "lower_both",
+                "push_west",
+            ],
+        )
+        np.testing.assert_allclose(
+            phases[1]["targets"]["right"],
+            [-9.4366, 4.71, 1.44],
+            atol=1e-9,
+        )
+        np.testing.assert_allclose(
+            phases[2]["targets"]["left"],
+            [-9.4366, 4.37, 1.304],
+            atol=1e-9,
+        )
+        np.testing.assert_allclose(
+            phases[3]["targets"]["right"],
+            [-10.2066, 4.71, 1.304],
+            atol=1e-9,
+        )
+
+    def test_l4_lower_recomputes_wall_contact_for_second_push(self):
+        module = load_module()
+        body_xpos = np.array([[0.0, 0.0, 1.2]], dtype=float)
+        backend = SimpleNamespace(
+            env=SimpleNamespace(
+                obj_body_id={"box": 0},
+                sim=SimpleNamespace(data=SimpleNamespace(body_xpos=body_xpos)),
+                has_judge_collision=False,
+            )
+        )
+        competition_driver = SimpleNamespace(_physical_hold={})
+        plan_calls = []
+
+        class Driver:
+            def capture_hold_targets(self, _backend):
+                return {}
+
+            def observe(self, _backend, _object_name):
+                return {
+                    "base_xy": np.zeros(2),
+                    "base_yaw": 0.0,
+                    "object_pos": body_xpos[0].copy(),
+                    "contacts": {"right": False, "left": False},
+                    "gripper_positions": {
+                        "right": np.zeros(3),
+                        "left": np.zeros(3),
+                    },
+                }
+
+            def step(self, _backend, **_kwargs):
+                if len(plan_calls) >= 2:
+                    body_xpos[0, 2] = 0.7
+                return {"collision": False}
+
+        def plan(**_kwargs):
+            plan_calls.append(body_xpos[0].copy())
+            return (
+                {
+                    "name": "push",
+                    "targets": {
+                        "right": np.array([1.0, 0.0, 0.0]),
+                        "left": np.array([1.0, 0.0, 0.0]),
+                    },
+                    "max_steps": 1,
+                },
+            )
+
+        with (
+            patch.object(module, "OfficialPhysicalCarryDriver", return_value=Driver()),
+            patch.object(
+                module,
+                "_l4_lower_bilateral_west_push_plan",
+                side_effect=plan,
+            ),
+            patch.object(module, "_object_all_robot_contacts", return_value=False),
+        ):
+            result = module._extract_l4_lower_container_to_floor(
+                backend,
+                competition_driver=competition_driver,
+                source="input_2",
+                object_name="box",
+                macro_count=1,
+                distance_m=0.1,
+                world_direction=np.array([0.0, -1.0]),
+                table_object_z=1.2,
+                stroke_m=0.1,
+                reset_m=0.1,
+                minimum_lift_m=0.1,
+                place_max_descent_m=0.1,
+            )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(len(plan_calls), 2)
 
     def test_slew_limited_command_bounds_each_control_dimension(self):
         module = load_module()
@@ -1333,6 +1958,22 @@ class InchwormTransportRunnerTests(unittest.TestCase):
 
         np.testing.assert_allclose(delta, [0.048, -0.08, 0.02])
 
+    def test_contact_reseat_moves_only_the_arm_that_lost_contact(self):
+        module = load_module()
+
+        deltas = module.contact_reseat_deltas(
+            {"right": False, "left": True},
+            {
+                "right": np.array([0.2, 0.0, 1.0]),
+                "left": np.array([-0.2, 0.0, 1.0]),
+            },
+            object_position=np.array([0.0, 0.0, 1.0]),
+            inward_delta=0.01,
+        )
+
+        self.assertGreater(np.linalg.norm(deltas["right"]), 0.0)
+        np.testing.assert_allclose(deltas["left"], np.zeros(2))
+
     def test_inchworm_defaults_strengthen_reset_arm_compensation(self):
         module = load_module()
 
@@ -1816,6 +2457,21 @@ class PhysicalPlacementRunnerTests(unittest.TestCase):
         self.assertFalse(result["success"])
         self.assertEqual(result["failure_stage"], "contact")
         self.assertNotIn(-1.0, [step["gripper_value"] for step in driver.steps])
+
+    def test_large_drop_to_stable_support_accepts_contact_loss_as_physical_setdown(self):
+        driver = FakePhysicalPlacementDriver(
+            object_heights=[1.0, 0.80, 0.80, 0.80, 0.80, 0.80],
+            contacts=[
+                {"right": True, "left": True},
+                {"right": False, "left": False},
+            ],
+        )
+
+        result = self.run_place(driver)
+
+        self.assertTrue(result["success"])
+        self.assertTrue(result["support_detected"])
+        self.assertNotIn(-1.0, [step["gripper_value"] for step in driver.steps[:2]])
 
     def test_descent_without_support_fails_without_release(self):
         driver = FakePhysicalPlacementDriver(

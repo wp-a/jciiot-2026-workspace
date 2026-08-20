@@ -86,6 +86,7 @@ class CompetitionFlowTests(unittest.TestCase):
         self.assertIn(("move", "input_5", False, "box_near"), driver.calls)
         self.assertIn(("move", "output_4", True, "box_near"), driver.calls)
 
+    @unittest.skip("historical floor-push route; forbidden by strict physical-carry policy")
     def test_l1_floor_push_grasp_never_activates_attachment(self):
         fake_grasp = types.ModuleType("robot_agent.skills.competition_grasp")
         fake_grasp.ScriptedGraspConfig = SimpleNamespace
@@ -132,6 +133,7 @@ class CompetitionFlowTests(unittest.TestCase):
         self.assertEqual(driver._physical_hold["object_z"], 1.32)
         self.assertAlmostEqual(driver._floor_push_table_object_z, 1.125)
 
+    @unittest.skip("historical floor-push route; forbidden by strict physical-carry policy")
     def test_l1_carrying_move_runs_floor_route_with_physical_target(self):
         calls = []
         transport = types.ModuleType("robot_agent.skills.competition_transport")
@@ -180,6 +182,7 @@ class CompetitionFlowTests(unittest.TestCase):
             [-0.166, -7.29],
         )
 
+    @unittest.skip("historical floor-push route; forbidden by strict physical-carry policy")
     def test_l1_place_accepts_only_successful_completed_floor_route(self):
         driver = object.__new__(self.module.OfficialCompetitionDriver)
         driver._transport_mode = "l1_floor_push"
@@ -397,7 +400,70 @@ class CompetitionFlowTests(unittest.TestCase):
 
         self.assertEqual(captured["object_names"], ["tote_upper"])
 
-    def test_official_l1_selects_physical_floor_push_transport_mode(self):
+    def test_official_task_routes_every_level_to_strict_physical_carry(self):
+        captured = {}
+
+        class Driver:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+            def rank_objects(self, _source, object_names):
+                return list(object_names)
+
+        class Flow:
+            def __init__(self, _driver, *, max_attempts):
+                captured["max_attempts"] = max_attempts
+
+            def run(self, **kwargs):
+                return {"success": False, **kwargs}
+
+        with (
+            patch.object(self.module, "OfficialCompetitionDriver", Driver),
+            patch.object(self.module, "CompetitionFlow", Flow),
+        ):
+            for level, source, target, object_name in (
+                ("L1", "input_5", "output_4", "container"),
+                ("L2", "input_6", "output_4", "green_tote_b01_upper"),
+                ("L3", "aux_input_1", "output_5", "blue_tote_b01_near_right"),
+                ("L4", "input_2", "output_5", "blue_container_h01_back_lower"),
+                ("L5", "input_1", "aux_output_1", "white_tote_b01_left_center"),
+            ):
+                captured.clear()
+                self.module.run_official_task(
+                    backend=object(),
+                    scene_context=object(),
+                    grid=object(),
+                    task={
+                        "level": level,
+                        "source": source,
+                        "target": target,
+                        "object": [object_name],
+                    },
+                )
+                self.assertEqual(
+                    captured["transport_mode"],
+                    "physical_carry",
+                    level,
+                )
+
+    def test_driver_rejects_shortcut_transport_modes(self):
+        with self.assertRaisesRegex(ValueError, "unsupported transport mode"):
+            self.module.OfficialCompetitionDriver(
+                backend=object(),
+                scene_context=object(),
+                grid=object(),
+                transport_mode="l1_floor_push",
+            )
+
+        with self.assertRaisesRegex(ValueError, "unsupported transport mode"):
+            self.module.OfficialCompetitionDriver(
+                backend=object(),
+                scene_context=object(),
+                grid=object(),
+                transport_mode="attachment",
+            )
+
+    def test_official_l1_selects_physical_carry_transport_mode(self):
         captured = {}
 
         class Driver:
@@ -432,9 +498,9 @@ class CompetitionFlowTests(unittest.TestCase):
             )
 
         self.assertTrue(result["success"])
-        self.assertEqual(captured["transport_mode"], "l1_floor_push")
+        self.assertEqual(captured["transport_mode"], "physical_carry")
 
-    def test_official_l2_keeps_verified_attachment_transport_mode(self):
+    def test_official_l2_selects_physical_carry_transport_mode(self):
         captured = {}
 
         class Driver:
@@ -469,7 +535,95 @@ class CompetitionFlowTests(unittest.TestCase):
             )
 
         self.assertTrue(result["success"])
-        self.assertEqual(captured["transport_mode"], "attachment")
+        self.assertEqual(captured["transport_mode"], "physical_carry")
+
+    def test_official_l3_selects_physical_carry_transport_mode(self):
+        captured = {}
+
+        class Driver:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+            def rank_objects(self, _source, object_names):
+                return list(object_names)
+
+        class Flow:
+            def __init__(self, _driver, *, max_attempts):
+                captured["max_attempts"] = max_attempts
+
+            def run(self, **kwargs):
+                return {"success": True, **kwargs}
+
+        task = {
+            "level": "L3",
+            "source": "aux_input_1",
+            "target": "output_5",
+            "object": [
+                "blue_tote_b01_far_right",
+                "blue_tote_b01_near_right",
+            ],
+        }
+        with (
+            patch.object(self.module, "OfficialCompetitionDriver", Driver),
+            patch.object(self.module, "CompetitionFlow", Flow),
+        ):
+            result = self.module.run_official_task(
+                backend=object(),
+                scene_context=object(),
+                grid=object(),
+                task=task,
+            )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(captured["transport_mode"], "physical_carry")
+        self.assertEqual(
+            result["object_names"],
+            ["blue_tote_b01_near_right"],
+        )
+
+    def test_official_l4_selects_physical_carry_transport_mode(self):
+        captured = {}
+
+        class Driver:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+            def rank_objects(self, _source, object_names):
+                return list(object_names)
+
+        class Flow:
+            def __init__(self, _driver, *, max_attempts):
+                captured["max_attempts"] = max_attempts
+
+            def run(self, **kwargs):
+                return {"success": True, **kwargs}
+
+        task = {
+            "level": "L4",
+            "source": "input_2",
+            "target": "output_5",
+            "object": [
+                "blue_container_h01_back_upper",
+                "blue_container_h01_back_lower",
+            ],
+        }
+        with (
+            patch.object(self.module, "OfficialCompetitionDriver", Driver),
+            patch.object(self.module, "CompetitionFlow", Flow),
+        ):
+            result = self.module.run_official_task(
+                backend=object(),
+                scene_context=object(),
+                grid=object(),
+                task=task,
+            )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(captured["transport_mode"], "physical_carry")
+        self.assertEqual(
+            result["object_names"],
+            ["blue_container_h01_back_lower"],
+        )
 
     def test_auxiliary_source_uses_verified_upper_crossing_corridor(self):
         detour = self.module.auxiliary_source_detour(
@@ -560,6 +714,7 @@ class CompetitionFlowTests(unittest.TestCase):
             )
         )
 
+    @unittest.skip("historical attachment route; forbidden by strict physical-carry policy")
     def test_carrying_move_targets_attachment_aligned_base_pose(self):
         calls = []
         driver = object.__new__(self.module.OfficialCompetitionDriver)
@@ -590,6 +745,7 @@ class CompetitionFlowTests(unittest.TestCase):
         self.assertTrue(success)
         self.assertEqual(calls, [("3.500000, -7.200000", True)])
 
+    @unittest.skip("historical attachment route; forbidden by strict physical-carry policy")
     def test_upper_green_tote_exits_along_the_outer_transport_corridor(self):
         calls = []
         driver = object.__new__(self.module.OfficialCompetitionDriver)
@@ -632,19 +788,19 @@ class CompetitionFlowTests(unittest.TestCase):
         )
         self.assertEqual(calls[-1][1], True)
 
-    def test_carrying_move_stops_without_verified_attachment(self):
+    def test_carrying_move_stops_without_verified_physical_hold(self):
         driver = object.__new__(self.module.OfficialCompetitionDriver)
-        driver._physical_hold = {"object_z": 1.1}
-        driver._transport_attached = False
-        driver._transport_attachment = None
+        driver._physical_hold = None
+        driver._transport_mode = "physical_carry"
         driver._move_to = lambda *_args, **_kwargs: self.fail(
-            "navigation must not run without the post-grasp attachment gate"
+            "navigation must not run without the physical hold gate"
         )
 
         success = driver.move("output_5", carrying=True, object_name="box")
 
         self.assertFalse(success)
 
+    @unittest.skip("historical attachment route; forbidden by strict physical-carry policy")
     def test_successful_grasp_keeps_legacy_crate_teleport_disabled(self):
         calls = []
         hold = {
@@ -761,6 +917,7 @@ class CompetitionFlowTests(unittest.TestCase):
         self.assertFalse(driver._transport_attached)
         self.assertIsNone(driver._physical_hold)
 
+    @unittest.skip("historical attachment route; forbidden by strict physical-carry policy")
     def test_attachment_activation_failure_stops_transport(self):
         fake_module = types.ModuleType("robot_agent.skills.competition_grasp")
         fake_module.ScriptedGraspConfig = SimpleNamespace
@@ -819,6 +976,7 @@ class CompetitionFlowTests(unittest.TestCase):
         self.assertIsNone(driver._physical_hold)
         self.assertIsNone(driver.backend._held_crate_name)
 
+    @unittest.skip("historical attachment route; forbidden by strict physical-carry policy")
     def test_place_enables_legacy_crate_handle_only_at_release_boundary(self):
         calls = []
         driver = object.__new__(self.module.OfficialCompetitionDriver)
@@ -859,6 +1017,7 @@ class CompetitionFlowTests(unittest.TestCase):
         self.assertIsNone(driver._physical_hold)
         self.assertFalse(driver._transport_attached)
 
+    @unittest.skip("historical attachment route; replaced by physical-place gate")
     def test_place_stops_without_verified_attachment(self):
         driver = object.__new__(self.module.OfficialCompetitionDriver)
         driver.backend = SimpleNamespace(
@@ -879,6 +1038,7 @@ class CompetitionFlowTests(unittest.TestCase):
 
         self.assertFalse(success)
 
+    @unittest.skip("historical attachment release route; forbidden by strict physical-carry policy")
     def test_unregistered_output_releases_scored_object_and_continues(self):
         calls = []
         cleared = []
@@ -948,6 +1108,7 @@ class CompetitionFlowTests(unittest.TestCase):
         self.assertIsNone(driver._physical_hold)
         self.assertFalse(driver._transport_attached)
 
+    @unittest.skip("historical attachment release route; forbidden by strict physical-carry policy")
     def test_unregistered_l4_output_does_not_use_sequential_release(self):
         backend = SimpleNamespace(
             env=SimpleNamespace(
@@ -978,6 +1139,7 @@ class CompetitionFlowTests(unittest.TestCase):
         self.assertIsNotNone(driver._physical_hold)
         self.assertTrue(driver._transport_attached)
 
+    @unittest.skip("historical attachment release route; forbidden by strict physical-carry policy")
     def test_unregistered_l4_output_accepts_verified_scoring_pose_hold(self):
         object_name = "blue_container_h01_back_upper"
         body_xpos = {7: np.array([4.800908, -8.005454, 1.38])}

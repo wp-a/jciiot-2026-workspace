@@ -1,27 +1,27 @@
 # JCIIOT 2026 Competition Submission Overlay
 
-This directory is the minimal code overlay for the official JCIIOT 2026
-baseline. It contains only files under the modification roots allowed by the
-official contestant manual.
+This directory is the exact code overlay for the official JCIIOT 2026
+baseline. Every file is inside a modification root allowed by the contestant
+manual. The release policy is strict physical carry: the official entrypoint
+rejects `attachment` and `l1_floor_push`, and a failed physical hold stops the
+workflow instead of silently falling back to a shortcut.
 
-> Status: fixed-public-scene baseline, not final. Its local trajectories score
-> 100/100 with the unmodified public scorer, but no BienData or organizer result
-> exists, no geometry-perturbation gate has passed, and the current private
-> transport-attachment reach must be replaced or explicitly cleared before
-> submission.
+This repository contains reproducible code and evidence, not an organizer
+score claim. Historical fixed-scene attachment and floor-contact results remain
+in the research archive as labelled comparisons; they are not the
+strict-physical release result.
 
 ## Locked baseline
 
 - Repository: `https://github.com/JCIIOT2026/JCIIOT2026.git`
 - Commit: `0dcdddf18a9e694569aa1433cdfc04eb097fed78`
-- Recommended runtime: Linux, Python 3.11, MuJoCo 3.9.0
-- Scored-path external checkpoints: none
-- External inference services during scored execution: none
-- Offline SOP image model: public, hash-locked, not bundled and not scored
+- Runtime: Linux, Python 3.11, MuJoCo 3.9.0, robosuite 1.5.2
+- Scored-path checkpoints or API calls: none
+- Offline SOP image model: public, hash-locked, not bundled and never loaded by the scored path
 
-The scored path uses the official environment, trajectory recorder and scorer.
-It does not modify `app.py`, `task_subprocess_runner.py`, `core/`,
-`environments/` or `knowledge/task_config.json`.
+The overlay does not modify `app.py`, `task_subprocess_runner.py`,
+`src/robot_agent/core/`, `src/robot_agent/environments/` or
+`knowledge/task_config.json`.
 
 ## Overlay contents
 
@@ -29,24 +29,25 @@ It does not modify `app.py`, `task_subprocess_runner.py`, `core/`,
 JCIIOT/src/robot_agent/skills/competition_grasp.py
 JCIIOT/src/robot_agent/skills/competition_navigation.py
 JCIIOT/src/robot_agent/skills/competition_task.py
+JCIIOT/src/robot_agent/skills/competition_transport.py
 JCIIOT/src/robot_agent/skills/sop_generator.py
 JCIIOT/src/robot_agent/skills/library.py
 JCIIOT/src/robot_agent/workflows/competition_flow.py
-JCIIOT/knowledge/generated_sop_l1.md
-JCIIOT/knowledge/generated_sop_l2.md
-JCIIOT/knowledge/generated_sop_l3.md
-JCIIOT/knowledge/generated_sop_l4.md
-JCIIOT/knowledge/generated_sop_l5.md
+JCIIOT/knowledge/generated_sop_l1.md ... generated_sop_l5.md
+```
+
+The runtime chain is:
+
+```text
+app.py -> task_subprocess_runner.py -> RobotAgent.run()
+       -> CompetitionTaskSkill -> CompetitionFlow
+       -> bilateral physical grasp/lift -> physical_carry -> physical_place
 ```
 
 `CompetitionTaskSkill` is registered first in the official skill library. The
-official `GATE_PLANNER=false` feature gate is used for scored execution, so the
-selected task runs through a deterministic, physically verified workflow
-instead of depending on a live LLM response.
+scored path does not depend on a live LLM response.
 
-## Materialize a candidate
-
-From the code-and-report package root:
+## Materialize the candidate
 
 ```bash
 git clone https://github.com/JCIIOT2026/JCIIOT2026.git official
@@ -57,96 +58,66 @@ bash scripts/materialize_submission.sh \
   --output "$PWD/candidate"
 ```
 
-The materializer rejects a different official commit and rejects files outside
-the allowed overlay boundary. Install the official repository exactly as
-described in its README and root `requirements.txt`; do not allow `mujoco` to
-float above the official `3.9.0` pin.
+The materializer rejects a different upstream commit and every file outside the
+allowed overlay boundary. Install dependencies from the official repository;
+do not float MuJoCo above the locked `3.9.0` version.
 
-## Run one headless scored task
+## Run and score one task
 
-The following command exercises the official `RobotAgent.run()` entry path,
-records the trajectory and invokes the unmodified official scorer. Task indices
-`0..4` correspond to L1..L5.
+Task indices `0..4` correspond to L1..L5. Replace `RELEASE_COMMIT` with the
+Git revision of this repository (for example, `git rev-parse HEAD`).
 
 ```bash
 python scripts/run_official_experiment.py \
   --candidate-root "$PWD/candidate" \
   --expected-official-commit 0dcdddf18a9e694569aa1433cdfc04eb097fed78 \
-  --workspace-commit 260839a7915c8327fcd2a2611b16053c582d5dc4 \
+  --workspace-commit RELEASE_COMMIT \
   --task-index 0 \
-  --seed 20260727 \
+  --seed 20260820 \
   --execution-mode agent \
   --trajectory "$PWD/results/trajectory-l1.json" \
   --output "$PWD/results/manifest-l1.json" \
   --required-score 10
 ```
 
-Repeat with required scores `15`, `20`, `25` and `30` for task indices
-`1`, `2`, `3` and `4`. A zero exit code requires full score, all required
-successful grasp events, zero collision frames, target distance below 0.8 m
-and a successful workflow result.
+Repeat with required scores `15`, `20`, `25` and `30` for task indices `1..4`.
+The command uses the unmodified official scorer. A zero exit code requires the
+requested score, all required physical `grasp_end` events, zero collision
+frames, a target distance below `0.8 m`, and a successful workflow result.
 
-On a graphical competition workstation, starting the official application and
-pressing **Execute** follows:
-
-```text
-app.py -> task_subprocess_runner.py -> RobotAgent.run()
-       -> CompetitionTaskSkill -> CompetitionFlow
-```
-
-The current baseline validation archive is separate from this overlay. Its root
-contains exactly the five published scene-named JSON trajectory files. Do not
-represent it as a final, hidden-set or organizer-verified prediction archive.
-
-## Regenerate SOP knowledge offline
-
-The five submitted `generated_sop_l*.md` files were generated from the original
-official DOCX files. The generator never reads the official hand-written
-`knowledge/sop*.md` files. It deterministically extracts DOCX text, parses the
-task-specific Prompt, checks the official Erratum, task configuration and
-semantic map, and uses a public VLM only for hash-addressed image evidence.
-
-Prepare the public model version in `config/sop-vlm-lock.json`, then run:
+## Tests and audits
 
 ```bash
-python candidate/JCIIOT/src/robot_agent/skills/sop_generator.py \
-  --app-root candidate/JCIIOT \
-  --output-dir results/sop_generated \
-  --use-vision \
-  --require-vision \
-  --local-vlm-model /path/to/Qwen3-VL-2B-Instruct \
-  --vision-model-id 'Qwen/Qwen3-VL-2B-Instruct@master+sha256:7de1838c87a5349b016c26a1c3f7d2bc400a3d485f95ef39a7059ffd734977a0' \
-  --local-vlm-device cuda:0
-```
-
-An OpenAI-compatible or Ollama vision endpoint can be used instead through
-`--vlm-base-url`, `--vlm-model` and `--vlm-api-type`. Do not put API keys in the
-repository; the key is read from the environment variable named by
-`--vlm-api-key-env`.
-
-The VLM evidence is advisory and cannot generate robot actions. The scored
-workflow does not load the VLM or its weights. Full generated Markdown,
-provenance, checksums and the fixed model runtime are documented in
-`sop_generated/`, `config/sop-vlm-lock.json` and the SOP experiment report.
-
-## Tests
-
-The Python unit and boundary tests are self-contained and do not require the
-simulator or the 1.7 GB official checkout:
-
-```bash
-PYTHONDONTWRITEBYTECODE=1 python3.13 -m pytest -q tests
-```
-
-The complete workspace audit additionally requires a Git checkout and the
-locked official repository at `vendor/JCIIOT2026`; reference checkouts may be
-absent:
-
-```bash
-bash scripts/check_workspace.sh
+PYTHONDONTWRITEBYTECODE=1 python3.11 -m pytest -q tests
+bash scripts/check_workspace.sh --require-private-remote
 git diff --check
 ```
 
-The final Linux validation used Python 3.11.15, MuJoCo 3.9.0 and robosuite
-1.5.2. See `TECHNICAL_REPORT.md` and the experiment reports included in the
-code-and-report package for results, evidence boundaries and limitations.
+The physical-carry HDF5 gate is run separately after a task-native dataset is
+materialized:
+
+```bash
+python scripts/audit_physical_carry_hdf5.py DATASET.hdf5 \
+  --output artifacts/data-audit/MANIFEST.json
+```
+
+It rejects wrong action/state widths, non-finite values, split leakage,
+missing event order, collisions, attachment calls and object-pose writes.
+Low-lift or low-translation trajectories are retained only as recovery data.
+
+## SOP knowledge
+
+The five `generated_sop_l*.md` files were generated from the official DOCX
+inputs. The generator does not read the official hand-written SOP Markdown. It
+cross-checks Prompt text, Erratum, immutable task configuration and semantic
+maps. Image evidence from the public Qwen3-VL-2B-Instruct model is advisory and
+cannot generate robot actions. Do not place model weights or API keys in this
+repository.
+
+## Evidence boundary
+
+Local unit tests and static boundary audits are reproducible in this workspace.
+At the time of this release, no new 8502 server run is presented as proof of
+five-level strict-physical success, and no BienData or organizer score is
+claimed. The corresponding limitations and historical baselines are recorded
+in `SUBMISSION_RELEASE_20260820.md` and `TECHNICAL_REPORT.md`.

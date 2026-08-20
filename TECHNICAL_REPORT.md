@@ -1,5 +1,13 @@
 # JCIIOT 2026 Technical Report
 
+> **Release note (2026-08-20):** This report contains historical baselines and
+> their evidence boundaries. The current submission release in
+> `SUBMISSION_RELEASE_20260820.md` routes every official level through
+> `physical_carry`, rejects `attachment` and `l1_floor_push`, and does not claim
+> a new five-level strict-physical score without a fresh server run. The older
+> `100/100` and L1 no-attachment numbers below are research comparisons, not
+> organizer-verified results for the current release.
+
 ## 1. Executive summary
 
 We implement a deterministic, verifiable mobile-manipulation system for the
@@ -9,7 +17,7 @@ object-family geometric grasp control, physically verified transport and
 stable multi-object placement. A language model is not allowed to issue base
 or joint commands on the scored path.
 
-On the published baseline commit
+In the historical published-baseline experiments on commit
 `0dcdddf18a9e694569aa1433cdfc04eb097fed78`, the attachment-based fixed-scene
 candidate scores with the unmodified public scorer
 `10/10`, `15/15`, `20/20`, `25/25` and `30/30`, for `100/100` total, with
@@ -48,7 +56,7 @@ Official task metadata and semantic map
   -> safe-corridor base navigation and heading alignment
   -> object-family two-arm geometric grasp
   -> bilateral contact and physical lift verification
-  -> L1: physical setdown and floor contact push; L2-L5 baseline: official attachment transport
+  -> strict release: physical setdown and continuous physical_carry for every level
   -> target-table release and multi-object slot assignment
   -> final state, collision and event verification
   -> published trajectory recorder and unmodified public scorer
@@ -92,13 +100,12 @@ extension is bounded by the remaining target distance.
 
 The controller preserves the upper-body posture while rotating the base,
 records every simulation frame and aborts immediately if the official backend
-reports a judged collision. The L2-L5 baseline uses a stowed arm posture and
-the official attachment mechanism so the payload remains synchronized with the
-base without writing final object poses directly. The separate L1 incumbent
-sets the object down and uses measured base-object contact to push it through
-the floor corridor; it does not activate transport attachment or write the
-object pose. Its navigation boundary is direct base-qpos, so it is not claimed
-as complete mobile-base actuator dynamics.
+reports a judged collision. The current strict release does not activate
+transport attachment or floor-push transport. It requires a verified physical
+hold before every carrying move and returns failure if contact, lift, or
+transport cannot be maintained. Historical attachment and floor-contact routes
+are described later only to make the comparison reproducible; they are not the
+active release route.
 
 ## 6. Geometric grasp controller
 

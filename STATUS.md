@@ -1,5 +1,15 @@
 # 当前状态
 
+## 2026-08-15 数据准入门禁
+
+已新增 `scripts/audit_physical_carry_hdf5.py`，严格物理 teacher 必须同时通过 20维动作、87维状态、事件顺序、seed级切分、连续双侧接触、抬升/位移和零 shortcut 审计。本地官方 HDF5 当前只是 Git LFS 指针，H2/H5b/H6 原始 payload 仍需从已登记远端路径同步后才能重新审计。该工具完成不代表服务器物理运输已成功。
+
+## 2026-08-14 严格物理运输切换
+
+已将官方 Agent 入口切换为 `physical_carry`。L1-L5 不再由入口选择地面推运或 `transport_attachment`；shortcut 模式在 driver 构造阶段直接拒绝。当前仅完成本地代码和单元测试验证，尚未在 8502 服务器完成新的五关物理实测，因此不能宣称五关真实抓取已成功。
+
+相关记录：`decisions/0005-strict-physical-carry-only.md`、`docs/12-data-and-algorithm-register.md`、`docs/plans/2026-08-14-strict-physical-carry.md`。
+
 更新时间：2026-08-05（Asia/Shanghai）
 
 ## 当前阶段

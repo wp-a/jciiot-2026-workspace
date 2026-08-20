@@ -407,6 +407,8 @@ def apply_object_grasp_profile(
             )
         config.site_below_offset = 0.035
         config.approach_tolerance = config.position_tolerance
+        if str(object_name).lower() == "blue_container_h01_back_lower":
+            config.approach_tolerance = 0.02
         config.close_steps = 80
         config.close_increment_interval = 1
         config.contact_settle_steps = config.close_steps + 1
@@ -417,6 +419,7 @@ def apply_object_grasp_profile(
         config.lift_hold_steps = 20
         config.lift_tolerance = 0.02
     elif "green_tote_b01" in str(object_name).lower():
+        config.approach_tolerance = 0.08
         config.face_insertion = 0.03
         config.close_follow_max_distance = 0.10
         if str(object_name).lower().endswith("_upper"):

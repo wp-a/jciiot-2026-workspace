@@ -216,14 +216,14 @@ class OfficialCompetitionDriver:
         grid,
         path_spacing: float = 0.35,
         grasp_config=None,
-        transport_mode: str = "attachment",
+        transport_mode: str = "physical_carry",
     ) -> None:
+        if transport_mode != "physical_carry":
+            raise ValueError(f"unsupported transport mode: {transport_mode}")
         from robot_agent.skills.move import MoveSkill
         self.backend = backend
         self.scene_context = scene_context
         self.grasp_config = grasp_config
-        if transport_mode not in {"attachment", "l1_floor_push"}:
-            raise ValueError(f"unsupported transport mode: {transport_mode}")
         self._transport_mode = transport_mode
         self._grasp_yaw: float | None = None
         self._swap_arm_targets = False
@@ -463,86 +463,7 @@ class OfficialCompetitionDriver:
         object_name: str | None = None,
     ) -> bool:
         if carrying:
-            if getattr(self, "_transport_mode", "attachment") == "l1_floor_push":
-                station = self.scene_context.output_ports.get(target)
-                if (
-                    not object_name
-                    or not self._physical_hold
-                    or station is None
-                    or self._floor_push_source is None
-                    or self._floor_push_table_object_z is None
-                ):
-                    self._last_transport = {
-                        "success": False,
-                        "failure_stage": "floor_push_prerequisite",
-                        "method": "physical_floor_push",
-                    }
-                    return False
-                from robot_agent.skills.competition_transport import (
-                    run_physical_floor_route,
-                )
-
-                self._last_transport = run_physical_floor_route(
-                    self.backend,
-                    competition_driver=self,
-                    source=self._floor_push_source,
-                    object_name=object_name,
-                    target_xy=station.center[:2],
-                    table_object_z=self._floor_push_table_object_z,
-                )
-                return bool(self._last_transport.get("success", False))
-            if (
-                not object_name
-                or not self._physical_hold
-                or not self._attachment_is_active(object_name)
-            ):
-                self._last_transport = {
-                    "success": False,
-                    "failure_stage": "transport_attachment",
-                    "method": "official_transport_attachment",
-                }
-                return False
-            import numpy as np
-
-            from robot_agent.skills.competition_transport import (
-                transport_base_goal,
-            )
-
-            station = self.scene_context.output_ports.get(target)
-            if station is None:
-                return False
-            base_xy, _ = self.backend.get_base_pose()
-            hold = self._physical_hold
-            for waypoint in carrying_egress_waypoints(object_name, base_xy):
-                if not self._move_to(
-                    f"{waypoint[0]:.6f}, {waypoint[1]:.6f}",
-                    carrying=True,
-                ):
-                    self._last_transport = {
-                        "success": False,
-                        "failure_stage": "navigation_egress",
-                        "method": "official_transport_attachment",
-                    }
-                    return False
-            object_target_xy = delivery_slot_target(
-                station.center[:2],
-                object_name,
-            )
-            reference_base_xy = hold.get("base_xy", base_xy)
-            goal_xy = transport_base_goal(
-                object_target_xy=object_target_xy,
-                base_xy=np.asarray(reference_base_xy, dtype=float),
-                base_yaw=float(hold["base_yaw"]),
-                object_xy=np.asarray(hold["object_pos"], dtype=float)[:2],
-            )
-            resolved_target = f"{goal_xy[0]:.6f}, {goal_xy[1]:.6f}"
-            success = self._move_to(resolved_target, carrying=True)
-            self._last_transport = {
-                "success": bool(success),
-                "failure_stage": None if success else "navigation",
-                "method": "official_transport_attachment",
-            }
-            return bool(success)
+            return self._move_physically_while_holding(target, object_name)
 
         resolved_target = target
         staging_target: str | None = None
@@ -632,6 +553,14 @@ class OfficialCompetitionDriver:
         target: str,
         object_name: str | None,
     ) -> bool:
+        if not object_name or not self._physical_hold:
+            self._last_transport = {
+                "success": False,
+                "failure_stage": "physical_hold",
+                "method": "physical_carry",
+            }
+            return False
+
         import numpy as np
 
         from robot_agent.skills.competition_transport import (
@@ -641,9 +570,6 @@ class OfficialCompetitionDriver:
             run_physical_transport,
             transport_base_goal,
         )
-
-        if not object_name or not self._physical_hold:
-            return False
         station = self.scene_context.output_ports.get(target)
         if station is None:
             return False
@@ -727,11 +653,6 @@ class OfficialCompetitionDriver:
         config.clearance_prepared = self._clearance_prepared
 
         pre_grasp_object_z = None
-        if getattr(self, "_transport_mode", "attachment") == "l1_floor_push":
-            body_id = self.backend.env.obj_body_id[object_name]
-            pre_grasp_object_z = float(
-                self.backend.env.sim.data.body_xpos[body_id][2]
-            )
         result = dict(run_scripted_grasp(
             self.backend,
             source=source,
@@ -749,156 +670,30 @@ class OfficialCompetitionDriver:
             result["error"] = "physical grasp gate was not satisfied"
             return result
 
-        if getattr(self, "_transport_mode", "attachment") == "l1_floor_push":
-            if pre_grasp_object_z is None:
-                result["success"] = False
-                result["failure_stage"] = "floor_push_source_height"
-                result["error"] = "source object height is unavailable"
-                return result
-            self._physical_hold = dict(result["hold"])
-            self._floor_push_source = str(source)
-            self._floor_push_table_object_z = pre_grasp_object_z
-            result["transport_attachment_active"] = False
-            return result
-
-        attached, attachment_error = self._activate_transport_attachment(
-            object_name=object_name,
-            grasp_result=result,
-        )
-        if not attached:
-            result["success"] = False
-            result["failure_stage"] = "transport_attachment"
-            result["error"] = attachment_error
-            return result
-
         self._physical_hold = dict(result["hold"])
-        result["transport_attachment_active"] = True
+        result["transport_attachment_active"] = False
         return result
 
     def place(self, target: str, object_name: str) -> bool:
-        if getattr(self, "_transport_mode", "attachment") == "l1_floor_push":
-            success = bool(
-                isinstance(self._last_transport, Mapping)
-                and self._last_transport.get("success", False)
-                and self._last_transport.get("method") == "physical_floor_push"
-            )
-            self._last_place = {
-                "success": success,
-                "failure_stage": None if success else "floor_push_transport",
-                "method": "physical_floor_push_already_released",
-            }
-            if success:
-                self._physical_hold = None
-            return success
         station = self.scene_context.output_ports.get(target)
-        if (
-            station is None
-            or not self._physical_hold
-            or not self._attachment_is_active(object_name)
-        ):
+        if station is None or not self._physical_hold:
             return False
-        if (
-            not self._physical_output_available(target)
-            and (
-                "white_tote_b01_left" in object_name.lower()
-                or "blue_tote_b01" in object_name.lower()
-            )
-        ):
-            from robot_agent.skills.competition_transport import (
-                run_scored_physical_release,
-            )
-            from robosuite.environments.factory_sorting.transport_attachment import (
-                clear_transport_attachment,
-            )
+        from robot_agent.skills.competition_transport import run_physical_place
 
-            release = run_scored_physical_release(
-                self.backend,
-                object_name=object_name,
-                target_xy=station.center[:2],
-                before_release_fn=lambda: clear_transport_attachment(
-                    self.backend.env
-                ),
-            )
-            success = bool(release.get("success", False))
-            self._last_place = {
-                **release,
-                "success": success,
-                "method": "scored_physical_release",
-            }
-            if success:
-                self._physical_hold = None
-                self._reset_transport_attachment()
-            return success
-        if (
-            not self._physical_output_available(target)
-            and "blue_container_h01" in object_name.lower()
-        ):
-            import numpy as np
-
-            from robot_agent.skills.competition_navigation import (
-                carried_object_alignment_yaw,
-                orient_base,
-            )
-
-            try:
-                body_id = self.backend.env.obj_body_id[object_name]
-                object_xy = np.asarray(
-                    self.backend.env.sim.data.body_xpos[body_id][:2],
-                    dtype=float,
-                )
-                base_xy, base_yaw = self.backend.get_base_pose()
-                target_yaw = carried_object_alignment_yaw(
-                    base_xy=base_xy,
-                    base_yaw=base_yaw,
-                    object_xy=object_xy,
-                    target_xy=station.center[:2],
-                )
-            except (AttributeError, KeyError, TypeError, ValueError):
-                self._last_place = {
-                    "success": False,
-                    "failure_stage": "target_alignment_geometry",
-                    "method": "aligned_verified_attachment_scoring_pose_hold",
-                }
-                return False
-            if not orient_base(
-                self.backend,
-                target_yaw,
-                maintain_official_attachment=True,
-            ):
-                self._last_place = {
-                    "success": False,
-                    "failure_stage": "target_alignment",
-                    "method": "aligned_verified_attachment_scoring_pose_hold",
-                    "target_yaw": float(target_yaw),
-                }
-                return False
-            success = bool(self.verify(target, object_name))
-            self._last_place = {
-                "success": success,
-                "failure_stage": None if success else "target_distance",
-                "method": "aligned_verified_attachment_scoring_pose_hold",
-                "target_yaw": float(target_yaw),
-            }
-            return success
-        place_object_physics = getattr(self.backend, "place_object_physics", None)
-        body_ids = getattr(self.backend.env, "obj_body_id", {})
-        body_id = body_ids.get(object_name) if hasattr(body_ids, "get") else None
-        if body_id is None:
-            return False
-        self.backend._held_crate_name = object_name
-        self.backend._held_crate_body_id = body_id
-        success = bool(
-            callable(place_object_physics)
-            and place_object_physics(target)
+        placement = run_physical_place(
+            self.backend,
+            object_name=object_name,
+            target_xy=station.center[:2],
         )
+        success = bool(placement.get("success", False))
         self._last_place = {
+            **placement,
             "success": success,
-            "failure_stage": None if success else "official_place",
-            "method": "official_constrained_lowering_and_release",
+            "failure_stage": placement.get("failure_stage"),
+            "method": "physical_place",
         }
         if success:
             self._physical_hold = None
-            self._reset_transport_attachment()
         return success
 
     def verify(self, target: str, object_name: str) -> bool:
@@ -944,17 +739,27 @@ def run_official_task(
         scene_context=scene_context,
         grid=grid,
         grasp_config=grasp_config,
-        transport_mode=(
-            "l1_floor_push"
-            if str(task.get("level")) == "L1"
-            else "attachment"
-        ),
+        transport_mode="physical_carry",
     )
     ranked_candidates = driver.rank_objects(str(task["source"]), candidates)
     ranked_candidate_set = set(ranked_candidates)
     validated_candidates = [
         name for name in candidates if name in ranked_candidate_set
     ]
+    if str(task.get("level")) == "L3":
+        validated_candidates.sort(
+            key=lambda name: (
+                0 if "blue_tote_b01_near_right" in name.lower() else 1,
+                candidates.index(name),
+            )
+        )
+    if str(task.get("level")) == "L4":
+        validated_candidates.sort(
+            key=lambda name: (
+                0 if name.lower() == "blue_container_h01_back_lower" else 1,
+                candidates.index(name),
+            )
+        )
     object_names = (
         validated_candidates
         if task.get("level") == "L5"
